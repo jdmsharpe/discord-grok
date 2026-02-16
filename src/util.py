@@ -5,12 +5,6 @@ from discord import Member, User
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
-# Models that support reasoning_effort parameter
-REASONING_MODELS = {
-    "grok-4-1-fast-reasoning",
-    "grok-4-fast-reasoning",
-}
-
 # All available Grok language models
 GROK_MODELS = [
     "grok-4-1-fast-reasoning",
@@ -45,7 +39,7 @@ class ChatCompletionParameters:
     system: str | None = None
     temperature: float | None = None
     top_p: float | None = None
-    max_tokens: int = 16384
+    max_tokens: int | None = None
     frequency_penalty: float | None = None
     presence_penalty: float | None = None
     seed: int | None = None

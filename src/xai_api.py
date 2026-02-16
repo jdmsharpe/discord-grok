@@ -25,7 +25,6 @@ from config.auth import GUILD_IDS, XAI_API_KEY
 from util import (
     ChatCompletionParameters,
     Conversation,
-    REASONING_MODELS,
     chunk_text,
     format_xai_error,
     truncate_text,
@@ -63,13 +62,13 @@ def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
             Embed(
                 title="Response" + (f" (Part {index})" if index > 1 else ""),
                 description=chunk,
-                color=Colour.default(),
+                color=Colour.dark_teal(),
             )
         )
 
 
 class xAIAPI(commands.Cog):
-    xai = SlashCommandGroup("xai", "xAI Grok commands", guild_ids=GUILD_IDS)
+    grok = SlashCommandGroup("grok", "xAI Grok commands", guild_ids=GUILD_IDS)
 
     def __init__(self, bot):
         """
@@ -313,7 +312,7 @@ class xAIAPI(commands.Cog):
         """
         self.logger.error(f"Error in event {event}: {args} {kwargs}", exc_info=True)
 
-    @xai.command(
+    @grok.command(
         name="check_permissions",
         description="Check if bot has necessary permissions in this channel",
     )
@@ -329,7 +328,7 @@ class xAIAPI(commands.Cog):
         else:
             await ctx.respond("Bot is missing necessary permissions in this channel.")
 
-    @xai.command(
+    @grok.command(
         name="converse",
         description="Starts a conversation with Grok.",
     )
@@ -365,7 +364,7 @@ class xAIAPI(commands.Cog):
     )
     @option(
         "max_tokens",
-        description="Maximum tokens in the response. (default: 16384)",
+        description="Maximum tokens in the response. (default: not set)",
         required=False,
         type=int,
     )
@@ -400,7 +399,7 @@ class xAIAPI(commands.Cog):
         model: str = "grok-4-1-fast-reasoning",
         system_prompt: str | None = None,
         attachment: Attachment | None = None,
-        max_tokens: int = 16384,
+        max_tokens: int | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
         frequency_penalty: float | None = None,
@@ -458,8 +457,9 @@ class xAIAPI(commands.Cog):
             create_kwargs = {
                 "model": model,
                 "messages": initial_messages,
-                "max_tokens": max_tokens,
             }
+            if max_tokens is not None:
+                create_kwargs["max_tokens"] = max_tokens
             if temperature is not None:
                 create_kwargs["temperature"] = temperature
             if top_p is not None:
@@ -468,9 +468,6 @@ class xAIAPI(commands.Cog):
                 create_kwargs["frequency_penalty"] = frequency_penalty
             if presence_penalty is not None:
                 create_kwargs["presence_penalty"] = presence_penalty
-            if model in REASONING_MODELS:
-                create_kwargs["reasoning_effort"] = "high"
-
             chat = self.client.chat.create(**create_kwargs)
             response = await chat.sample()
             response_text = response.content or "No response."
@@ -485,7 +482,8 @@ class xAIAPI(commands.Cog):
             description += f"**Model:** {model}\n"
             if system_prompt:
                 description += f"**System:** {truncate_text(system_prompt, 500)}\n"
-            description += f"**Max Tokens:** {max_tokens}\n"
+            if max_tokens is not None:
+                description += f"**Max Tokens:** {max_tokens}\n"
             if temperature is not None:
                 description += f"**Temperature:** {temperature}\n"
             if top_p is not None:
@@ -551,7 +549,7 @@ class xAIAPI(commands.Cog):
             if typing_task:
                 typing_task.cancel()
 
-    @xai.command(
+    @grok.command(
         name="image",
         description="Generates an image from a prompt.",
     )
@@ -616,7 +614,7 @@ class xAIAPI(commands.Cog):
                 embed = Embed(
                     title="Image Generation",
                     description=description,
-                    color=Colour.default(),
+                    color=Colour.dark_teal(),
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
@@ -635,7 +633,7 @@ class xAIAPI(commands.Cog):
                 embed = Embed(
                     title="Image Generation",
                     description=description,
-                    color=Colour.default(),
+                    color=Colour.dark_teal(),
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
@@ -652,7 +650,7 @@ class xAIAPI(commands.Cog):
                 embed=Embed(title="Error", description=description, color=Colour.red())
             )
 
-    @xai.command(
+    @grok.command(
         name="video",
         description="Generates a video from a prompt.",
     )
@@ -727,7 +725,7 @@ class xAIAPI(commands.Cog):
             embed = Embed(
                 title="Video Generation",
                 description=description,
-                color=Colour.default(),
+                color=Colour.dark_teal(),
             )
             await ctx.send_followup(embed=embed, file=File(data, "video.mp4"))
             self.logger.info("Successfully generated and sent video")
