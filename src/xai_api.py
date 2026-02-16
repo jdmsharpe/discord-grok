@@ -63,7 +63,7 @@ def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
             Embed(
                 title="Response" + (f" (Part {index})" if index > 1 else ""),
                 description=chunk,
-                color=Colour.dark_teal(),
+                color=Colour.default(),
             )
         )
 
@@ -616,7 +616,7 @@ class xAIAPI(commands.Cog):
                 embed = Embed(
                     title="Image Generation",
                     description=description,
-                    color=Colour.dark_teal(),
+                    color=Colour.default(),
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
@@ -635,7 +635,7 @@ class xAIAPI(commands.Cog):
                 embed = Embed(
                     title="Image Generation",
                     description=description,
-                    color=Colour.dark_teal(),
+                    color=Colour.default(),
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
@@ -727,7 +727,7 @@ class xAIAPI(commands.Cog):
             embed = Embed(
                 title="Video Generation",
                 description=description,
-                color=Colour.dark_teal(),
+                color=Colour.default(),
             )
             await ctx.send_followup(embed=embed, file=File(data, "video.mp4"))
             self.logger.info("Successfully generated and sent video")
