@@ -124,7 +124,7 @@ class TestChatCompletionParameters:
         assert params.system is None
         assert params.temperature is None
         assert params.top_p is None
-        assert params.max_tokens == 16384
+        assert params.max_tokens is None
         assert params.frequency_penalty is None
         assert params.presence_penalty is None
         assert params.seed is None
