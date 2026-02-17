@@ -121,7 +121,7 @@ docker-compose up -d
 2. Once a conversation is started, simply type messages in the same channel to continue the conversation
 3. Use the interactive buttons:
    - :arrows_counterclockwise: Regenerate the last response
-   - :play_pause: Pause/resume the conversation
+   - :play_or_pause_button: Pause/resume the conversation
    - :stop_button: End the conversation
 
 ## Requirements
