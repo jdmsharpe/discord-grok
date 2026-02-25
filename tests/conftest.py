@@ -30,6 +30,9 @@ def mock_xai_client():
         mock_response = MagicMock()
         mock_response.content = "Hello! How can I help you today?"
         mock_response.reasoning_content = ""
+        mock_response.citations = []
+        mock_response.server_side_tool_usage = {}
+        mock_response.tool_calls = []
         mock_response.id = "resp_01XFDUDYJgAACzvnptvVoYEL"
         mock_response.role = "assistant"
         mock_response.finish_reason = "stop"
