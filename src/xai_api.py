@@ -1,13 +1,14 @@
 import asyncio
 import io
 import logging
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 import aiohttp
 
 from xai_sdk import AsyncClient
 from xai_sdk.chat import image, system, user
 from xai_sdk.image import ImageAspectRatio
+from xai_sdk.tools import collections_search as collections_search_tool
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
 from discord import (
@@ -21,16 +22,23 @@ from discord.commands import OptionChoice, SlashCommandGroup, option
 from discord.ext import commands
 
 from button_view import ButtonView
-from config.auth import GUILD_IDS, XAI_API_KEY
+from config.auth import GUILD_IDS, XAI_API_KEY, XAI_COLLECTION_IDS
 from util import (
     ChatCompletionParameters,
     Conversation,
+    TOOL_BUILDERS,
+    TOOL_COLLECTIONS_SEARCH,
     chunk_text,
     format_xai_error,
     truncate_text,
 )
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+INLINE_CITATION_INCLUDE = "inline_citations"
+
+
+class ToolInfo(TypedDict):
+    citations: list[str]
 
 
 def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
@@ -65,6 +73,61 @@ def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
                 color=Colour.dark_teal(),
             )
         )
+
+
+def extract_tool_info(response: Any) -> ToolInfo:
+    """Extract citation links from an xAI SDK response."""
+    citations: list[str] = []
+    seen_citations: set[str] = set()
+
+    citations_value = getattr(response, "citations", [])
+    if citations_value is None:
+        citation_items: list[Any] = []
+    elif isinstance(citations_value, (list, tuple, set)):
+        citation_items = list(citations_value)
+    else:
+        try:
+            citation_items = list(citations_value)
+        except TypeError:
+            citation_items = []
+
+    for citation in citation_items:
+        citation_url = str(citation).strip()
+        if not citation_url or citation_url in seen_citations:
+            continue
+        seen_citations.add(citation_url)
+        citations.append(citation_url)
+
+    return {"citations": citations}
+
+
+def append_sources_embed(embeds: list[Embed], citations: list[str]) -> None:
+    """Append a compact sources embed for tool-backed responses."""
+    if not citations or len(embeds) >= 10:
+        return
+
+    source_lines: list[str] = []
+    for index, citation_url in enumerate(citations[:8], start=1):
+        if citation_url.startswith("http://") or citation_url.startswith("https://"):
+            citation_title = truncate_text(
+                citation_url.removeprefix("https://").removeprefix("http://"),
+                120,
+            )
+            source_lines.append(f"{index}. [{citation_title}]({citation_url})")
+        else:
+            source_lines.append(f"{index}. `{truncate_text(citation_url, 300)}`")
+
+    description = "\n".join(source_lines)
+    if len(description) > 4000:
+        description = truncate_text(description, 3990)
+
+    embeds.append(
+        Embed(
+            title="Sources",
+            description=description,
+            color=Colour.dark_teal(),
+        )
+    )
 
 
 class xAIAPI(commands.Cog):
@@ -134,6 +197,44 @@ class xAIAPI(commands.Cog):
                     new_loop.close()
         self._http_session = None
 
+    def resolve_selected_tools(
+        self, selected_tool_names: list[str]
+    ) -> tuple[list[Any], str | None]:
+        """Build tool payloads for the selected tool names."""
+        tools: list[Any] = []
+
+        for tool_name in selected_tool_names:
+            if tool_name == TOOL_COLLECTIONS_SEARCH:
+                if not XAI_COLLECTION_IDS:
+                    return (
+                        [],
+                        "Collections search requires XAI_COLLECTION_IDS to be set in your .env.",
+                    )
+                tools.append(
+                    collections_search_tool(collection_ids=XAI_COLLECTION_IDS.copy())
+                )
+                continue
+
+            tool_builder = TOOL_BUILDERS.get(tool_name)
+            if tool_builder is None:
+                continue
+            tools.append(tool_builder())
+
+        return tools, None
+
+    def _apply_tools_to_chat(self, chat: Any, tools: list[Any]) -> None:
+        """Apply the current tool set to a mutable xAI chat request."""
+        chat_proto = getattr(chat, "proto", None)
+        if chat_proto is None:
+            return
+
+        try:
+            chat_proto.ClearField("tools")
+            if tools:
+                chat_proto.tools.extend(tools)
+        except Exception as error:
+            self.logger.warning("Unable to update chat tools dynamically: %s", error)
+
     async def handle_new_message_in_conversation(
         self, message, conversation: Conversation
     ):
@@ -171,9 +272,11 @@ class xAIAPI(commands.Cog):
             if content_parts:
                 chat.append(user(*content_parts))
 
+            self._apply_tools_to_chat(chat, params.tools)
             response = await chat.sample()
             response_text = response.content or "No response."
             reasoning_text = response.reasoning_content or ""
+            tool_info = extract_tool_info(response)
 
             # Stop typing as soon as we have the response
             if typing_task:
@@ -185,6 +288,7 @@ class xAIAPI(commands.Cog):
 
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
+            append_sources_embed(embeds, tool_info["citations"])
 
             view = self.views.get(message.author)
             main_conversation_id = params.conversation_id
@@ -392,6 +496,30 @@ class xAIAPI(commands.Cog):
         required=False,
         type=float,
     )
+    @option(
+        "web_search",
+        description="Enable web search for real-time web results. (default: false)",
+        required=False,
+        type=bool,
+    )
+    @option(
+        "x_search",
+        description="Enable X search for posts and threads. (default: false)",
+        required=False,
+        type=bool,
+    )
+    @option(
+        "code_execution",
+        description="Enable code execution for calculations and analysis. (default: false)",
+        required=False,
+        type=bool,
+    )
+    @option(
+        "collections_search",
+        description="Enable collections search over XAI_COLLECTION_IDS. (default: false)",
+        required=False,
+        type=bool,
+    )
     async def converse(
         self,
         ctx: ApplicationContext,
@@ -404,6 +532,10 @@ class xAIAPI(commands.Cog):
         top_p: float | None = None,
         frequency_penalty: float | None = None,
         presence_penalty: float | None = None,
+        web_search: bool = False,
+        x_search: bool = False,
+        code_execution: bool = False,
+        collections_search: bool = False,
     ):
         """
         Creates a persistent conversation session with Grok.
@@ -441,6 +573,26 @@ class xAIAPI(commands.Cog):
 
         try:
             typing_task = asyncio.create_task(self.keep_typing(ctx.channel))
+            selected_tool_names: list[str] = []
+            if web_search:
+                selected_tool_names.append("web_search")
+            if x_search:
+                selected_tool_names.append("x_search")
+            if code_execution:
+                selected_tool_names.append("code_execution")
+            if collections_search:
+                selected_tool_names.append("collections_search")
+
+            tools, tool_error = self.resolve_selected_tools(selected_tool_names)
+            if tool_error:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description=tool_error,
+                        color=Colour.red(),
+                    )
+                )
+                return
 
             # Build initial messages
             initial_messages = []
@@ -457,6 +609,7 @@ class xAIAPI(commands.Cog):
             create_kwargs = {
                 "model": model,
                 "messages": initial_messages,
+                "include": [INLINE_CITATION_INCLUDE],
             }
             if max_tokens is not None:
                 create_kwargs["max_tokens"] = max_tokens
@@ -468,10 +621,13 @@ class xAIAPI(commands.Cog):
                 create_kwargs["frequency_penalty"] = frequency_penalty
             if presence_penalty is not None:
                 create_kwargs["presence_penalty"] = presence_penalty
+            if tools:
+                create_kwargs["tools"] = tools
             chat = self.client.chat.create(**create_kwargs)
             response = await chat.sample()
             response_text = response.content or "No response."
             reasoning_text = response.reasoning_content or ""
+            tool_info = extract_tool_info(response)
 
             # Add assistant response to chat history
             chat.append(response)
@@ -492,6 +648,8 @@ class xAIAPI(commands.Cog):
                 description += f"**Frequency Penalty:** {frequency_penalty}\n"
             if presence_penalty is not None:
                 description += f"**Presence Penalty:** {presence_penalty}\n"
+            if selected_tool_names:
+                description += f"**Tools:** {', '.join(selected_tool_names)}\n"
 
             embeds = [
                 Embed(
@@ -502,6 +660,7 @@ class xAIAPI(commands.Cog):
             ]
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
+            append_sources_embed(embeds, tool_info["citations"])
 
             if len(embeds) == 1:
                 await ctx.send_followup("No response generated.")
@@ -513,6 +672,7 @@ class xAIAPI(commands.Cog):
                 cog=self,
                 conversation_starter=ctx.author,
                 conversation_id=main_conversation_id,
+                initial_tools=tools,
             )
             self.views[ctx.author] = view
 
@@ -528,6 +688,7 @@ class xAIAPI(commands.Cog):
                 top_p=top_p,
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
+                tools=tools,
                 conversation_starter=ctx.author,
                 channel_id=ctx.channel.id,
                 conversation_id=main_conversation_id,

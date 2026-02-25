@@ -3,6 +3,27 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
+class TestExtractToolInfo:
+    """Tests for extract_tool_info helper."""
+
+    def test_extract_tool_info_deduplicates_citations(self):
+        from src.xai_api import extract_tool_info
+
+        response = MagicMock()
+        response.citations = [
+            "https://x.ai/news",
+            "https://x.ai/news",
+            "collections://collection_1/files/file_1",
+        ]
+
+        result = extract_tool_info(response)
+
+        assert result["citations"] == [
+            "https://x.ai/news",
+            "collections://collection_1/files/file_1",
+        ]
+
+
 class TestAppendReasoningEmbeds:
     """Tests for the append_reasoning_embeds helper."""
 
@@ -85,6 +106,9 @@ class TestXAIAPICog:
             mock_response = MagicMock()
             mock_response.content = "Test response"
             mock_response.reasoning_content = ""
+            mock_response.citations = []
+            mock_response.server_side_tool_usage = {}
+            mock_response.tool_calls = []
             mock_chat.sample = AsyncMock(return_value=mock_response)
             mock_chat.append = MagicMock()
             mock_chat.messages = []
@@ -132,6 +156,41 @@ class TestXAIAPICog:
         assert len(cog.conversations) == 1
 
     @pytest.mark.asyncio
+    async def test_converse_with_four_tools(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """Converse should pass the selected four tools to chat.create."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        with patch("src.xai_api.XAI_COLLECTION_IDS", ["collection_123"]):
+            await cog.converse.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="Tool test",
+                model="grok-4-1-fast-reasoning",
+                web_search=True,
+                x_search=True,
+                code_execution=True,
+                collections_search=True,
+            )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert "tools" in create_kwargs
+        assert len(create_kwargs["tools"]) == 4
+        tool_names = sorted(tool.WhichOneof("tool") for tool in create_kwargs["tools"])
+        assert tool_names == [
+            "code_execution",
+            "collections_search",
+            "web_search",
+            "x_search",
+        ]
+        assert create_kwargs["include"] == ["inline_citations"]
+
+    @pytest.mark.asyncio
     async def test_converse_prevents_duplicate_conversations(
         self, cog, mock_discord_context
     ):
@@ -155,6 +214,31 @@ class TestXAIAPICog:
         mock_discord_context.send_followup.assert_called()
         call_kwargs = mock_discord_context.send_followup.call_args[1]
         assert "already have an active conversation" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_resolve_selected_tools_collections_requires_ids(self, cog):
+        with patch("src.xai_api.XAI_COLLECTION_IDS", []):
+            tools, error = cog.resolve_selected_tools(["collections_search"])
+
+        assert tools == []
+        assert "XAI_COLLECTION_IDS" in error
+
+    @pytest.mark.asyncio
+    async def test_resolve_selected_tools_success(self, cog):
+        with patch("src.xai_api.XAI_COLLECTION_IDS", ["collection_abc"]):
+            tools, error = cog.resolve_selected_tools(
+                ["web_search", "x_search", "code_execution", "collections_search"]
+            )
+
+        assert error is None
+        assert len(tools) == 4
+        tool_names = sorted(tool.WhichOneof("tool") for tool in tools)
+        assert tool_names == [
+            "code_execution",
+            "collections_search",
+            "web_search",
+            "x_search",
+        ]
 
     @pytest.mark.asyncio
     async def test_on_message_ignores_bot_messages(self, cog, mock_discord_message):

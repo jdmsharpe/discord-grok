@@ -1,7 +1,8 @@
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 from discord import Member, User
+from xai_sdk.tools import code_execution, web_search, x_search
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
@@ -30,6 +31,39 @@ GROK_VIDEO_MODELS = [
     "grok-imagine-video",
 ]
 
+# Built-in tools supported by /grok converse.
+TOOL_WEB_SEARCH = "web_search"
+TOOL_X_SEARCH = "x_search"
+TOOL_CODE_EXECUTION = "code_execution"
+TOOL_COLLECTIONS_SEARCH = "collections_search"
+
+# Tool names available to the Discord UI.
+AVAILABLE_TOOLS = {
+    TOOL_WEB_SEARCH: "Web Search",
+    TOOL_X_SEARCH: "X Search",
+    TOOL_CODE_EXECUTION: "Code Execution",
+    TOOL_COLLECTIONS_SEARCH: "Collections Search",
+}
+
+# Tool builders that don't require runtime configuration.
+TOOL_BUILDERS: dict[str, Callable[[], Any]] = {
+    TOOL_WEB_SEARCH: web_search,
+    TOOL_X_SEARCH: x_search,
+    TOOL_CODE_EXECUTION: code_execution,
+}
+
+
+def resolve_tool_name(tool_config: Any) -> str | None:
+    """Resolve a tool proto to its tool name."""
+    which_oneof = getattr(tool_config, "WhichOneof", None)
+    if not callable(which_oneof):
+        return None
+
+    tool_name = which_oneof("tool")
+    if tool_name in AVAILABLE_TOOLS:
+        return tool_name
+    return None
+
 
 @dataclass
 class ChatCompletionParameters:
@@ -44,6 +78,7 @@ class ChatCompletionParameters:
     presence_penalty: float | None = None
     seed: int | None = None
     reasoning_effort: str | None = None
+    tools: list[Any] = field(default_factory=list)
     conversation_starter: Member | User | None = None
     conversation_id: int | None = None
     channel_id: int | None = None

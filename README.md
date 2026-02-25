@@ -23,6 +23,13 @@ All commands are grouped under `/grok` for clean namespacing.
 - Reasoning content displayed in spoilered embeds for reasoning-capable models
 - Customizable system prompts
 - Advanced parameters: temperature, top_p, frequency_penalty, presence_penalty, max_tokens
+- Built-in tool calling support for:
+  - `web_search`
+  - `x_search`
+  - `code_execution`
+  - `collections_search` (requires `XAI_COLLECTION_IDS`)
+- Conversation tool toggle dropdown to enable/disable tools mid-conversation
+- Source citations shown in a dedicated "Sources" embed when available
 
 ### Image Generation
 
@@ -85,6 +92,7 @@ All commands are grouped under `/grok` for clean namespacing.
    BOT_TOKEN=your_discord_bot_token
    GUILD_IDS=your_guild_id_1,your_guild_id_2
    XAI_API_KEY=your_xai_api_key
+   XAI_COLLECTION_IDS=optional_collection_id_1,optional_collection_id_2
    ```
 
 ### Running the Bot
@@ -126,7 +134,7 @@ docker-compose up -d
 
 ## Requirements
 
-- xai-sdk ~1.6
+- xai-sdk ~1.7
 - py-cord ~2.7
 - python-dotenv ~1.2
 

@@ -1,9 +1,17 @@
+from xai_sdk.tools import collections_search as collections_search_tool
+
 from src.util import (
     CHUNK_TEXT_SIZE,
     ChatCompletionParameters,
     Conversation,
+    TOOL_BUILDERS,
+    TOOL_CODE_EXECUTION,
+    TOOL_COLLECTIONS_SEARCH,
+    TOOL_WEB_SEARCH,
+    TOOL_X_SEARCH,
     chunk_text,
     format_xai_error,
+    resolve_tool_name,
     truncate_text,
 )
 
@@ -129,6 +137,7 @@ class TestChatCompletionParameters:
         assert params.presence_penalty is None
         assert params.seed is None
         assert params.reasoning_effort is None
+        assert params.tools == []
         assert params.paused is False
         assert params.conversation_id is None
         assert params.channel_id is None
@@ -145,6 +154,11 @@ class TestChatCompletionParameters:
             presence_penalty=0.3,
             seed=42,
             reasoning_effort="high",
+            tools=[
+                TOOL_BUILDERS[TOOL_WEB_SEARCH](),
+                TOOL_BUILDERS[TOOL_X_SEARCH](),
+                TOOL_BUILDERS[TOOL_CODE_EXECUTION](),
+            ],
         )
         assert params.model == "grok-4-1-fast-reasoning"
         assert params.system == "You are helpful."
@@ -155,6 +169,38 @@ class TestChatCompletionParameters:
         assert params.presence_penalty == 0.3
         assert params.seed == 42
         assert params.reasoning_effort == "high"
+        assert len(params.tools) == 3
+        assert resolve_tool_name(params.tools[0]) == TOOL_WEB_SEARCH
+        assert resolve_tool_name(params.tools[1]) == TOOL_X_SEARCH
+        assert resolve_tool_name(params.tools[2]) == TOOL_CODE_EXECUTION
+
+    def test_default_tools_isolated(self):
+        """Default tools list should not be shared across instances."""
+        params_one = ChatCompletionParameters(model="grok-3")
+        params_one.tools.append(TOOL_BUILDERS[TOOL_WEB_SEARCH]())
+
+        params_two = ChatCompletionParameters(model="grok-3")
+        assert params_two.tools == []
+        assert params_one.tools is not params_two.tools
+
+
+class TestToolHelpers:
+    """Tests for tool helper constants and functions."""
+
+    def test_resolve_tool_name_for_builtin_tools(self):
+        assert resolve_tool_name(TOOL_BUILDERS[TOOL_WEB_SEARCH]()) == TOOL_WEB_SEARCH
+        assert resolve_tool_name(TOOL_BUILDERS[TOOL_X_SEARCH]()) == TOOL_X_SEARCH
+        assert (
+            resolve_tool_name(TOOL_BUILDERS[TOOL_CODE_EXECUTION]())
+            == TOOL_CODE_EXECUTION
+        )
+
+    def test_resolve_tool_name_for_collections_search(self):
+        tool = collections_search_tool(collection_ids=["collection_123"])
+        assert resolve_tool_name(tool) == TOOL_COLLECTIONS_SEARCH
+
+    def test_resolve_tool_name_unknown(self):
+        assert resolve_tool_name(object()) is None
 
 
 class TestConversation:
