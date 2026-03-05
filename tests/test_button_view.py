@@ -23,7 +23,7 @@ class TestButtonView:
 
         conversation = MagicMock()
         conversation.params = MagicMock()
-        conversation.params.model = "grok-4-1-fast-reasoning"
+        conversation.params.model = "grok-4.20-experimental-beta"
         conversation.params.tools = []
         conversation.chat = MagicMock()
         cog.conversations[111] = conversation
