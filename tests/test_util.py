@@ -145,7 +145,7 @@ class TestChatCompletionParameters:
     def test_all_params_set(self):
         """All parameters should be stored correctly."""
         params = ChatCompletionParameters(
-            model="grok-4-1-fast-reasoning",
+            model="grok-4.20-experimental-beta",
             system="You are helpful.",
             temperature=0.7,
             top_p=0.9,
@@ -160,7 +160,7 @@ class TestChatCompletionParameters:
                 TOOL_BUILDERS[TOOL_CODE_EXECUTION](),
             ],
         )
-        assert params.model == "grok-4-1-fast-reasoning"
+        assert params.model == "grok-4.20-experimental-beta"
         assert params.system == "You are helpful."
         assert params.temperature == 0.7
         assert params.top_p == 0.9
