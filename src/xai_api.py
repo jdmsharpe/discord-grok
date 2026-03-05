@@ -718,7 +718,7 @@ class xAIAPI(commands.Cog):
     @option("prompt", description="Prompt", required=True, type=str)
     @option(
         "model",
-        description="Choose from the following image generation models. (default: Grok Imagine Image)",
+        description="Choose from the following image generation models. (default: Grok Imagine Image Pro)",
         required=False,
         type=str,
         choices=[
@@ -746,7 +746,7 @@ class xAIAPI(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
-        model: str = "grok-imagine-image",
+        model: str = "grok-imagine-image-pro",
         aspect_ratio: str = "1:1",
     ):
         """

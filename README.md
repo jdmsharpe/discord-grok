@@ -12,6 +12,7 @@ All commands are grouped under `/grok` for clean namespacing.
 
 - **`/grok converse`**: Have multi-turn conversations with Grok AI models
 - Support for multiple Grok models:
+  - Grok 4.20 Experimental Beta (Default)
   - Grok 4.1 Fast (Reasoning / Non-Reasoning)
   - Grok Code Fast 1
   - Grok 4 Fast (Reasoning / Non-Reasoning)
@@ -35,8 +36,8 @@ All commands are grouped under `/grok` for clean namespacing.
 
 - **`/grok image`**: Generate images from text prompts
 - Model options:
-  - Grok Imagine Image Pro
-  - Grok Imagine Image (Default)
+  - Grok Imagine Image Pro (Default)
+  - Grok Imagine Image
   - Grok 2 Image (1212)
 - Multiple aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
 
