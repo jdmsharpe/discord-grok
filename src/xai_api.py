@@ -445,9 +445,10 @@ class xAIAPI(commands.Cog):
     )
     @option(
         "model",
-        description="Choose from the following Grok models. (default: Grok 4.1 Fast Reasoning)",
+        description="Choose from the following Grok models. (default: Grok 4.20 Experimental Beta)",
         required=False,
         choices=[
+            OptionChoice(name="Grok 4.20 Experimental Beta", value="grok-4.20-experimental-beta"),
             OptionChoice(name="Grok 4.1 Fast Reasoning", value="grok-4-1-fast-reasoning"),
             OptionChoice(name="Grok 4.1 Fast Non-Reasoning", value="grok-4-1-fast-non-reasoning"),
             OptionChoice(name="Grok Code Fast 1", value="grok-code-fast-1"),
@@ -524,7 +525,7 @@ class xAIAPI(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
-        model: str = "grok-4-1-fast-reasoning",
+        model: str = "grok-4.20-experimental-beta",
         system_prompt: str | None = None,
         attachment: Attachment | None = None,
         max_tokens: int | None = None,
