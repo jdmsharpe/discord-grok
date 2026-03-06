@@ -171,7 +171,7 @@ class TestXAIAPICog:
                 cog,
                 ctx=mock_discord_context,
                 prompt="Tool test",
-                model="grok-4.20-experimental-beta",
+                model="grok-4.20-experimental-beta-reasoning-latest",
                 web_search=True,
                 x_search=True,
                 code_execution=True,
