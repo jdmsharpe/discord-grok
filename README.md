@@ -12,7 +12,7 @@ All commands are grouped under `/grok` for clean namespacing.
 
 - **`/grok converse`**: Have multi-turn conversations with Grok AI models
 - Support for multiple Grok models:
-  - Grok 4.20 Experimental Beta (Default)
+  - Grok 4.20 Experimental Beta Latest (Default)
   - Grok 4.1 Fast (Reasoning / Non-Reasoning)
   - Grok Code Fast 1
   - Grok 4 Fast (Reasoning / Non-Reasoning)
