@@ -31,7 +31,7 @@ GROK_VIDEO_MODELS = [
     "grok-imagine-video",
 ]
 
-# Built-in tools supported by /grok converse.
+# Built-in tools supported by /grok chat.
 TOOL_WEB_SEARCH = "web_search"
 TOOL_X_SEARCH = "x_search"
 TOOL_CODE_EXECUTION = "code_execution"

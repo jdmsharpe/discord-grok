@@ -10,7 +10,7 @@ All commands are grouped under `/grok` for clean namespacing.
 
 ### Text Generation
 
-- **`/grok converse`**: Have multi-turn conversations with Grok AI models
+- **`/grok chat`**: Have multi-turn conversations with Grok AI models
 - Support for multiple Grok models:
   - Grok 4.20 Experimental Beta Latest (Default)
   - Grok 4.1 Fast (Reasoning / Non-Reasoning)
@@ -126,7 +126,7 @@ docker-compose up -d
 
 ## Usage
 
-1. Use `/grok converse` to start a conversation with Grok
+1. Use `/grok chat` to start a conversation with Grok
 2. Once a conversation is started, simply type messages in the same channel to continue the conversation
 3. Use the interactive buttons:
    - :arrows_counterclockwise: Regenerate the last response

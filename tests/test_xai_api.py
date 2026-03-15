@@ -131,10 +131,10 @@ class TestXAIAPICog:
         assert cog.views == {}
 
     @pytest.mark.asyncio
-    async def test_converse_creates_conversation(
+    async def test_chat_creates_conversation(
         self, cog, mock_discord_context, mock_xai_client
     ):
-        """Test that converse command creates a conversation entry."""
+        """Test that chat command creates a conversation entry."""
         cog.client = mock_xai_client
 
         # Mock the channel typing context manager
@@ -142,7 +142,7 @@ class TestXAIAPICog:
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
 
-        await cog.converse.callback(
+        await cog.chat.callback(
             cog,
             ctx=mock_discord_context,
             prompt="Hello Grok!",
@@ -156,10 +156,10 @@ class TestXAIAPICog:
         assert len(cog.conversations) == 1
 
     @pytest.mark.asyncio
-    async def test_converse_with_four_tools(
+    async def test_chat_with_four_tools(
         self, cog, mock_discord_context, mock_xai_client
     ):
-        """Converse should pass the selected four tools to chat.create."""
+        """Chat should pass the selected four tools to chat.create."""
         cog.client = mock_xai_client
 
         mock_discord_context.channel.typing = MagicMock()
@@ -167,7 +167,7 @@ class TestXAIAPICog:
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
 
         with patch("src.xai_api.XAI_COLLECTION_IDS", ["collection_123"]):
-            await cog.converse.callback(
+            await cog.chat.callback(
                 cog,
                 ctx=mock_discord_context,
                 prompt="Tool test",
@@ -191,7 +191,7 @@ class TestXAIAPICog:
         assert create_kwargs["include"] == ["inline_citations"]
 
     @pytest.mark.asyncio
-    async def test_converse_prevents_duplicate_conversations(
+    async def test_chat_prevents_duplicate_conversations(
         self, cog, mock_discord_context
     ):
         """Test that users can't start multiple conversations in the same channel."""
@@ -205,7 +205,7 @@ class TestXAIAPICog:
         )
         cog.conversations[123] = Conversation(params=existing_params, chat=MagicMock())
 
-        await cog.converse.callback(
+        await cog.chat.callback(
             cog,
             ctx=mock_discord_context,
             prompt="Hello again!",
