@@ -12,13 +12,13 @@ All commands are grouped under `/grok` for clean namespacing.
 
 - **`/grok chat`**: Have multi-turn conversations with Grok AI models
 - Support for multiple Grok models:
-  - Grok 4.20 Experimental Beta Latest (Default)
+  - Grok 4.20 Multi-Agent Beta
+  - Grok 4.20 Beta (Reasoning (Default) / Non-Reasoning)
   - Grok 4.1 Fast (Reasoning / Non-Reasoning)
   - Grok Code Fast 1
   - Grok 4 Fast (Reasoning / Non-Reasoning)
   - Grok 4 (0709)
   - Grok 3, Grok 3 Mini
-  - Grok 2 Vision (1212)
 - Persistent conversation history with interactive button controls (regenerate, pause/resume, stop)
 - Multimodal support (text + images: JPEG, PNG, GIF, WEBP)
 - Reasoning content displayed in spoilered embeds for reasoning-capable models
@@ -38,7 +38,6 @@ All commands are grouped under `/grok` for clean namespacing.
 - Model options:
   - Grok Imagine Image Pro (Default)
   - Grok Imagine Image
-  - Grok 2 Image (1212)
 - Multiple aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
 
 ### Video Generation
