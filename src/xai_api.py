@@ -445,10 +445,12 @@ class xAIAPI(commands.Cog):
     )
     @option(
         "model",
-        description="Choose from the following Grok models. (default: Grok 4.20 Experimental Beta Reasoning)",
+        description="Choose from the following Grok models. (default: Grok 4.20 Beta Reasoning)",
         required=False,
         choices=[
-            OptionChoice(name="Grok 4.20 Experimental Beta Reasoning", value="grok-4.20-experimental-beta-reasoning-latest"),
+            OptionChoice(name="Grok 4.20 Multi-Agent Beta", value="grok-4.20-multi-agent-beta-latest"),
+            OptionChoice(name="Grok 4.20 Beta Reasoning", value="grok-4.20-beta-latest-reasoning"),
+            OptionChoice(name="Grok 4.20 Beta Non-Reasoning", value="grok-4.20-beta-latest-non-reasoning"),
             OptionChoice(name="Grok 4.1 Fast Reasoning", value="grok-4-1-fast-reasoning"),
             OptionChoice(name="Grok 4.1 Fast Non-Reasoning", value="grok-4-1-fast-non-reasoning"),
             OptionChoice(name="Grok Code Fast 1", value="grok-code-fast-1"),
@@ -457,7 +459,6 @@ class xAIAPI(commands.Cog):
             OptionChoice(name="Grok 4 (0709)", value="grok-4-0709"),
             OptionChoice(name="Grok 3 Mini", value="grok-3-mini"),
             OptionChoice(name="Grok 3", value="grok-3"),
-            OptionChoice(name="Grok 2 Vision (1212)", value="grok-2-vision-1212"),
         ],
         type=str,
     )
@@ -525,7 +526,7 @@ class xAIAPI(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
-        model: str = "grok-4.20-experimental-beta-reasoning-latest",
+        model: str = "grok-4.20-beta-latest-reasoning",
         system_prompt: str | None = None,
         attachment: Attachment | None = None,
         max_tokens: int | None = None,
@@ -724,7 +725,6 @@ class xAIAPI(commands.Cog):
         choices=[
             OptionChoice(name="Grok Imagine Image Pro", value="grok-imagine-image-pro"),
             OptionChoice(name="Grok Imagine Image", value="grok-imagine-image"),
-            OptionChoice(name="Grok 2 Image (1212)", value="grok-2-image-1212"),
         ],
     )
     @option(

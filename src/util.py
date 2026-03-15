@@ -8,6 +8,9 @@ CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
 # All available Grok language models
 GROK_MODELS = [
+    "grok-4.20-multi-agent-beta-latest",
+    "grok-4.20-beta-latest-reasoning",
+    "grok-4.20-beta-latest-non-reasoning",
     "grok-4-1-fast-reasoning",
     "grok-4-1-fast-non-reasoning",
     "grok-code-fast-1",
@@ -16,14 +19,12 @@ GROK_MODELS = [
     "grok-4-0709",
     "grok-3-mini",
     "grok-3",
-    "grok-2-vision-1212",
 ]
 
 # Image generation models
 GROK_IMAGE_MODELS = [
     "grok-imagine-image-pro",
     "grok-imagine-image",
-    "grok-2-image-1212",
 ]
 
 # Video generation models
