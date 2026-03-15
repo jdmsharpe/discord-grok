@@ -5,7 +5,7 @@
 This is a Discord bot built on Pycord 2.x that integrates xAI's SDK to provide:
 
 - Multi-turn conversational chat with Grok
-- Built-in tool calling in `/grok converse`
+- Built-in tool calling in `/grok chat`
 - Image generation
 - Video generation
 
@@ -63,7 +63,7 @@ Main Discord cog class: `xAIAPI`
 
 - Command group: `/grok`
 - Commands:
-  - `/grok converse`
+  - `/grok chat`
   - `/grok image`
   - `/grok video`
   - `/grok check_permissions`
@@ -74,7 +74,7 @@ Main Discord cog class: `xAIAPI`
 - Tool flow:
   - `resolve_selected_tools()` builds tool protos
   - `collections_search` is guarded by `XAI_COLLECTION_IDS`
-  - `chat.create(... include=["inline_citations"])` enabled in converse
+  - `chat.create(... include=["inline_citations"])` enabled in chat
   - `extract_tool_info()` reads `response.citations`
   - `append_sources_embed()` renders source URLs (including `collections://...` citations)
   - `_apply_tools_to_chat()` updates tools dynamically when toggled mid-conversation
@@ -92,7 +92,7 @@ UI controls attached to conversation messages:
   - Calls cog-level `resolve_selected_tools()`
   - Applies tool changes immediately to the active chat object
 
-## `/grok converse` Parameters
+## `/grok chat` Parameters
 
 Current parameter count: 13
 
@@ -118,8 +118,8 @@ Current parameter count: 13
 - `append_reasoning_embeds()`:
   - Truncates reasoning at ~3,500 chars and wraps in spoiler tags
 - Prompt truncation in command metadata embeds:
-  - Converse prompt: 2,000 chars
-  - Converse system prompt: 500 chars
+  - Chat prompt: 2,000 chars
+  - Chat system prompt: 500 chars
   - Image prompt: 2,000 chars
   - Video prompt: 2,000 chars
 - Sources embed:
@@ -136,7 +136,7 @@ Current parameter count: 13
 | `XAI_API_KEY`         | xAI API key for chat/image/video                                     |
 | `XAI_COLLECTION_IDS`  | Optional comma-separated collection IDs used by `collections_search` |
 
-If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, converse returns a user-facing error.
+If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a user-facing error.
 
 ## Test Commands
 
@@ -148,7 +148,7 @@ Windows PowerShell:
 
 ## Notes for Future Changes
 
-- Tool support currently targets exactly four built-in tools for `/grok converse`.
+- Tool support currently targets exactly four built-in tools for `/grok chat`.
 - If new tools are added:
   - Update `src/util.py` constants/builders
   - Update `resolve_selected_tools()` in `src/xai_api.py`
