@@ -184,6 +184,32 @@ class TestChatCompletionParameters:
         assert params_one.tools is not params_two.tools
 
 
+class TestModelLists:
+    """Tests for the model list constants."""
+
+    def test_grok_models_contains_new_4_20_models(self):
+        """GROK_MODELS should include all grok-4.20 beta models."""
+        from src.util import GROK_MODELS
+
+        assert "grok-4.20-multi-agent-beta-latest" in GROK_MODELS
+        assert "grok-4.20-beta-latest-reasoning" in GROK_MODELS
+        assert "grok-4.20-beta-latest-non-reasoning" in GROK_MODELS
+
+    def test_grok_models_no_deprecated(self):
+        """GROK_MODELS should not contain deprecated grok-2 models."""
+        from src.util import GROK_MODELS
+
+        for model in GROK_MODELS:
+            assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
+
+    def test_grok_image_models_no_deprecated(self):
+        """GROK_IMAGE_MODELS should not contain deprecated grok-2 models."""
+        from src.util import GROK_IMAGE_MODELS
+
+        for model in GROK_IMAGE_MODELS:
+            assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
+
+
 class TestToolHelpers:
     """Tests for tool helper constants and functions."""
 

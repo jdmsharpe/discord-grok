@@ -241,6 +241,55 @@ class TestXAIAPICog:
         ]
 
     @pytest.mark.asyncio
+    async def test_chat_default_model(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """Chat should use grok-4.20-beta-latest-reasoning as the default model."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello!",
+        )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert create_kwargs["model"] == "grok-4.20-beta-latest-reasoning"
+
+    def test_chat_model_choices_match_grok_models(self, cog):
+        """Chat command model choices should match GROK_MODELS."""
+        from src.util import GROK_MODELS
+
+        # Extract choice values from the chat command's model option
+        chat_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "chat"
+        )
+
+        model_option = next(
+            opt for opt in chat_cmd.options if opt.name == "model"
+        )
+        choice_values = sorted(c.value for c in model_option.choices)
+        assert choice_values == sorted(GROK_MODELS)
+
+    def test_image_model_choices_match_grok_image_models(self, cog):
+        """Image command model choices should match GROK_IMAGE_MODELS."""
+        from src.util import GROK_IMAGE_MODELS
+
+        image_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
+        )
+
+        model_option = next(
+            opt for opt in image_cmd.options if opt.name == "model"
+        )
+        choice_values = sorted(c.value for c in model_option.choices)
+        assert choice_values == sorted(GROK_IMAGE_MODELS)
+
+    @pytest.mark.asyncio
     async def test_on_message_ignores_bot_messages(self, cog, mock_discord_message):
         """Test that the bot ignores its own messages."""
         mock_discord_message.author = cog.bot.user
