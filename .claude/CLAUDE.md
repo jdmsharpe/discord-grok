@@ -56,6 +56,7 @@ discord-grok/
   - `TTS_VOICES` list of available TTS voice IDs (`eve`, `ara`, `rex`, `sal`, `leo`)
   - `PENALTY_SUPPORTED_MODELS` set of models that accept `frequency_penalty`/`presence_penalty` (non-reasoning only)
   - `REASONING_EFFORT_MODELS` set of models that accept `reasoning_effort` (`grok-3-mini` only)
+  - `MULTI_AGENT_MODELS` set of models that support `agent_count` and have special constraints (no `max_tokens`)
 - Pricing
   - `MODEL_PRICING` maps chat models to `(input_cost, output_cost)` per million tokens
   - `IMAGE_PRICING` maps image models to flat per-image cost
@@ -99,6 +100,11 @@ Main Discord cog class: `xAIAPI`
   - `extract_tool_info()` reads `response.citations`
   - `append_sources_embed()` renders source URLs (including `collections://...` citations)
   - `_apply_tools_to_chat()` updates tools dynamically when toggled mid-conversation
+- Multi-agent flow:
+  - Multi-agent models automatically get `use_encrypted_content=True` for proper multi-turn context
+  - `agent_count` (4 or 16) is passed to `chat.create()` when specified
+  - `max_tokens` is rejected for multi-agent models (not supported by the API)
+  - `agent_count` is rejected for non-multi-agent models
 - File attachment flow (xAI Files API):
   - Non-image attachments are downloaded from Discord and uploaded via `client.files.upload()`
   - `_upload_file_attachment()` handles download + upload, enforces 48 MB limit
@@ -137,30 +143,31 @@ UI controls attached to conversation messages:
 
 ## `/grok chat` Parameters
 
-Current parameter count: 22
+Current parameter count: 23
 
 1. `prompt`
 2. `system_prompt`
 3. `model`
 4. `attachment` (images passed inline, other files uploaded via xAI Files API)
-5. `max_tokens`
+5. `max_tokens` (not supported by multi-agent models)
 6. `temperature`
 7. `top_p`
 8. `frequency_penalty`
 9. `presence_penalty`
 10. `reasoning_effort` (choices: low, high; only `grok-3-mini`; default: not set)
-11. `web_search`
-12. `x_search`
-13. `code_execution`
-14. `collections_search`
-15. `x_search_images` (enable image understanding in X posts)
-16. `x_search_videos` (enable video understanding in X posts)
-17. `x_search_date_range` (comma-separated ISO8601 start,end date filter e.g. YYYY-MM-DD,YYYY-MM-DD)
-18. `x_search_allowed_handles` (comma-separated, max 10, mutually exclusive with excluded)
-19. `x_search_excluded_handles` (comma-separated, max 10, mutually exclusive with allowed)
-20. `web_search_allowed_domains` (comma-separated, max 5, mutually exclusive with excluded)
-21. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
-22. `web_search_images` (enable image understanding during web browsing)
+11. `agent_count` (choices: 4, 16; only multi-agent models; default: not set)
+12. `web_search`
+13. `x_search`
+14. `code_execution`
+15. `collections_search`
+16. `x_search_images` (enable image understanding in X posts)
+17. `x_search_videos` (enable video understanding in X posts)
+18. `x_search_date_range` (comma-separated ISO8601 start,end date filter e.g. YYYY-MM-DD,YYYY-MM-DD)
+19. `x_search_allowed_handles` (comma-separated, max 10, mutually exclusive with excluded)
+20. `x_search_excluded_handles` (comma-separated, max 10, mutually exclusive with allowed)
+21. `web_search_allowed_domains` (comma-separated, max 5, mutually exclusive with excluded)
+22. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
+23. `web_search_images` (enable image understanding during web browsing)
 
 ## `/grok tts` Parameters
 

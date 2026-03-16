@@ -24,7 +24,8 @@ All commands are grouped under `/grok` for clean namespacing.
 - File attachment support via xAI Files API (PDF, TXT, CSV, code files, etc., up to 48 MB)
 - Reasoning content displayed in spoilered embeds for reasoning-capable models
 - Customizable system prompts
-- Advanced parameters: temperature, top_p, frequency_penalty, presence_penalty, reasoning_effort, max_tokens
+- Multi-agent research mode with configurable agent count (4 for quick, 16 for deep research)
+- Advanced parameters: temperature, top_p, frequency_penalty, presence_penalty, reasoning_effort, agent_count, max_tokens
 - Built-in tool calling support for:
   - `web_search`
   - `x_search`
