@@ -20,6 +20,9 @@ The conversation path supports optional tool calling with:
 
 ```text
 discord-grok/
+├── .github/
+│   └── workflows/
+│       └── main.yml          # CI workflow (pytest)
 ├── src/
 │   ├── bot.py               # Main bot entry point
 │   ├── xai_api.py           # xAI Discord cog and slash commands
@@ -33,8 +36,10 @@ discord-grok/
 │   ├── test_button_view.py
 │   └── test_util.py
 ├── .env.example
+├── .gitattributes
 ├── requirements.txt
 ├── Dockerfile
+├── Dockerfile.test
 ├── docker-compose.yaml
 └── README.md
 ```
@@ -43,6 +48,10 @@ discord-grok/
 
 ### `src/util.py`
 
+- Model lists
+  - `GROK_MODELS` list of all chat model IDs
+  - `GROK_IMAGE_MODELS` list of image generation model IDs
+  - `GROK_VIDEO_MODELS` list of video generation model IDs
 - Pricing
   - `MODEL_PRICING` maps chat models to `(input_cost, output_cost)` per million tokens
   - `IMAGE_PRICING` maps image models to flat per-image cost
@@ -56,6 +65,7 @@ discord-grok/
   - Tracks `file_ids` for xAI Files API cleanup on conversation end
 - Tool helpers
   - `TOOL_WEB_SEARCH`, `TOOL_X_SEARCH`, `TOOL_CODE_EXECUTION`, `TOOL_COLLECTIONS_SEARCH`
+  - `AVAILABLE_TOOLS` maps tool constants to display names for the Discord UI
   - `TOOL_BUILDERS` for tool proto creation
   - `resolve_tool_name()` to map tool protos back to canonical names
 - Text helpers

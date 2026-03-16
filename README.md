@@ -21,6 +21,7 @@ All commands are grouped under `/grok` for clean namespacing.
   - Grok 3, Grok 3 Mini
 - Persistent conversation history with interactive button controls (regenerate, pause/resume, stop)
 - Multimodal support (text + images: JPEG, PNG, GIF, WEBP)
+- File attachment support via xAI Files API (PDF, TXT, CSV, code files, etc., up to 48 MB)
 - Reasoning content displayed in spoilered embeds for reasoning-capable models
 - Customizable system prompts
 - Advanced parameters: temperature, top_p, frequency_penalty, presence_penalty, max_tokens
@@ -30,7 +31,11 @@ All commands are grouped under `/grok` for clean namespacing.
   - `code_execution`
   - `collections_search` (requires `XAI_COLLECTION_IDS`)
 - Conversation tool toggle dropdown to enable/disable tools mid-conversation
+- Tool configuration options:
+  - X search: date range filter, allowed/excluded handles, image and video understanding
+  - Web search: allowed/excluded domains, image understanding
 - Source citations shown in a dedicated "Sources" embed when available
+- Per-request cost and token usage tracking with daily cumulative cost per user
 
 ### Image Generation
 
@@ -135,9 +140,10 @@ docker-compose up -d
 
 ## Requirements
 
-- xai-sdk ~1.7
+- aiohttp ~3.13
 - py-cord ~2.7
 - python-dotenv ~1.2
+- xai-sdk ~1.8
 
 ## License
 
