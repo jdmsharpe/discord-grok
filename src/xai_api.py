@@ -742,7 +742,7 @@ class xAIAPI(commands.Cog):
             OptionChoice(name="2:3", value="2:3"),
         ],
     )
-    async def generate_image(
+    async def image(
         self,
         ctx: ApplicationContext,
         prompt: str,
@@ -846,7 +846,7 @@ class xAIAPI(commands.Cog):
             OptionChoice(name="480p", value="480p"),
         ],
     )
-    async def generate_video(
+    async def video(
         self,
         ctx: ApplicationContext,
         prompt: str,
