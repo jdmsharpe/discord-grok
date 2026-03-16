@@ -218,6 +218,28 @@ class TestModelLists:
             assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
 
 
+class TestReasoningConstants:
+    """Tests for reasoning model constants."""
+
+    def test_penalty_supported_models_are_non_reasoning(self):
+        from src.util import PENALTY_SUPPORTED_MODELS
+
+        for model in PENALTY_SUPPORTED_MODELS:
+            assert "non-reasoning" in model
+
+    def test_reasoning_models_excluded_from_penalty_support(self):
+        from src.util import PENALTY_SUPPORTED_MODELS
+
+        assert "grok-3-mini" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-3" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-4-0709" not in PENALTY_SUPPORTED_MODELS
+
+    def test_reasoning_effort_models(self):
+        from src.util import REASONING_EFFORT_MODELS
+
+        assert REASONING_EFFORT_MODELS == {"grok-3-mini"}
+
+
 class TestTTSConstants:
     """Tests for TTS-related constants."""
 
