@@ -1,6 +1,7 @@
 import asyncio
 import io
 import logging
+from datetime import datetime
 from typing import Any, TypedDict, cast
 
 import aiohttp
@@ -28,6 +29,8 @@ from util import (
     Conversation,
     TOOL_BUILDERS,
     TOOL_COLLECTIONS_SEARCH,
+    TOOL_WEB_SEARCH,
+    TOOL_X_SEARCH,
     chunk_text,
     format_xai_error,
     truncate_text,
@@ -248,7 +251,10 @@ class xAIAPI(commands.Cog):
         self._http_session = None
 
     def resolve_selected_tools(
-        self, selected_tool_names: list[str]
+        self,
+        selected_tool_names: list[str],
+        x_search_kwargs: dict[str, Any] | None = None,
+        web_search_kwargs: dict[str, Any] | None = None,
     ) -> tuple[list[Any], str | None]:
         """Build tool payloads for the selected tool names."""
         tools: list[Any] = []
@@ -263,6 +269,18 @@ class xAIAPI(commands.Cog):
                 tools.append(
                     collections_search_tool(collection_ids=XAI_COLLECTION_IDS.copy())
                 )
+                continue
+
+            if tool_name == TOOL_X_SEARCH and x_search_kwargs:
+                tool_builder = TOOL_BUILDERS.get(tool_name)
+                if tool_builder is not None:
+                    tools.append(tool_builder(**x_search_kwargs))
+                continue
+
+            if tool_name == TOOL_WEB_SEARCH and web_search_kwargs:
+                tool_builder = TOOL_BUILDERS.get(tool_name)
+                if tool_builder is not None:
+                    tools.append(tool_builder(**web_search_kwargs))
                 continue
 
             tool_builder = TOOL_BUILDERS.get(tool_name)
@@ -577,6 +595,60 @@ class xAIAPI(commands.Cog):
         required=False,
         type=bool,
     )
+    @option(
+        "x_search_images",
+        description="Allow X search to analyze images in posts. (default: false)",
+        required=False,
+        type=bool,
+    )
+    @option(
+        "x_search_videos",
+        description="Allow X search to analyze videos in posts. (default: false)",
+        required=False,
+        type=bool,
+    )
+    @option(
+        "x_search_from_date",
+        description="X search start date in YYYY-MM-DD format. (default: not set)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "x_search_to_date",
+        description="X search end date in YYYY-MM-DD format. (default: not set)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "x_search_allowed_handles",
+        description="Only search posts from these X handles, comma-separated, max 10. (default: not set)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "x_search_excluded_handles",
+        description="Exclude posts from these X handles, comma-separated, max 10. (default: not set)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "web_search_allowed_domains",
+        description="Only search these domains, comma-separated, max 5. (default: not set)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "web_search_excluded_domains",
+        description="Exclude these domains from search, comma-separated, max 5. (default: not set)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "web_search_images",
+        description="Allow web search to analyze images on web pages. (default: false)",
+        required=False,
+        type=bool,
+    )
     async def chat(
         self,
         ctx: ApplicationContext,
@@ -593,6 +665,15 @@ class xAIAPI(commands.Cog):
         x_search: bool = False,
         code_execution: bool = False,
         collections_search: bool = False,
+        x_search_images: bool = False,
+        x_search_videos: bool = False,
+        x_search_from_date: str | None = None,
+        x_search_to_date: str | None = None,
+        x_search_allowed_handles: str | None = None,
+        x_search_excluded_handles: str | None = None,
+        web_search_allowed_domains: str | None = None,
+        web_search_excluded_domains: str | None = None,
+        web_search_images: bool = False,
     ):
         """
         Creates a persistent conversation session with Grok.
@@ -630,6 +711,109 @@ class xAIAPI(commands.Cog):
 
         try:
             typing_task = asyncio.create_task(self.keep_typing(ctx.channel))
+
+            # Build x_search kwargs from optional parameters
+            x_search_kw: dict[str, Any] = {}
+            if x_search_images:
+                x_search_kw["enable_image_understanding"] = True
+            if x_search_videos:
+                x_search_kw["enable_video_understanding"] = True
+            if x_search_from_date:
+                try:
+                    x_search_kw["from_date"] = datetime.fromisoformat(x_search_from_date)
+                except ValueError:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description="Invalid `x_search_from_date` format. Use YYYY-MM-DD.",
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+            if x_search_to_date:
+                try:
+                    x_search_kw["to_date"] = datetime.fromisoformat(x_search_to_date)
+                except ValueError:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description="Invalid `x_search_to_date` format. Use YYYY-MM-DD.",
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+            if x_search_allowed_handles and x_search_excluded_handles:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description="Cannot use both `x_search_allowed_handles` and `x_search_excluded_handles` at the same time.",
+                        color=Colour.red(),
+                    )
+                )
+                return
+            if x_search_allowed_handles:
+                handles = [h.strip().lstrip("@") for h in x_search_allowed_handles.split(",") if h.strip()]
+                if len(handles) > 10:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description="`x_search_allowed_handles` supports a maximum of 10 handles.",
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+                x_search_kw["allowed_x_handles"] = handles
+            if x_search_excluded_handles:
+                handles = [h.strip().lstrip("@") for h in x_search_excluded_handles.split(",") if h.strip()]
+                if len(handles) > 10:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description="`x_search_excluded_handles` supports a maximum of 10 handles.",
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+                x_search_kw["excluded_x_handles"] = handles
+
+            # Build web_search kwargs from optional parameters
+            web_search_kw: dict[str, Any] = {}
+            if web_search_images:
+                web_search_kw["enable_image_understanding"] = True
+            if web_search_allowed_domains and web_search_excluded_domains:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description="Cannot use both `web_search_allowed_domains` and `web_search_excluded_domains` at the same time.",
+                        color=Colour.red(),
+                    )
+                )
+                return
+            if web_search_allowed_domains:
+                domains = [d.strip() for d in web_search_allowed_domains.split(",") if d.strip()]
+                if len(domains) > 5:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description="`web_search_allowed_domains` supports a maximum of 5 domains.",
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+                web_search_kw["allowed_domains"] = domains
+            if web_search_excluded_domains:
+                domains = [d.strip() for d in web_search_excluded_domains.split(",") if d.strip()]
+                if len(domains) > 5:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description="`web_search_excluded_domains` supports a maximum of 5 domains.",
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+                web_search_kw["excluded_domains"] = domains
+
             selected_tool_names: list[str] = []
             if web_search:
                 selected_tool_names.append("web_search")
@@ -640,7 +824,11 @@ class xAIAPI(commands.Cog):
             if collections_search:
                 selected_tool_names.append("collections_search")
 
-            tools, tool_error = self.resolve_selected_tools(selected_tool_names)
+            tools, tool_error = self.resolve_selected_tools(
+                selected_tool_names,
+                x_search_kwargs=x_search_kw,
+                web_search_kwargs=web_search_kw,
+            )
             if tool_error:
                 await ctx.send_followup(
                     embed=Embed(
@@ -753,6 +941,8 @@ class xAIAPI(commands.Cog):
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
                 tools=tools,
+                x_search_kwargs=x_search_kw,
+                web_search_kwargs=web_search_kw,
                 conversation_starter=ctx.author,
                 channel_id=ctx.channel.id,
                 conversation_id=main_conversation_id,

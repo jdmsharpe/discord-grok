@@ -99,7 +99,11 @@ class ButtonView(View):
                     value for value in raw_values if value in AVAILABLE_TOOLS
                 ]
 
-        tools, error_message = self.cog.resolve_selected_tools(selected_values)
+        tools, error_message = self.cog.resolve_selected_tools(
+            selected_values,
+            x_search_kwargs=conversation.params.x_search_kwargs,
+            web_search_kwargs=conversation.params.web_search_kwargs,
+        )
         if error_message:
             await interaction.response.send_message(error_message, ephemeral=True)
             return

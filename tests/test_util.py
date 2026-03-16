@@ -138,6 +138,8 @@ class TestChatCompletionParameters:
         assert params.seed is None
         assert params.reasoning_effort is None
         assert params.tools == []
+        assert params.x_search_kwargs == {}
+        assert params.web_search_kwargs == {}
         assert params.paused is False
         assert params.conversation_id is None
         assert params.channel_id is None

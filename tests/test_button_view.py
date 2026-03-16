@@ -25,6 +25,8 @@ class TestButtonView:
         conversation.params = MagicMock()
         conversation.params.model = "grok-4.20-beta-latest-reasoning"
         conversation.params.tools = []
+        conversation.params.x_search_kwargs = {"enable_image_understanding": True}
+        conversation.params.web_search_kwargs = {"allowed_domains": ["example.com"]}
         conversation.chat = MagicMock()
         cog.conversations[111] = conversation
         return cog
@@ -91,6 +93,11 @@ class TestButtonView:
 
         conversation = cog.conversations[111]
         assert conversation.params.tools == selected_tools
+        cog.resolve_selected_tools.assert_called_once_with(
+            ["web_search", "code_execution"],
+            x_search_kwargs={"enable_image_understanding": True},
+            web_search_kwargs={"allowed_domains": ["example.com"]},
+        )
         cog._apply_tools_to_chat.assert_called_once_with(
             conversation.chat, selected_tools
         )
