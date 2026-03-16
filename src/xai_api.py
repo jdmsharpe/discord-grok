@@ -469,15 +469,13 @@ class xAIAPI(commands.Cog):
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
 
-            # Auxiliary embeds (sources, cost) sent separately so view stays with response
-            aux_embeds: list[Embed] = []
-            append_sources_embed(aux_embeds, tool_info["citations"])
+            append_sources_embed(embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
                 message.author.id, params.model, input_tokens, output_tokens
             )
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
-                    aux_embeds, params.model, input_tokens, output_tokens, daily_cost, reasoning_tokens
+                    embeds, params.model, input_tokens, output_tokens, daily_cost, reasoning_tokens
                 )
 
             view = self.views.get(message.author)
@@ -508,9 +506,6 @@ class xAIAPI(commands.Cog):
                         main_conversation_id
                     )
                     self.last_view_messages[message.author] = reply_message
-
-                if aux_embeds:
-                    await message.channel.send(embeds=aux_embeds)
 
                 self.logger.debug("Replied with generated response.")
             else:
@@ -1105,15 +1100,13 @@ class xAIAPI(commands.Cog):
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
 
-            # Auxiliary embeds (sources, cost) sent separately so view stays with response
-            aux_embeds: list[Embed] = []
-            append_sources_embed(aux_embeds, tool_info["citations"])
+            append_sources_embed(embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
                 ctx.author.id, model, input_tokens, output_tokens
             )
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
-                    aux_embeds, model, input_tokens, output_tokens, daily_cost, reasoning_tokens
+                    embeds, model, input_tokens, output_tokens, daily_cost, reasoning_tokens
                 )
 
             if len(embeds) == 1:
@@ -1137,9 +1130,6 @@ class xAIAPI(commands.Cog):
             msg = await ctx.send_followup(embeds=embeds, view=view)
             self.message_to_conversation_id[msg.id] = main_conversation_id
             self.last_view_messages[ctx.author] = msg
-
-            if aux_embeds:
-                await ctx.send_followup(embeds=aux_embeds)
 
             # Store the conversation
             params = ChatCompletionParameters(
