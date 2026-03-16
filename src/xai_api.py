@@ -27,6 +27,8 @@ from config.auth import GUILD_IDS, SHOW_COST_EMBEDS, XAI_API_KEY, XAI_COLLECTION
 from util import (
     ChatCompletionParameters,
     Conversation,
+    PENALTY_SUPPORTED_MODELS,
+    REASONING_EFFORT_MODELS,
     TOOL_BUILDERS,
     TOOL_COLLECTIONS_SEARCH,
     TOOL_WEB_SEARCH,
@@ -146,14 +148,16 @@ def append_pricing_embed(
     input_tokens: int,
     output_tokens: int,
     daily_cost: float,
+    reasoning_tokens: int = 0,
 ) -> None:
     """Append a compact pricing embed showing cost and token usage."""
     if not SHOW_COST_EMBEDS:
         return
     cost = calculate_cost(model, input_tokens, output_tokens)
-    description = (
-        f"{model} · ${cost:.4f} · {input_tokens:,} in / {output_tokens:,} out · daily ${daily_cost:.2f}"
-    )
+    token_info = f"{input_tokens:,} in / {output_tokens:,} out"
+    if reasoning_tokens > 0:
+        token_info += f" ({reasoning_tokens:,} reasoning)"
+    description = f"{model} · ${cost:.4f} · {token_info} · daily ${daily_cost:.2f}"
     embeds.append(Embed(description=description, color=Colour.dark_teal()))
 
 
@@ -433,6 +437,7 @@ class xAIAPI(commands.Cog):
             usage = getattr(response, "usage", None)
             input_tokens = getattr(usage, "prompt_tokens", 0) or 0
             output_tokens = getattr(usage, "completion_tokens", 0) or 0
+            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
 
             # Stop typing as soon as we have the response
             if typing_task:
@@ -449,7 +454,7 @@ class xAIAPI(commands.Cog):
                 message.author.id, params.model, input_tokens, output_tokens
             )
             append_pricing_embed(
-                embeds, params.model, input_tokens, output_tokens, daily_cost
+                embeds, params.model, input_tokens, output_tokens, daily_cost, reasoning_tokens
             )
 
             view = self.views.get(message.author)
@@ -650,15 +655,25 @@ class xAIAPI(commands.Cog):
     )
     @option(
         "frequency_penalty",
-        description="(Advanced) Controls how much the model should repeat itself. (default: not set)",
+        description="(Advanced) Repetition control. Non-reasoning models only. (default: not set)",
         required=False,
         type=float,
     )
     @option(
         "presence_penalty",
-        description="(Advanced) Controls how much the model should talk about new topics. (default: not set)",
+        description="(Advanced) New topic control. Non-reasoning models only. (default: not set)",
         required=False,
         type=float,
+    )
+    @option(
+        "reasoning_effort",
+        description="(Advanced) How hard the model thinks. grok-3-mini only. (default: not set)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="Low", value="low"),
+            OptionChoice(name="High", value="high"),
+        ],
     )
     @option(
         "web_search",
@@ -744,6 +759,7 @@ class xAIAPI(commands.Cog):
         top_p: float | None = None,
         frequency_penalty: float | None = None,
         presence_penalty: float | None = None,
+        reasoning_effort: str | None = None,
         web_search: bool = False,
         x_search: bool = False,
         code_execution: bool = False,
@@ -793,6 +809,33 @@ class xAIAPI(commands.Cog):
 
         try:
             typing_task = asyncio.create_task(self.keep_typing(ctx.channel))
+
+            # Validate reasoning model parameter constraints
+            if (frequency_penalty is not None or presence_penalty is not None) and model not in PENALTY_SUPPORTED_MODELS:
+                unsupported = []
+                if frequency_penalty is not None:
+                    unsupported.append("`frequency_penalty`")
+                if presence_penalty is not None:
+                    unsupported.append("`presence_penalty`")
+                param_list = " and ".join(unsupported)
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description=f"{param_list} {'is' if len(unsupported) == 1 else 'are'} not supported by reasoning model `{model}`.",
+                        color=Colour.red(),
+                    )
+                )
+                return
+
+            if reasoning_effort is not None and model not in REASONING_EFFORT_MODELS:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description=f"`reasoning_effort` is only supported by {', '.join(f'`{m}`' for m in sorted(REASONING_EFFORT_MODELS))}.",
+                        color=Colour.red(),
+                    )
+                )
+                return
 
             # Build x_search kwargs from optional parameters
             x_search_kw: dict[str, Any] = {}
@@ -954,6 +997,8 @@ class xAIAPI(commands.Cog):
                 create_kwargs["frequency_penalty"] = frequency_penalty
             if presence_penalty is not None:
                 create_kwargs["presence_penalty"] = presence_penalty
+            if reasoning_effort is not None:
+                create_kwargs["reasoning_effort"] = reasoning_effort
             if tools:
                 create_kwargs["tools"] = tools
             chat = self.client.chat.create(**create_kwargs)
@@ -966,6 +1011,7 @@ class xAIAPI(commands.Cog):
             usage = getattr(response, "usage", None)
             input_tokens = getattr(usage, "prompt_tokens", 0) or 0
             output_tokens = getattr(usage, "completion_tokens", 0) or 0
+            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
 
             # Add assistant response to chat history
             chat.append(response)
@@ -986,6 +1032,8 @@ class xAIAPI(commands.Cog):
                 description += f"**Frequency Penalty:** {frequency_penalty}\n"
             if presence_penalty is not None:
                 description += f"**Presence Penalty:** {presence_penalty}\n"
+            if reasoning_effort is not None:
+                description += f"**Reasoning Effort:** {reasoning_effort}\n"
             if selected_tool_names:
                 description += f"**Tools:** {', '.join(selected_tool_names)}\n"
 
@@ -1003,7 +1051,7 @@ class xAIAPI(commands.Cog):
                 ctx.author.id, model, input_tokens, output_tokens
             )
             append_pricing_embed(
-                embeds, model, input_tokens, output_tokens, daily_cost
+                embeds, model, input_tokens, output_tokens, daily_cost, reasoning_tokens
             )
 
             if len(embeds) == 1:
@@ -1032,6 +1080,7 @@ class xAIAPI(commands.Cog):
                 top_p=top_p,
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
+                reasoning_effort=reasoning_effort,
                 tools=tools,
                 x_search_kwargs=x_search_kw,
                 web_search_kwargs=web_search_kw,

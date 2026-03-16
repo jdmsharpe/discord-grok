@@ -21,6 +21,21 @@ class TestAppendPricingEmbed:
         assert "daily $1.50" in desc
         assert embeds[0].colour == Colour.dark_teal()
 
+    def test_append_pricing_embed_with_reasoning_tokens(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3-mini", 1000, 500, 1.50, reasoning_tokens=200)
+        assert len(embeds) == 1
+        assert "200 reasoning" in embeds[0].description
+
+    def test_append_pricing_embed_hides_zero_reasoning_tokens(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, reasoning_tokens=0)
+        assert "reasoning" not in embeds[0].description
+
     def test_append_generation_pricing_embed(self):
         from src.xai_api import append_generation_pricing_embed
 
@@ -360,6 +375,113 @@ class TestXAIAPICog:
 
         create_kwargs = mock_xai_client.chat.create.call_args.kwargs
         assert create_kwargs["model"] == "grok-4.20-beta-latest-reasoning"
+
+    @pytest.mark.asyncio
+    async def test_chat_rejects_frequency_penalty_on_reasoning_model(
+        self, cog, mock_discord_context
+    ):
+        """frequency_penalty should be rejected for reasoning models."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-3-mini",
+            frequency_penalty=0.5,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "frequency_penalty" in call_kwargs["embed"].description
+        assert "not supported" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_chat_rejects_both_penalties_on_reasoning_model(
+        self, cog, mock_discord_context
+    ):
+        """Both penalties set on a reasoning model should be rejected."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-3",
+            frequency_penalty=0.5,
+            presence_penalty=0.3,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "frequency_penalty" in call_kwargs["embed"].description
+        assert "presence_penalty" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_chat_allows_penalty_on_non_reasoning_model(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """Penalty params should be allowed for non-reasoning models."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-4.20-beta-latest-non-reasoning",
+            frequency_penalty=0.5,
+        )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert create_kwargs["frequency_penalty"] == 0.5
+
+    @pytest.mark.asyncio
+    async def test_chat_rejects_reasoning_effort_on_unsupported_model(
+        self, cog, mock_discord_context
+    ):
+        """reasoning_effort should be rejected for models that don't support it."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-3",
+            reasoning_effort="high",
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "reasoning_effort" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_chat_passes_reasoning_effort_for_supported_model(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """reasoning_effort should be passed to the API for grok-3-mini."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-3-mini",
+            reasoning_effort="high",
+        )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert create_kwargs["reasoning_effort"] == "high"
 
     def test_chat_model_choices_match_grok_models(self, cog):
         """Chat command model choices should match GROK_MODELS."""

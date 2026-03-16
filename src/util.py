@@ -76,6 +76,17 @@ GROK_VIDEO_MODELS = [
 # TTS voices
 TTS_VOICES = ["eve", "ara", "rex", "sal", "leo"]
 
+# Models that support frequency_penalty and presence_penalty parameters.
+# Reasoning models do NOT support these parameters.
+PENALTY_SUPPORTED_MODELS: set[str] = {
+    "grok-4.20-beta-latest-non-reasoning",
+    "grok-4-1-fast-non-reasoning",
+    "grok-4-fast-non-reasoning",
+}
+
+# Models that support the reasoning_effort parameter.
+REASONING_EFFORT_MODELS: set[str] = {"grok-3-mini"}
+
 # Built-in tools supported by /grok chat.
 TOOL_WEB_SEARCH = "web_search"
 TOOL_X_SEARCH = "x_search"
