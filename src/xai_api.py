@@ -155,7 +155,7 @@ def append_pricing_embed(
     if not SHOW_COST_EMBEDS:
         return
     cost = calculate_cost(model, input_tokens, output_tokens)
-    token_info = f"{input_tokens:,} in / {output_tokens:,} out"
+    token_info = f"{input_tokens:,} tokens in / {output_tokens:,} tokens out"
     if reasoning_tokens > 0:
         token_info += f" ({reasoning_tokens:,} reasoning)"
     description = f"{model} · ${cost:.4f} · {token_info} · daily ${daily_cost:.2f}"

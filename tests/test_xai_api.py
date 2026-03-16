@@ -16,8 +16,8 @@ class TestAppendPricingEmbed:
         assert len(embeds) == 1
         desc = embeds[0].description
         assert "grok-3" in desc
-        assert "1,000 in" in desc
-        assert "500 out" in desc
+        assert "1,000 tokens in" in desc
+        assert "500 tokens out" in desc
         assert "daily $1.50" in desc
         assert embeds[0].colour == Colour.dark_teal()
 
