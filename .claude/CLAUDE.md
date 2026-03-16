@@ -129,7 +129,7 @@ Main Discord cog class: `xAIAPI`
   - `append_pricing_embed()` shows per-request cost, token counts, and daily cumulative cost for chat
   - `append_generation_pricing_embed()` shows flat cost for image/video generation
   - `SHOW_COST_EMBEDS` is checked at each call site (not inside the helper functions)
-  - Sources and cost embeds are sent as a separate auxiliary message (`aux_embeds`) so the ButtonView stays cleanly attached to the response
+  - Sources and cost embeds are included in the main response message (after response/reasoning embeds, before the ButtonView)
   - `_track_daily_cost()` accumulates token-based costs per `(user_id, date)`
   - `_track_daily_cost_flat()` accumulates flat costs (image/video) per `(user_id, date)`
   - `self.daily_costs` dict keyed by `(user_id, date_iso_str)`
