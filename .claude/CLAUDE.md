@@ -93,6 +93,8 @@ Main Discord cog class: `xAIAPI`
   - Tracks per-conversation state in `self.conversations`
   - Follow-up messages in the same channel are routed back to the conversation starter
   - Pause/resume and stop controls via `ButtonView`
+  - `_strip_previous_view()` removes buttons from the previous turn's message before sending a new response
+  - `self.last_view_messages` tracks the most recent message with buttons per user
 - Tool flow:
   - `resolve_selected_tools()` builds tool protos
   - `collections_search` is guarded by `XAI_COLLECTION_IDS`
@@ -107,7 +109,9 @@ Main Discord cog class: `xAIAPI`
   - `agent_count` is rejected for non-multi-agent models
 - File attachment flow (xAI Files API):
   - Non-image attachments are downloaded from Discord and uploaded via `client.files.upload()`
-  - `_upload_file_attachment()` handles download + upload, enforces 48 MB limit
+  - `_upload_file_attachment()` handles download + upload, enforces 48 MB Files API limit
+  - Inline images are validated: only `image/jpeg` and `image/png` accepted, max 20 MiB
+  - Images are sent with `detail="high"` for better image understanding
   - Uploaded file IDs are tracked in `Conversation.file_ids`
   - `xai_file(file_id)` is included in message content parts (triggers server-side `attachment_search`)
   - `_cleanup_conversation_files()` deletes all tracked files from xAI on conversation end
@@ -124,6 +128,8 @@ Main Discord cog class: `xAIAPI`
   - Token usage extracted via `response.usage.prompt_tokens` / `response.usage.completion_tokens` (xAI SDK uses OpenAI-style naming, not `input_tokens`/`output_tokens`)
   - `append_pricing_embed()` shows per-request cost, token counts, and daily cumulative cost for chat
   - `append_generation_pricing_embed()` shows flat cost for image/video generation
+  - `SHOW_COST_EMBEDS` is checked at each call site (not inside the helper functions)
+  - Sources and cost embeds are sent as a separate auxiliary message (`aux_embeds`) so the ButtonView stays cleanly attached to the response
   - `_track_daily_cost()` accumulates token-based costs per `(user_id, date)`
   - `_track_daily_cost_flat()` accumulates flat costs (image/video) per `(user_id, date)`
   - `self.daily_costs` dict keyed by `(user_id, date_iso_str)`

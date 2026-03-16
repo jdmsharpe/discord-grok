@@ -15,7 +15,6 @@ class TestAppendPricingEmbed:
         append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50)
         assert len(embeds) == 1
         desc = embeds[0].description
-        assert "grok-3" in desc
         assert "1,000 tokens in" in desc
         assert "500 tokens out" in desc
         assert "daily $1.50" in desc

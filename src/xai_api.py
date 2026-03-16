@@ -45,7 +45,8 @@ from util import (
 TTS_API_URL = "https://api.x.ai/v1/tts"
 TTS_MAX_CHARS = 15_000
 
-SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MiB xAI image understanding limit
 MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
 INLINE_CITATION_INCLUDE = "inline_citations"
 
@@ -152,13 +153,11 @@ def append_pricing_embed(
     reasoning_tokens: int = 0,
 ) -> None:
     """Append a compact pricing embed showing cost and token usage."""
-    if not SHOW_COST_EMBEDS:
-        return
     cost = calculate_cost(model, input_tokens, output_tokens)
     token_info = f"{input_tokens:,} tokens in / {output_tokens:,} tokens out"
     if reasoning_tokens > 0:
         token_info += f" ({reasoning_tokens:,} reasoning)"
-    description = f"{model} · ${cost:.4f} · {token_info} · daily ${daily_cost:.2f}"
+    description = f"${cost:.4f} · {token_info} · daily ${daily_cost:.2f}"
     embeds.append(Embed(description=description, color=Colour.dark_teal()))
 
 
@@ -168,8 +167,6 @@ def append_generation_pricing_embed(
     daily_cost: float,
 ) -> None:
     """Append a compact pricing embed for image/video generation."""
-    if not SHOW_COST_EMBEDS:
-        return
     description = f"${cost:.4f} · daily ${daily_cost:.2f}"
     embeds.append(Embed(description=description, color=Colour.dark_teal()))
 
@@ -198,6 +195,8 @@ class xAIAPI(commands.Cog):
         self.message_to_conversation_id: dict[int, int] = {}
         # Dictionary to store UI views for each conversation
         self.views = {}
+        # Last message with a ButtonView attached, keyed by user — used to strip old buttons
+        self.last_view_messages = {}
         # Daily cost tracking: (user_id, date_iso) -> cumulative cost
         self.daily_costs: dict[tuple[int, str], float] = {}
         self._http_session: aiohttp.ClientSession | None = None
@@ -225,6 +224,15 @@ class xAIAPI(commands.Cog):
         key = (user_id, date.today().isoformat())
         self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
         return self.daily_costs[key]
+
+    async def _strip_previous_view(self, user) -> None:
+        """Edit the last message that had buttons to remove its view."""
+        prev = self.last_view_messages.pop(user, None)
+        if prev is not None:
+            try:
+                await prev.edit(view=None)
+            except Exception:
+                pass  # Message may have been deleted or is no longer editable
 
     async def _generate_tts(
         self, text: str, voice_id: str, language: str, codec: str
@@ -316,6 +324,9 @@ class xAIAPI(commands.Cog):
         """End a conversation and clean up associated resources."""
         conversation = self.conversations.pop(conversation_id, None)
         if conversation is not None:
+            starter = conversation.params.conversation_starter
+            if starter is not None:
+                self.last_view_messages.pop(starter, None)
             await self._cleanup_conversation_files(conversation)
 
     def cog_unload(self):
@@ -418,7 +429,14 @@ class xAIAPI(commands.Cog):
             if message.attachments:
                 for attachment in message.attachments:
                     if attachment.content_type and attachment.content_type in SUPPORTED_IMAGE_TYPES:
-                        content_parts.append(image(attachment.url))
+                        if attachment.size > MAX_IMAGE_SIZE:
+                            self.logger.warning(
+                                "Image %s exceeds 20 MiB limit (%s bytes), skipping",
+                                attachment.filename,
+                                attachment.size,
+                            )
+                            continue
+                        content_parts.append(image(attachment.url, detail="high"))
                     else:
                         file_id = await self._upload_file_attachment(attachment)
                         if file_id:
@@ -450,13 +468,17 @@ class xAIAPI(commands.Cog):
 
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
-            append_sources_embed(embeds, tool_info["citations"])
+
+            # Auxiliary embeds (sources, cost) sent separately so view stays with response
+            aux_embeds: list[Embed] = []
+            append_sources_embed(aux_embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
                 message.author.id, params.model, input_tokens, output_tokens
             )
-            append_pricing_embed(
-                embeds, params.model, input_tokens, output_tokens, daily_cost, reasoning_tokens
-            )
+            if SHOW_COST_EMBEDS:
+                append_pricing_embed(
+                    aux_embeds, params.model, input_tokens, output_tokens, daily_cost, reasoning_tokens
+                )
 
             view = self.views.get(message.author)
             main_conversation_id = params.conversation_id
@@ -465,12 +487,16 @@ class xAIAPI(commands.Cog):
                 self.logger.error("Conversation ID is None, cannot track message")
                 return
 
+            # Strip buttons from previous turn's message
+            await self._strip_previous_view(message.author)
+
             if embeds:
                 try:
                     reply_message = await message.reply(embed=embeds[0], view=view)
                     self.message_to_conversation_id[reply_message.id] = (
                         main_conversation_id
                     )
+                    self.last_view_messages[message.author] = reply_message
                 except Exception as embed_error:
                     self.logger.warning(f"Embed failed, sending as text: {embed_error}")
                     safe_response_text = response_text or "No response text available"
@@ -481,6 +507,7 @@ class xAIAPI(commands.Cog):
                     self.message_to_conversation_id[reply_message.id] = (
                         main_conversation_id
                     )
+                    self.last_view_messages[message.author] = reply_message
 
                 for embed in embeds[1:]:
                     try:
@@ -498,6 +525,9 @@ class xAIAPI(commands.Cog):
                         self.message_to_conversation_id[followup_message.id] = (
                             main_conversation_id
                         )
+
+                if aux_embeds:
+                    await message.channel.send(embeds=aux_embeds)
 
                 self.logger.debug("Replied with generated response.")
             else:
@@ -1006,7 +1036,13 @@ class xAIAPI(commands.Cog):
             content_parts: list[Any] = [prompt]
             if attachment:
                 if attachment.content_type in SUPPORTED_IMAGE_TYPES:
-                    content_parts.append(image(attachment.url))
+                    if attachment.size > MAX_IMAGE_SIZE:
+                        await ctx.followup.send(
+                            f"Image `{attachment.filename}` exceeds the 20 MiB limit.",
+                            ephemeral=True,
+                        )
+                        return
+                    content_parts.append(image(attachment.url, detail="high"))
                 else:
                     file_id = await self._upload_file_attachment(attachment)
                     if file_id:
@@ -1085,13 +1121,17 @@ class xAIAPI(commands.Cog):
             ]
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
-            append_sources_embed(embeds, tool_info["citations"])
+
+            # Auxiliary embeds (sources, cost) sent separately so view stays with response
+            aux_embeds: list[Embed] = []
+            append_sources_embed(aux_embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
                 ctx.author.id, model, input_tokens, output_tokens
             )
-            append_pricing_embed(
-                embeds, model, input_tokens, output_tokens, daily_cost, reasoning_tokens
-            )
+            if SHOW_COST_EMBEDS:
+                append_pricing_embed(
+                    aux_embeds, model, input_tokens, output_tokens, daily_cost, reasoning_tokens
+                )
 
             if len(embeds) == 1:
                 await ctx.send_followup("No response generated.")
@@ -1099,6 +1139,10 @@ class xAIAPI(commands.Cog):
 
             # Create the view with buttons
             main_conversation_id = ctx.interaction.id
+
+            # Strip buttons from any prior conversation's last message
+            await self._strip_previous_view(ctx.author)
+
             view = ButtonView(
                 cog=self,
                 conversation_starter=ctx.author,
@@ -1109,6 +1153,10 @@ class xAIAPI(commands.Cog):
 
             msg = await ctx.send_followup(embeds=embeds, view=view)
             self.message_to_conversation_id[msg.id] = main_conversation_id
+            self.last_view_messages[ctx.author] = msg
+
+            if aux_embeds:
+                await ctx.send_followup(embeds=aux_embeds)
 
             # Store the conversation
             params = ChatCompletionParameters(
@@ -1219,7 +1267,8 @@ class xAIAPI(commands.Cog):
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
                 embeds = [embed]
-                append_generation_pricing_embed(embeds, image_cost, daily_cost)
+                if SHOW_COST_EMBEDS:
+                    append_generation_pricing_embed(embeds, image_cost, daily_cost)
                 await ctx.send_followup(embeds=embeds, file=file)
                 self.logger.info("Successfully generated and sent image")
 
@@ -1240,7 +1289,8 @@ class xAIAPI(commands.Cog):
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
                 embeds = [embed]
-                append_generation_pricing_embed(embeds, image_cost, daily_cost)
+                if SHOW_COST_EMBEDS:
+                    append_generation_pricing_embed(embeds, image_cost, daily_cost)
                 await ctx.send_followup(embeds=embeds, file=file)
                 self.logger.info("Successfully generated and sent image")
 
@@ -1335,7 +1385,8 @@ class xAIAPI(commands.Cog):
                 color=Colour.dark_teal(),
             )
             embeds = [embed]
-            append_generation_pricing_embed(embeds, video_cost, daily_cost)
+            if SHOW_COST_EMBEDS:
+                append_generation_pricing_embed(embeds, video_cost, daily_cost)
             await ctx.send_followup(embeds=embeds, file=File(data, "video.mp4"))
             self.logger.info("Successfully generated and sent video")
 
