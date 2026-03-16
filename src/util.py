@@ -6,6 +6,47 @@ from xai_sdk.tools import code_execution, web_search, x_search
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
+# Per-million-token pricing: (input_cost, output_cost)
+MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "grok-4.20-multi-agent-beta-latest": (2.00, 6.00),
+    "grok-4.20-beta-latest-reasoning": (2.00, 6.00),
+    "grok-4.20-beta-latest-non-reasoning": (2.00, 6.00),
+    "grok-4-1-fast-reasoning": (0.20, 0.50),
+    "grok-4-1-fast-non-reasoning": (0.20, 0.50),
+    "grok-code-fast-1": (0.20, 1.50),
+    "grok-4-fast-reasoning": (0.20, 0.50),
+    "grok-4-fast-non-reasoning": (0.20, 0.50),
+    "grok-4-0709": (3.00, 15.00),
+    "grok-3-mini": (0.30, 0.50),
+    "grok-3": (3.00, 15.00),
+}
+
+# Flat per-image pricing
+IMAGE_PRICING: dict[str, float] = {
+    "grok-imagine-image-pro": 0.07,
+    "grok-imagine-image": 0.02,
+}
+
+# Per-second video pricing
+VIDEO_PRICING_PER_SECOND: float = 0.05
+
+
+def calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Calculate the cost in dollars for a given model and token usage."""
+    input_price, output_price = MODEL_PRICING.get(model, (2.00, 6.00))
+    return (input_tokens / 1_000_000) * input_price + (output_tokens / 1_000_000) * output_price
+
+
+def calculate_image_cost(model: str) -> float:
+    """Calculate the cost in dollars for an image generation."""
+    return IMAGE_PRICING.get(model, 0.07)
+
+
+def calculate_video_cost(duration: int) -> float:
+    """Calculate the cost in dollars for a video generation."""
+    return duration * VIDEO_PRICING_PER_SECOND
+
+
 # All available Grok language models
 GROK_MODELS = [
     "grok-4.20-multi-agent-beta-latest",

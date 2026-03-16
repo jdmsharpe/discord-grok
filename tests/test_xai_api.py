@@ -2,6 +2,59 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from discord import Colour, Embed
+
+
+class TestAppendPricingEmbed:
+    """Tests for the append_pricing_embed helper."""
+
+    def test_append_pricing_embed(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50)
+        assert len(embeds) == 1
+        desc = embeds[0].description
+        assert "grok-3" in desc
+        assert "1,000 in" in desc
+        assert "500 out" in desc
+        assert "daily $1.50" in desc
+        assert embeds[0].colour == Colour.orange()
+
+    def test_append_generation_pricing_embed(self):
+        from src.xai_api import append_generation_pricing_embed
+
+        embeds: list[Embed] = []
+        append_generation_pricing_embed(embeds, 0.07, 2.50)
+        assert len(embeds) == 1
+        assert "$0.0700" in embeds[0].description
+        assert "daily $2.50" in embeds[0].description
+
+
+class TestTrackDailyCost:
+    """Tests for the _track_daily_cost methods."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        with patch("xai_sdk.AsyncClient"):
+            from src.xai_api import xAIAPI
+
+            cog = xAIAPI(bot=mock_bot)
+            return cog
+
+    def test_track_daily_cost_accumulates(self, cog):
+        # grok-3: $3/M in, $15/M out
+        daily = cog._track_daily_cost(1, "grok-3", 1_000_000, 0)
+        assert daily == pytest.approx(3.00)
+        daily = cog._track_daily_cost(1, "grok-3", 0, 1_000_000)
+        assert daily == pytest.approx(18.00)
+
+    def test_track_daily_cost_flat(self, cog):
+        daily = cog._track_daily_cost_flat(1, 0.07)
+        assert daily == pytest.approx(0.07)
+        daily = cog._track_daily_cost_flat(1, 0.02)
+        assert daily == pytest.approx(0.09)
+
 
 class TestExtractToolInfo:
     """Tests for extract_tool_info helper."""

@@ -2,6 +2,9 @@ from xai_sdk.tools import collections_search as collections_search_tool
 
 from src.util import (
     CHUNK_TEXT_SIZE,
+    IMAGE_PRICING,
+    MODEL_PRICING,
+    VIDEO_PRICING_PER_SECOND,
     ChatCompletionParameters,
     Conversation,
     TOOL_BUILDERS,
@@ -9,6 +12,9 @@ from src.util import (
     TOOL_COLLECTIONS_SEARCH,
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
+    calculate_cost,
+    calculate_image_cost,
+    calculate_video_cost,
     chunk_text,
     format_xai_error,
     resolve_tool_name,
@@ -229,6 +235,49 @@ class TestToolHelpers:
 
     def test_resolve_tool_name_unknown(self):
         assert resolve_tool_name(object()) is None
+
+
+class TestPricing:
+    """Tests for pricing constants and cost calculation functions."""
+
+    def test_model_pricing_covers_all_grok_models(self):
+        """Every model in GROK_MODELS should have a pricing entry."""
+        from src.util import GROK_MODELS
+
+        for model in GROK_MODELS:
+            assert model in MODEL_PRICING, f"Missing pricing for {model}"
+
+    def test_image_pricing_covers_all_image_models(self):
+        """Every model in GROK_IMAGE_MODELS should have a pricing entry."""
+        from src.util import GROK_IMAGE_MODELS
+
+        for model in GROK_IMAGE_MODELS:
+            assert model in IMAGE_PRICING, f"Missing pricing for {model}"
+
+    def test_calculate_cost_known_model(self):
+        """Cost should use the model's pricing rates."""
+        cost = calculate_cost("grok-3", 1_000_000, 1_000_000)
+        assert cost == 3.00 + 15.00
+
+    def test_calculate_cost_unknown_model_uses_default(self):
+        """Unknown models should fall back to the default pricing."""
+        cost = calculate_cost("unknown-model", 1_000_000, 1_000_000)
+        assert cost == 2.00 + 6.00
+
+    def test_calculate_cost_zero_tokens(self):
+        """Zero tokens should return zero cost."""
+        assert calculate_cost("grok-3", 0, 0) == 0.0
+
+    def test_calculate_image_cost_known_model(self):
+        assert calculate_image_cost("grok-imagine-image") == 0.02
+        assert calculate_image_cost("grok-imagine-image-pro") == 0.07
+
+    def test_calculate_image_cost_unknown_model(self):
+        assert calculate_image_cost("unknown") == 0.07
+
+    def test_calculate_video_cost(self):
+        assert calculate_video_cost(5) == 5 * VIDEO_PRICING_PER_SECOND
+        assert calculate_video_cost(0) == 0.0
 
 
 class TestConversation:
