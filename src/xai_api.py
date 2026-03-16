@@ -485,7 +485,7 @@ class xAIAPI(commands.Cog):
                 for embed in embeds[1:]:
                     try:
                         followup_message = await message.channel.send(
-                            embed=embed, view=view
+                            embed=embed
                         )
                         self.message_to_conversation_id[followup_message.id] = (
                             main_conversation_id
@@ -494,7 +494,6 @@ class xAIAPI(commands.Cog):
                         self.logger.warning(f"Followup embed failed: {embed_error}")
                         followup_message = await message.channel.send(
                             content=f"**Response (continued):**\n{embed.description[:1900]}{'...' if len(embed.description) > 1900 else ''}",
-                            view=view,
                         )
                         self.message_to_conversation_id[followup_message.id] = (
                             main_conversation_id
