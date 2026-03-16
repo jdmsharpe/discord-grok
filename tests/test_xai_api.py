@@ -241,6 +241,54 @@ class TestXAIAPICog:
         ]
 
     @pytest.mark.asyncio
+    async def test_resolve_selected_tools_x_search_with_kwargs(self, cog):
+        """x_search kwargs should be forwarded to the x_search tool builder."""
+        x_search_kw = {
+            "enable_image_understanding": True,
+            "allowed_x_handles": ["elonmusk"],
+        }
+        tools, error = cog.resolve_selected_tools(
+            ["x_search"], x_search_kwargs=x_search_kw
+        )
+
+        assert error is None
+        assert len(tools) == 1
+        assert tools[0].WhichOneof("tool") == "x_search"
+
+    @pytest.mark.asyncio
+    async def test_resolve_selected_tools_x_search_without_kwargs(self, cog):
+        """x_search without kwargs should still work."""
+        tools, error = cog.resolve_selected_tools(["x_search"])
+
+        assert error is None
+        assert len(tools) == 1
+        assert tools[0].WhichOneof("tool") == "x_search"
+
+    @pytest.mark.asyncio
+    async def test_resolve_selected_tools_web_search_with_kwargs(self, cog):
+        """web_search kwargs should be forwarded to the web_search tool builder."""
+        web_search_kw = {
+            "enable_image_understanding": True,
+            "allowed_domains": ["example.com"],
+        }
+        tools, error = cog.resolve_selected_tools(
+            ["web_search"], web_search_kwargs=web_search_kw
+        )
+
+        assert error is None
+        assert len(tools) == 1
+        assert tools[0].WhichOneof("tool") == "web_search"
+
+    @pytest.mark.asyncio
+    async def test_resolve_selected_tools_web_search_without_kwargs(self, cog):
+        """web_search without kwargs should still work."""
+        tools, error = cog.resolve_selected_tools(["web_search"])
+
+        assert error is None
+        assert len(tools) == 1
+        assert tools[0].WhichOneof("tool") == "web_search"
+
+    @pytest.mark.asyncio
     async def test_chat_default_model(
         self, cog, mock_discord_context, mock_xai_client
     ):

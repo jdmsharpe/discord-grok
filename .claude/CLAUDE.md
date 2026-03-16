@@ -102,7 +102,7 @@ UI controls attached to conversation messages:
 
 ## `/grok chat` Parameters
 
-Current parameter count: 13
+Current parameter count: 22
 
 1. `prompt`
 2. `system_prompt`
@@ -117,6 +117,15 @@ Current parameter count: 13
 11. `x_search`
 12. `code_execution`
 13. `collections_search`
+14. `x_search_images` (enable image understanding in X posts)
+15. `x_search_videos` (enable video understanding in X posts)
+16. `x_search_from_date` (ISO8601 start date filter)
+17. `x_search_to_date` (ISO8601 end date filter)
+18. `x_search_allowed_handles` (comma-separated, max 10, mutually exclusive with excluded)
+19. `x_search_excluded_handles` (comma-separated, max 10, mutually exclusive with allowed)
+20. `web_search_allowed_domains` (comma-separated, max 5, mutually exclusive with excluded)
+21. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
+22. `web_search_images` (enable image understanding during web browsing)
 
 ## Embed and Truncation Behavior
 

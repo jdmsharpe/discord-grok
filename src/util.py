@@ -80,6 +80,8 @@ class ChatCompletionParameters:
     seed: int | None = None
     reasoning_effort: str | None = None
     tools: list[Any] = field(default_factory=list)
+    x_search_kwargs: dict[str, Any] = field(default_factory=dict)
+    web_search_kwargs: dict[str, Any] = field(default_factory=dict)
     conversation_starter: Member | User | None = None
     conversation_id: int | None = None
     channel_id: int | None = None
