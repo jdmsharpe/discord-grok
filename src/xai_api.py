@@ -23,7 +23,7 @@ from discord.commands import OptionChoice, SlashCommandGroup, option
 from discord.ext import commands
 
 from button_view import ButtonView
-from config.auth import GUILD_IDS, XAI_API_KEY, XAI_COLLECTION_IDS
+from config.auth import GUILD_IDS, SHOW_COST_EMBEDS, XAI_API_KEY, XAI_COLLECTION_IDS
 from util import (
     ChatCompletionParameters,
     Conversation,
@@ -145,11 +145,13 @@ def append_pricing_embed(
     daily_cost: float,
 ) -> None:
     """Append a compact pricing embed showing cost and token usage."""
+    if not SHOW_COST_EMBEDS:
+        return
     cost = calculate_cost(model, input_tokens, output_tokens)
     description = (
         f"{model} · ${cost:.4f} · {input_tokens:,} in / {output_tokens:,} out · daily ${daily_cost:.2f}"
     )
-    embeds.append(Embed(description=description, color=Colour.orange()))
+    embeds.append(Embed(description=description, color=Colour.dark_teal()))
 
 
 def append_generation_pricing_embed(
@@ -158,8 +160,10 @@ def append_generation_pricing_embed(
     daily_cost: float,
 ) -> None:
     """Append a compact pricing embed for image/video generation."""
+    if not SHOW_COST_EMBEDS:
+        return
     description = f"${cost:.4f} · daily ${daily_cost:.2f}"
-    embeds.append(Embed(description=description, color=Colour.orange()))
+    embeds.append(Embed(description=description, color=Colour.dark_teal()))
 
 
 class xAIAPI(commands.Cog):
@@ -664,14 +668,8 @@ class xAIAPI(commands.Cog):
         type=bool,
     )
     @option(
-        "x_search_from_date",
-        description="X search start date in YYYY-MM-DD format. (default: not set)",
-        required=False,
-        type=str,
-    )
-    @option(
-        "x_search_to_date",
-        description="X search end date in YYYY-MM-DD format. (default: not set)",
+        "x_search_date_range",
+        description="X search date range as YYYY-MM-DD,YYYY-MM-DD (start,end). (default: not set)",
         required=False,
         type=str,
     )
@@ -723,8 +721,7 @@ class xAIAPI(commands.Cog):
         collections_search: bool = False,
         x_search_images: bool = False,
         x_search_videos: bool = False,
-        x_search_from_date: str | None = None,
-        x_search_to_date: str | None = None,
+        x_search_date_range: str | None = None,
         x_search_allowed_handles: str | None = None,
         x_search_excluded_handles: str | None = None,
         web_search_allowed_domains: str | None = None,
@@ -774,26 +771,25 @@ class xAIAPI(commands.Cog):
                 x_search_kw["enable_image_understanding"] = True
             if x_search_videos:
                 x_search_kw["enable_video_understanding"] = True
-            if x_search_from_date:
-                try:
-                    x_search_kw["from_date"] = datetime.fromisoformat(x_search_from_date)
-                except ValueError:
+            if x_search_date_range:
+                date_parts = [p.strip() for p in x_search_date_range.split(",")]
+                if len(date_parts) != 2 or not all(date_parts):
                     await ctx.send_followup(
                         embed=Embed(
                             title="Error",
-                            description="Invalid `x_search_from_date` format. Use YYYY-MM-DD.",
+                            description="Invalid `x_search_date_range` format. Use YYYY-MM-DD,YYYY-MM-DD.",
                             color=Colour.red(),
                         )
                     )
                     return
-            if x_search_to_date:
                 try:
-                    x_search_kw["to_date"] = datetime.fromisoformat(x_search_to_date)
+                    x_search_kw["from_date"] = datetime.fromisoformat(date_parts[0])
+                    x_search_kw["to_date"] = datetime.fromisoformat(date_parts[1])
                 except ValueError:
                     await ctx.send_followup(
                         embed=Embed(
                             title="Error",
-                            description="Invalid `x_search_to_date` format. Use YYYY-MM-DD.",
+                            description="Invalid `x_search_date_range` format. Use YYYY-MM-DD,YYYY-MM-DD.",
                             color=Colour.red(),
                         )
                     )

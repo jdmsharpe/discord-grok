@@ -93,6 +93,7 @@ All commands are grouped under `/grok` for clean namespacing.
    GUILD_IDS=your_guild_id_1,your_guild_id_2
    XAI_API_KEY=your_xai_api_key
    XAI_COLLECTION_IDS=optional_collection_id_1,optional_collection_id_2
+   SHOW_COST_EMBEDS=true
    ```
 
 ### Running the Bot

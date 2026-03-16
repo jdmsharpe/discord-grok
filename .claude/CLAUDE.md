@@ -114,7 +114,7 @@ UI controls attached to conversation messages:
 
 ## `/grok chat` Parameters
 
-Current parameter count: 22
+Current parameter count: 21
 
 1. `prompt`
 2. `system_prompt`
@@ -131,13 +131,12 @@ Current parameter count: 22
 13. `collections_search`
 14. `x_search_images` (enable image understanding in X posts)
 15. `x_search_videos` (enable video understanding in X posts)
-16. `x_search_from_date` (ISO8601 start date filter)
-17. `x_search_to_date` (ISO8601 end date filter)
-18. `x_search_allowed_handles` (comma-separated, max 10, mutually exclusive with excluded)
-19. `x_search_excluded_handles` (comma-separated, max 10, mutually exclusive with allowed)
-20. `web_search_allowed_domains` (comma-separated, max 5, mutually exclusive with excluded)
-21. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
-22. `web_search_images` (enable image understanding during web browsing)
+16. `x_search_date_range` (comma-separated ISO8601 start,end date filter e.g. YYYY-MM-DD,YYYY-MM-DD)
+17. `x_search_allowed_handles` (comma-separated, max 10, mutually exclusive with excluded)
+18. `x_search_excluded_handles` (comma-separated, max 10, mutually exclusive with allowed)
+19. `web_search_allowed_domains` (comma-separated, max 5, mutually exclusive with excluded)
+20. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
+21. `web_search_images` (enable image understanding during web browsing)
 
 ## Embed and Truncation Behavior
 
@@ -158,12 +157,13 @@ Current parameter count: 22
 
 ## Environment Variables
 
-| Variable              | Description                                                          |
-| --------------------- | -------------------------------------------------------------------- |
-| `BOT_TOKEN`           | Discord bot token                                                    |
-| `GUILD_IDS`           | Comma-separated Discord guild IDs                                    |
-| `XAI_API_KEY`         | xAI API key for chat/image/video                                     |
-| `XAI_COLLECTION_IDS`  | Optional comma-separated collection IDs used by `collections_search` |
+| Variable             | Description                                                                |
+| -------------------- | -------------------------------------------------------------------------- |
+| `BOT_TOKEN`          | Discord bot token                                                          |
+| `GUILD_IDS`          | Comma-separated Discord guild IDs                                          |
+| `XAI_API_KEY`        | xAI API key for chat/image/video                                           |
+| `XAI_COLLECTION_IDS` | Optional comma-separated collection IDs used by `collections_search`       |
+| `SHOW_COST_EMBEDS`   | Show cost/token usage embeds on responses (`true`/`false`, default `true`) |
 
 If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a user-facing error.
 
