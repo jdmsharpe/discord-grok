@@ -492,7 +492,7 @@ class xAIAPI(commands.Cog):
 
             if embeds:
                 try:
-                    reply_message = await message.reply(embed=embeds[0], view=view)
+                    reply_message = await message.reply(embeds=embeds, view=view)
                     self.message_to_conversation_id[reply_message.id] = (
                         main_conversation_id
                     )
@@ -508,23 +508,6 @@ class xAIAPI(commands.Cog):
                         main_conversation_id
                     )
                     self.last_view_messages[message.author] = reply_message
-
-                for embed in embeds[1:]:
-                    try:
-                        followup_message = await message.channel.send(
-                            embed=embed
-                        )
-                        self.message_to_conversation_id[followup_message.id] = (
-                            main_conversation_id
-                        )
-                    except Exception as embed_error:
-                        self.logger.warning(f"Followup embed failed: {embed_error}")
-                        followup_message = await message.channel.send(
-                            content=f"**Response (continued):**\n{embed.description[:1900]}{'...' if len(embed.description) > 1900 else ''}",
-                        )
-                        self.message_to_conversation_id[followup_message.id] = (
-                            main_conversation_id
-                        )
 
                 if aux_embeds:
                     await message.channel.send(embeds=aux_embeds)
