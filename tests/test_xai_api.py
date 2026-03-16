@@ -19,7 +19,7 @@ class TestAppendPricingEmbed:
         assert "1,000 in" in desc
         assert "500 out" in desc
         assert "daily $1.50" in desc
-        assert embeds[0].colour == Colour.orange()
+        assert embeds[0].colour == Colour.dark_teal()
 
     def test_append_generation_pricing_embed(self):
         from src.xai_api import append_generation_pricing_embed

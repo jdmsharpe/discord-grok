@@ -12,3 +12,4 @@ XAI_COLLECTION_IDS = [
     for collection_id in os.getenv("XAI_COLLECTION_IDS", "").split(",")
     if collection_id
 ]
+SHOW_COST_EMBEDS = os.getenv("SHOW_COST_EMBEDS", "true").lower() in ("true", "1", "yes")
