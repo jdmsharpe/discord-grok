@@ -483,6 +483,93 @@ class TestXAIAPICog:
         create_kwargs = mock_xai_client.chat.create.call_args.kwargs
         assert create_kwargs["reasoning_effort"] == "high"
 
+    @pytest.mark.asyncio
+    async def test_chat_rejects_max_tokens_on_multi_agent(
+        self, cog, mock_discord_context
+    ):
+        """max_tokens should be rejected for multi-agent models."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-4.20-multi-agent-beta-latest",
+            max_tokens=1024,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "max_tokens" in call_kwargs["embed"].description
+        assert "not supported" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_chat_rejects_agent_count_on_non_multi_agent(
+        self, cog, mock_discord_context
+    ):
+        """agent_count should be rejected for non-multi-agent models."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-3",
+            agent_count=4,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "agent_count" in call_kwargs["embed"].description
+        assert "multi-agent" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_chat_passes_agent_count_for_multi_agent(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """agent_count should be passed to chat.create for multi-agent models."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Research quantum computing",
+            model="grok-4.20-multi-agent-beta-latest",
+            agent_count=16,
+        )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert create_kwargs["agent_count"] == 16
+        assert create_kwargs["use_encrypted_content"] is True
+
+    @pytest.mark.asyncio
+    async def test_chat_multi_agent_sets_encrypted_content(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """Multi-agent model should always set use_encrypted_content=True."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-4.20-multi-agent-beta-latest",
+        )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert create_kwargs["use_encrypted_content"] is True
+        assert "agent_count" not in create_kwargs
+
     def test_chat_model_choices_match_grok_models(self, cog):
         """Chat command model choices should match GROK_MODELS."""
         from src.util import GROK_MODELS

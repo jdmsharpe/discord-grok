@@ -27,6 +27,7 @@ from config.auth import GUILD_IDS, SHOW_COST_EMBEDS, XAI_API_KEY, XAI_COLLECTION
 from util import (
     ChatCompletionParameters,
     Conversation,
+    MULTI_AGENT_MODELS,
     PENALTY_SUPPORTED_MODELS,
     REASONING_EFFORT_MODELS,
     TOOL_BUILDERS,
@@ -676,6 +677,16 @@ class xAIAPI(commands.Cog):
         ],
     )
     @option(
+        "agent_count",
+        description="Number of agents for multi-agent model. 4=quick, 16=deep research. (default: not set)",
+        required=False,
+        type=int,
+        choices=[
+            OptionChoice(name="4 Agents (Quick)", value=4),
+            OptionChoice(name="16 Agents (Deep Research)", value=16),
+        ],
+    )
+    @option(
         "web_search",
         description="Enable web search for real-time web results. (default: false)",
         required=False,
@@ -760,6 +771,7 @@ class xAIAPI(commands.Cog):
         frequency_penalty: float | None = None,
         presence_penalty: float | None = None,
         reasoning_effort: str | None = None,
+        agent_count: int | None = None,
         web_search: bool = False,
         x_search: bool = False,
         code_execution: bool = False,
@@ -832,6 +844,28 @@ class xAIAPI(commands.Cog):
                     embed=Embed(
                         title="Error",
                         description=f"`reasoning_effort` is only supported by {', '.join(f'`{m}`' for m in sorted(REASONING_EFFORT_MODELS))}.",
+                        color=Colour.red(),
+                    )
+                )
+                return
+
+            is_multi_agent = model in MULTI_AGENT_MODELS
+
+            if max_tokens is not None and is_multi_agent:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description=f"`max_tokens` is not supported by multi-agent model `{model}`.",
+                        color=Colour.red(),
+                    )
+                )
+                return
+
+            if agent_count is not None and not is_multi_agent:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description=f"`agent_count` is only supported by multi-agent models ({', '.join(f'`{m}`' for m in sorted(MULTI_AGENT_MODELS))}).",
                         color=Colour.red(),
                     )
                 )
@@ -999,6 +1033,10 @@ class xAIAPI(commands.Cog):
                 create_kwargs["presence_penalty"] = presence_penalty
             if reasoning_effort is not None:
                 create_kwargs["reasoning_effort"] = reasoning_effort
+            if is_multi_agent:
+                create_kwargs["use_encrypted_content"] = True
+                if agent_count is not None:
+                    create_kwargs["agent_count"] = agent_count
             if tools:
                 create_kwargs["tools"] = tools
             chat = self.client.chat.create(**create_kwargs)
@@ -1034,6 +1072,8 @@ class xAIAPI(commands.Cog):
                 description += f"**Presence Penalty:** {presence_penalty}\n"
             if reasoning_effort is not None:
                 description += f"**Reasoning Effort:** {reasoning_effort}\n"
+            if agent_count is not None:
+                description += f"**Agent Count:** {agent_count}\n"
             if selected_tool_names:
                 description += f"**Tools:** {', '.join(selected_tool_names)}\n"
 
@@ -1081,6 +1121,7 @@ class xAIAPI(commands.Cog):
                 frequency_penalty=frequency_penalty,
                 presence_penalty=presence_penalty,
                 reasoning_effort=reasoning_effort,
+                agent_count=agent_count,
                 tools=tools,
                 x_search_kwargs=x_search_kw,
                 web_search_kwargs=web_search_kw,

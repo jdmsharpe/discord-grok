@@ -87,6 +87,9 @@ PENALTY_SUPPORTED_MODELS: set[str] = {
 # Models that support the reasoning_effort parameter.
 REASONING_EFFORT_MODELS: set[str] = {"grok-3-mini"}
 
+# Multi-agent models that support agent_count and have special parameter constraints.
+MULTI_AGENT_MODELS: set[str] = {"grok-4.20-multi-agent-beta-latest"}
+
 # Built-in tools supported by /grok chat.
 TOOL_WEB_SEARCH = "web_search"
 TOOL_X_SEARCH = "x_search"
@@ -134,6 +137,7 @@ class ChatCompletionParameters:
     presence_penalty: float | None = None
     seed: int | None = None
     reasoning_effort: str | None = None
+    agent_count: int | None = None
     tools: list[Any] = field(default_factory=list)
     x_search_kwargs: dict[str, Any] = field(default_factory=dict)
     web_search_kwargs: dict[str, Any] = field(default_factory=dict)

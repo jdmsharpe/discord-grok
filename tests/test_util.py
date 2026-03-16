@@ -143,6 +143,7 @@ class TestChatCompletionParameters:
         assert params.presence_penalty is None
         assert params.seed is None
         assert params.reasoning_effort is None
+        assert params.agent_count is None
         assert params.tools == []
         assert params.x_search_kwargs == {}
         assert params.web_search_kwargs == {}
@@ -238,6 +239,13 @@ class TestReasoningConstants:
         from src.util import REASONING_EFFORT_MODELS
 
         assert REASONING_EFFORT_MODELS == {"grok-3-mini"}
+
+    def test_multi_agent_models(self):
+        from src.util import MULTI_AGENT_MODELS
+
+        assert "grok-4.20-multi-agent-beta-latest" in MULTI_AGENT_MODELS
+        for model in MULTI_AGENT_MODELS:
+            assert "multi-agent" in model
 
 
 class TestTTSConstants:
