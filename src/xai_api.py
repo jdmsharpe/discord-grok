@@ -6,7 +6,7 @@ from typing import Any, TypedDict, cast
 import aiohttp
 
 from xai_sdk import AsyncClient
-from xai_sdk.chat import image, system, user
+from xai_sdk.chat import file as xai_file, image, system, user
 from xai_sdk.image import ImageAspectRatio
 from xai_sdk.tools import collections_search as collections_search_tool
 from xai_sdk.video import VideoAspectRatio, VideoResolution
@@ -34,6 +34,7 @@ from util import (
 )
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
 INLINE_CITATION_INCLUDE = "inline_citations"
 
 
@@ -182,6 +183,55 @@ class xAIAPI(commands.Cog):
             )
         return None
 
+    async def _upload_file_attachment(self, attachment: Attachment) -> str | None:
+        """Download a Discord attachment and upload it to the xAI Files API.
+
+        Returns the xAI file ID, or None on failure.
+        """
+        if attachment.size > MAX_FILE_SIZE:
+            self.logger.warning(
+                "Attachment %s exceeds 48 MB limit (%s bytes)",
+                attachment.filename,
+                attachment.size,
+            )
+            return None
+
+        file_bytes = await self._fetch_attachment_bytes(attachment)
+        if file_bytes is None:
+            return None
+
+        try:
+            uploaded = await self.client.files.upload(
+                file_bytes, filename=attachment.filename
+            )
+            self.logger.info(
+                "Uploaded file %s as %s", attachment.filename, uploaded.id
+            )
+            return uploaded.id
+        except Exception as error:
+            self.logger.warning(
+                "Failed to upload file %s to xAI: %s", attachment.filename, error
+            )
+            return None
+
+    async def _cleanup_conversation_files(self, conversation: Conversation) -> None:
+        """Delete all xAI files associated with a conversation."""
+        for file_id in conversation.file_ids:
+            try:
+                await self.client.files.delete(file_id)
+                self.logger.info("Deleted xAI file %s", file_id)
+            except Exception as error:
+                self.logger.warning(
+                    "Failed to delete xAI file %s: %s", file_id, error
+                )
+        conversation.file_ids.clear()
+
+    async def end_conversation(self, conversation_id: int) -> None:
+        """End a conversation and clean up associated resources."""
+        conversation = self.conversations.pop(conversation_id, None)
+        if conversation is not None:
+            await self._cleanup_conversation_files(conversation)
+
     def cog_unload(self):
         loop = getattr(self.bot, "loop", None)
 
@@ -268,6 +318,11 @@ class xAIAPI(commands.Cog):
                 for attachment in message.attachments:
                     if attachment.content_type and attachment.content_type in SUPPORTED_IMAGE_TYPES:
                         content_parts.append(image(attachment.url))
+                    else:
+                        file_id = await self._upload_file_attachment(attachment)
+                        if file_id:
+                            conversation.file_ids.append(file_id)
+                            content_parts.append(xai_file(file_id))
 
             if content_parts:
                 chat.append(user(*content_parts))
@@ -464,7 +519,7 @@ class xAIAPI(commands.Cog):
     )
     @option(
         "attachment",
-        description="Attach an image (JPEG, PNG, GIF, WEBP).",
+        description="Attach an image or document (PDF, TXT, CSV, code files, etc.).",
         required=False,
         type=Attachment,
     )
@@ -602,9 +657,16 @@ class xAIAPI(commands.Cog):
                 initial_messages.append(system(system_prompt))
 
             # Build user message content parts
+            uploaded_file_ids: list[str] = []
             content_parts: list[Any] = [prompt]
-            if attachment and attachment.content_type in SUPPORTED_IMAGE_TYPES:
-                content_parts.append(image(attachment.url))
+            if attachment:
+                if attachment.content_type in SUPPORTED_IMAGE_TYPES:
+                    content_parts.append(image(attachment.url))
+                else:
+                    file_id = await self._upload_file_attachment(attachment)
+                    if file_id:
+                        uploaded_file_ids.append(file_id)
+                        content_parts.append(xai_file(file_id))
             initial_messages.append(user(*content_parts))
 
             # Build create kwargs
@@ -695,7 +757,9 @@ class xAIAPI(commands.Cog):
                 channel_id=ctx.channel.id,
                 conversation_id=main_conversation_id,
             )
-            conversation = Conversation(params=params, chat=chat)
+            conversation = Conversation(
+                params=params, chat=chat, file_ids=uploaded_file_ids
+            )
             self.conversations[main_conversation_id] = conversation
 
         except Exception as e:

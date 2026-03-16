@@ -48,6 +48,7 @@ discord-grok/
   - Includes `tools` for active tool configuration in ongoing conversations
 - `Conversation`
   - Stores the pair: `params` + mutable `chat` object from `xai_sdk`
+  - Tracks `file_ids` for xAI Files API cleanup on conversation end
 - Tool helpers
   - `TOOL_WEB_SEARCH`, `TOOL_X_SEARCH`, `TOOL_CODE_EXECUTION`, `TOOL_COLLECTIONS_SEARCH`
   - `TOOL_BUILDERS` for tool proto creation
@@ -78,6 +79,13 @@ Main Discord cog class: `xAIAPI`
   - `extract_tool_info()` reads `response.citations`
   - `append_sources_embed()` renders source URLs (including `collections://...` citations)
   - `_apply_tools_to_chat()` updates tools dynamically when toggled mid-conversation
+- File attachment flow (xAI Files API):
+  - Non-image attachments are downloaded from Discord and uploaded via `client.files.upload()`
+  - `_upload_file_attachment()` handles download + upload, enforces 48 MB limit
+  - Uploaded file IDs are tracked in `Conversation.file_ids`
+  - `xai_file(file_id)` is included in message content parts (triggers server-side `attachment_search`)
+  - `_cleanup_conversation_files()` deletes all tracked files from xAI on conversation end
+  - `end_conversation()` removes the conversation and cleans up files
 
 ### `src/button_view.py`
 
@@ -99,7 +107,7 @@ Current parameter count: 13
 1. `prompt`
 2. `system_prompt`
 3. `model`
-4. `attachment`
+4. `attachment` (images passed inline, other files uploaded via xAI Files API)
 5. `max_tokens`
 6. `temperature`
 7. `top_p`

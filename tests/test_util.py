@@ -240,3 +240,22 @@ class TestConversation:
 
         assert conv.params == params
         assert conv.chat is mock_chat
+        assert conv.file_ids == []
+
+    def test_conversation_with_file_ids(self):
+        """Conversation should store file IDs."""
+        params = ChatCompletionParameters(model="grok-3")
+        conv = Conversation(
+            params=params, chat=object(), file_ids=["file-1", "file-2"]
+        )
+        assert conv.file_ids == ["file-1", "file-2"]
+
+    def test_default_file_ids_isolated(self):
+        """Default file_ids list should not be shared across instances."""
+        params = ChatCompletionParameters(model="grok-3")
+        conv_one = Conversation(params=params, chat=object())
+        conv_one.file_ids.append("file-1")
+
+        conv_two = Conversation(params=params, chat=object())
+        assert conv_two.file_ids == []
+        assert conv_one.file_ids is not conv_two.file_ids

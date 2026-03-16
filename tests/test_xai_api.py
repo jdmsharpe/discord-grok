@@ -315,3 +315,171 @@ class TestXAIAPICog:
 
         with pytest.raises(asyncio.CancelledError):
             await task
+
+
+class TestFileUploadAndCleanup:
+    """Tests for the xAI Files API integration."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        """Create an xAIAPI cog instance with mocked dependencies."""
+        with patch("xai_sdk.AsyncClient") as mock_client_class:
+            mock_client = MagicMock()
+
+            mock_chat = MagicMock()
+            mock_response = MagicMock()
+            mock_response.content = "Test response"
+            mock_response.reasoning_content = ""
+            mock_response.citations = []
+            mock_chat.sample = AsyncMock(return_value=mock_response)
+            mock_chat.append = MagicMock()
+            mock_chat.messages = []
+            mock_client.chat = MagicMock()
+            mock_client.chat.create = MagicMock(return_value=mock_chat)
+
+            # Mock files API
+            mock_uploaded_file = MagicMock()
+            mock_uploaded_file.id = "file-abc123"
+            mock_uploaded_file.filename = "document.pdf"
+            mock_client.files = MagicMock()
+            mock_client.files.upload = AsyncMock(return_value=mock_uploaded_file)
+            mock_client.files.delete = AsyncMock()
+
+            mock_client_class.return_value = mock_client
+
+            from src.xai_api import xAIAPI
+
+            cog = xAIAPI(bot=mock_bot)
+            cog.client = mock_client
+            return cog
+
+    @pytest.mark.asyncio
+    async def test_upload_file_attachment_success(self, cog, mock_file_attachment):
+        """Should download from Discord and upload to xAI, returning the file ID."""
+        with patch.object(cog, "_fetch_attachment_bytes", new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = b"file content"
+
+            file_id = await cog._upload_file_attachment(mock_file_attachment)
+
+        assert file_id == "file-abc123"
+        cog.client.files.upload.assert_awaited_once_with(
+            b"file content", filename="document.pdf"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upload_file_attachment_too_large(self, cog, mock_file_attachment):
+        """Files exceeding 48 MB should be rejected."""
+        mock_file_attachment.size = 50 * 1024 * 1024  # 50 MB
+
+        file_id = await cog._upload_file_attachment(mock_file_attachment)
+
+        assert file_id is None
+        cog.client.files.upload.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_upload_file_attachment_fetch_fails(self, cog, mock_file_attachment):
+        """Should return None when the Discord download fails."""
+        with patch.object(cog, "_fetch_attachment_bytes", new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = None
+
+            file_id = await cog._upload_file_attachment(mock_file_attachment)
+
+        assert file_id is None
+        cog.client.files.upload.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_upload_file_attachment_xai_upload_fails(self, cog, mock_file_attachment):
+        """Should return None when the xAI upload fails."""
+        with patch.object(cog, "_fetch_attachment_bytes", new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = b"file content"
+            cog.client.files.upload.side_effect = Exception("Upload failed")
+
+            file_id = await cog._upload_file_attachment(mock_file_attachment)
+
+        assert file_id is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_conversation_files(self, cog):
+        """Should delete all tracked file IDs from xAI."""
+        from src.util import ChatCompletionParameters, Conversation
+
+        conversation = Conversation(
+            params=ChatCompletionParameters(model="grok-3"),
+            chat=MagicMock(),
+            file_ids=["file-1", "file-2", "file-3"],
+        )
+
+        await cog._cleanup_conversation_files(conversation)
+
+        assert cog.client.files.delete.await_count == 3
+        cog.client.files.delete.assert_any_await("file-1")
+        cog.client.files.delete.assert_any_await("file-2")
+        cog.client.files.delete.assert_any_await("file-3")
+        assert conversation.file_ids == []
+
+    @pytest.mark.asyncio
+    async def test_cleanup_continues_on_failure(self, cog):
+        """Should continue deleting remaining files even if one fails."""
+        from src.util import ChatCompletionParameters, Conversation
+
+        conversation = Conversation(
+            params=ChatCompletionParameters(model="grok-3"),
+            chat=MagicMock(),
+            file_ids=["file-1", "file-2"],
+        )
+        cog.client.files.delete.side_effect = [Exception("Failed"), None]
+
+        await cog._cleanup_conversation_files(conversation)
+
+        assert cog.client.files.delete.await_count == 2
+        assert conversation.file_ids == []
+
+    @pytest.mark.asyncio
+    async def test_end_conversation_cleans_up_files(self, cog):
+        """end_conversation should remove the conversation and delete files."""
+        from src.util import ChatCompletionParameters, Conversation
+
+        conversation = Conversation(
+            params=ChatCompletionParameters(model="grok-3"),
+            chat=MagicMock(),
+            file_ids=["file-1"],
+        )
+        cog.conversations[999] = conversation
+
+        await cog.end_conversation(999)
+
+        assert 999 not in cog.conversations
+        cog.client.files.delete.assert_awaited_once_with("file-1")
+
+    @pytest.mark.asyncio
+    async def test_end_conversation_missing_id(self, cog):
+        """end_conversation with unknown ID should not error."""
+        await cog.end_conversation(999)
+        cog.client.files.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_chat_with_file_attachment(
+        self, cog, mock_discord_context, mock_xai_client, mock_file_attachment
+    ):
+        """Chat command with a non-image attachment should upload to xAI Files API."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        with patch.object(cog, "_upload_file_attachment", new_callable=AsyncMock) as mock_upload:
+            mock_upload.return_value = "file-xyz789"
+
+            await cog.chat.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="What does this file say?",
+                model="grok-3",
+                attachment=mock_file_attachment,
+            )
+
+        mock_upload.assert_awaited_once_with(mock_file_attachment)
+        assert len(cog.conversations) == 1
+        conversation = list(cog.conversations.values())[0]
+        assert "file-xyz789" in conversation.file_ids

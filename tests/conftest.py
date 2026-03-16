@@ -57,6 +57,18 @@ def mock_xai_client():
         client.video = MagicMock()
         client.video.generate = AsyncMock(return_value=mock_video_response)
 
+        # Mock files API
+        mock_uploaded_file = MagicMock()
+        mock_uploaded_file.id = "file-abc123"
+        mock_uploaded_file.filename = "document.pdf"
+        mock_uploaded_file.size = 1024
+        client.files = MagicMock()
+        client.files.upload = AsyncMock(return_value=mock_uploaded_file)
+        mock_delete_response = MagicMock()
+        mock_delete_response.deleted = True
+        mock_delete_response.id = "file-abc123"
+        client.files.delete = AsyncMock(return_value=mock_delete_response)
+
         mock_class.return_value = client
         yield client
 
@@ -95,9 +107,21 @@ def mock_discord_message():
 
 @pytest.fixture
 def mock_attachment():
-    """Create a mock Discord attachment."""
+    """Create a mock Discord image attachment."""
     attachment = MagicMock()
     attachment.url = "https://example.com/image.png"
     attachment.content_type = "image/png"
     attachment.filename = "image.png"
+    attachment.size = 1024
+    return attachment
+
+
+@pytest.fixture
+def mock_file_attachment():
+    """Create a mock Discord file attachment (non-image)."""
+    attachment = MagicMock()
+    attachment.url = "https://example.com/document.pdf"
+    attachment.content_type = "application/pdf"
+    attachment.filename = "document.pdf"
+    attachment.size = 2048
     return attachment
