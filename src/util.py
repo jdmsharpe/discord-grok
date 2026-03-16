@@ -73,6 +73,9 @@ GROK_VIDEO_MODELS = [
     "grok-imagine-video",
 ]
 
+# TTS voices
+TTS_VOICES = ["eve", "ara", "rex", "sal", "leo"]
+
 # Built-in tools supported by /grok chat.
 TOOL_WEB_SEARCH = "web_search"
 TOOL_X_SEARCH = "x_search"

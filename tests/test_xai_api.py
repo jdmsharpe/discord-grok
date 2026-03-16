@@ -418,6 +418,75 @@ class TestXAIAPICog:
             await task
 
 
+class TestTTSCommand:
+    """Tests for the /grok tts command."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        with patch("xai_sdk.AsyncClient"):
+            from src.xai_api import xAIAPI
+
+            cog = xAIAPI(bot=mock_bot)
+            return cog
+
+    @pytest.mark.asyncio
+    async def test_tts_text_too_long(self, cog, mock_discord_context):
+        """Text over 15,000 chars should be rejected."""
+        await cog.tts.callback(
+            cog,
+            ctx=mock_discord_context,
+            text="a" * 15001,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "15,000" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_tts_success(self, cog, mock_discord_context):
+        """Successful TTS should send an audio file with metadata embed."""
+        with patch.object(cog, "_generate_tts", new_callable=AsyncMock) as mock_gen:
+            mock_gen.return_value = b"fake audio bytes"
+
+            await cog.tts.callback(
+                cog,
+                ctx=mock_discord_context,
+                text="Hello world",
+                voice="eve",
+                language="en",
+                output_format="mp3",
+            )
+
+        mock_gen.assert_awaited_once_with("Hello world", "eve", "en", "mp3")
+        mock_discord_context.send_followup.assert_called_once()
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert call_kwargs["embed"].title == "Text-to-Speech Generation"
+        assert call_kwargs["file"] is not None
+
+    @pytest.mark.asyncio
+    async def test_tts_api_error(self, cog, mock_discord_context):
+        """API errors should display an error embed."""
+        with patch.object(cog, "_generate_tts", new_callable=AsyncMock) as mock_gen:
+            mock_gen.side_effect = Exception("TTS API error (HTTP 400): bad request")
+
+            await cog.tts.callback(
+                cog,
+                ctx=mock_discord_context,
+                text="Hello",
+            )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert call_kwargs["embed"].title == "Error"
+
+    def test_tts_voice_choices_match_tts_voices(self, cog):
+        """TTS command voice choices should match TTS_VOICES."""
+        from src.util import TTS_VOICES
+
+        tts_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "tts")
+        voice_option = next(opt for opt in tts_cmd.options if opt.name == "voice")
+        choice_values = sorted(c.value for c in voice_option.choices)
+        assert choice_values == sorted(TTS_VOICES)
+
+
 class TestFileUploadAndCleanup:
     """Tests for the xAI Files API integration."""
 

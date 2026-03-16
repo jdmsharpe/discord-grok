@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml/badge.svg)](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml)
 
-A Discord bot built on [Pycord 2.0](https://github.com/Pycord-Development/pycord) that integrates xAI's Grok API via the official [xAI SDK](https://github.com/xai-org/sdk-python). It provides conversational AI, image generation, and video generation accessible through Discord slash commands.
+A Discord bot built on [Pycord 2.0](https://github.com/Pycord-Development/pycord) that integrates xAI's Grok API via the official [xAI SDK](https://github.com/xai-org/sdk-python). It provides conversational AI, image generation, video generation, and text-to-speech accessible through Discord slash commands.
 
 ## Features
 
@@ -50,6 +50,15 @@ All commands are grouped under `/grok` for clean namespacing.
 - **`/grok video`**: Generate videos from text prompts
 - Customizable aspect ratio (16:9, 9:16, 1:1, 4:3, 3:4)
 - Adjustable duration and resolution (720p / 480p)
+
+### Text-to-Speech
+
+- **`/grok tts`**: Convert text to speech audio
+- Five expressive voices: Eve, Ara, Rex, Sal, Leo
+- 20+ supported languages via BCP-47 codes
+- Output formats: MP3, WAV
+- Supports xAI speech tags for expressive delivery (pauses, whispers, emphasis, etc.)
+- Maximum 15,000 characters per request
 
 ### Utility
 
