@@ -8,6 +8,7 @@ This is a Discord bot built on Pycord 2.x that integrates xAI's SDK to provide:
 - Built-in tool calling in `/grok chat`
 - Image generation
 - Video generation
+- Text-to-speech audio generation
 
 The conversation path supports optional tool calling with:
 
@@ -52,6 +53,7 @@ discord-grok/
   - `GROK_MODELS` list of all chat model IDs
   - `GROK_IMAGE_MODELS` list of image generation model IDs
   - `GROK_VIDEO_MODELS` list of video generation model IDs
+  - `TTS_VOICES` list of available TTS voice IDs (`eve`, `ara`, `rex`, `sal`, `leo`)
 - Pricing
   - `MODEL_PRICING` maps chat models to `(input_cost, output_cost)` per million tokens
   - `IMAGE_PRICING` maps image models to flat per-image cost
@@ -82,6 +84,7 @@ Main Discord cog class: `xAIAPI`
   - `/grok chat`
   - `/grok image`
   - `/grok video`
+  - `/grok tts`
   - `/grok check_permissions`
 - Conversation management:
   - Tracks per-conversation state in `self.conversations`
@@ -101,6 +104,14 @@ Main Discord cog class: `xAIAPI`
   - `xai_file(file_id)` is included in message content parts (triggers server-side `attachment_search`)
   - `_cleanup_conversation_files()` deletes all tracked files from xAI on conversation end
   - `end_conversation()` removes the conversation and cleans up files
+- TTS flow (xAI TTS REST API):
+  - `_generate_tts()` calls `POST https://api.x.ai/v1/tts` directly via aiohttp (not part of xAI SDK)
+  - Returns raw audio bytes; sent to Discord as a file attachment
+  - Supports 5 voices: `eve`, `ara`, `rex`, `sal`, `leo`
+  - Supports BCP-47 language codes (default `en`)
+  - Output formats: `mp3` (default), `wav`
+  - Text limit: 15,000 characters
+  - Constants `TTS_API_URL` and `TTS_MAX_CHARS` defined in `xai_api.py`
 - Pricing and token usage:
   - Token usage extracted via `response.usage.prompt_tokens` / `response.usage.completion_tokens` (xAI SDK uses OpenAI-style naming, not `input_tokens`/`output_tokens`)
   - `append_pricing_embed()` shows per-request cost, token counts, and daily cumulative cost for chat
@@ -148,6 +159,15 @@ Current parameter count: 21
 20. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
 21. `web_search_images` (enable image understanding during web browsing)
 
+## `/grok tts` Parameters
+
+Current parameter count: 4
+
+1. `text` (max 15,000 characters)
+2. `voice` (choices: eve, ara, rex, sal, leo; default: eve)
+3. `language` (free-text BCP-47 code; default: en)
+4. `output_format` (choices: mp3, wav; default: mp3)
+
 ## Embed and Truncation Behavior
 
 - `append_response_embeds()`:
@@ -160,6 +180,7 @@ Current parameter count: 21
   - Chat system prompt: 500 chars
   - Image prompt: 2,000 chars
   - Video prompt: 2,000 chars
+  - TTS text: 2,000 chars
 - Sources embed:
   - Up to 8 citation lines
   - HTTP citations are rendered as links
@@ -171,7 +192,7 @@ Current parameter count: 21
 | -------------------- | -------------------------------------------------------------------------- |
 | `BOT_TOKEN`          | Discord bot token                                                          |
 | `GUILD_IDS`          | Comma-separated Discord guild IDs                                          |
-| `XAI_API_KEY`        | xAI API key for chat/image/video                                           |
+| `XAI_API_KEY`        | xAI API key for chat/image/video/tts                                       |
 | `XAI_COLLECTION_IDS` | Optional comma-separated collection IDs used by `collections_search`       |
 | `SHOW_COST_EMBEDS`   | Show cost/token usage embeds on responses (`true`/`false`, default `true`) |
 

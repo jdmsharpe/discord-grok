@@ -39,6 +39,9 @@ from util import (
     truncate_text,
 )
 
+TTS_API_URL = "https://api.x.ai/v1/tts"
+TTS_MAX_CHARS = 15_000
+
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
 INLINE_CITATION_INCLUDE = "inline_citations"
@@ -217,6 +220,32 @@ class xAIAPI(commands.Cog):
         key = (user_id, date.today().isoformat())
         self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
         return self.daily_costs[key]
+
+    async def _generate_tts(
+        self, text: str, voice_id: str, language: str, codec: str
+    ) -> bytes:
+        """Call the xAI TTS REST endpoint and return raw audio bytes."""
+        session = await self._get_http_session()
+        payload: dict[str, Any] = {
+            "text": text,
+            "voice_id": voice_id,
+            "language": language,
+            "output_format": {"codec": codec},
+        }
+        async with session.post(
+            TTS_API_URL,
+            headers={
+                "Authorization": f"Bearer {XAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        ) as resp:
+            if resp.status != 200:
+                error_body = await resp.text()
+                raise Exception(
+                    f"TTS API error (HTTP {resp.status}): {error_body}"
+                )
+            return await resp.read()
 
     async def _fetch_attachment_bytes(self, attachment: Attachment) -> bytes | None:
         session = await self._get_http_session()
@@ -1225,6 +1254,94 @@ class xAIAPI(commands.Cog):
             description = format_xai_error(e)
             self.logger.error(
                 f"Video generation failed: {description}", exc_info=True
+            )
+            await ctx.send_followup(
+                embed=Embed(title="Error", description=description, color=Colour.red())
+            )
+
+    @grok.command(
+        name="tts",
+        description="Converts text to speech audio.",
+    )
+    @option("text", description="Text to convert to speech. (max 15,000 characters)", required=True, type=str)
+    @option(
+        "voice",
+        description="Voice to use for synthesis. (default: Eve)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="Eve (Energetic, upbeat)", value="eve"),
+            OptionChoice(name="Ara (Warm, friendly)", value="ara"),
+            OptionChoice(name="Rex (Confident, clear)", value="rex"),
+            OptionChoice(name="Sal (Smooth, balanced)", value="sal"),
+            OptionChoice(name="Leo (Authoritative, strong)", value="leo"),
+        ],
+    )
+    @option(
+        "language",
+        description="BCP-47 language code, e.g. en, zh, ja, fr, de, es-ES. (default: en)",
+        required=False,
+        type=str,
+    )
+    @option(
+        "output_format",
+        description="Audio output format. (default: mp3)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="MP3", value="mp3"),
+            OptionChoice(name="WAV", value="wav"),
+        ],
+    )
+    async def tts(
+        self,
+        ctx: ApplicationContext,
+        text: str,
+        voice: str = "eve",
+        language: str = "en",
+        output_format: str = "mp3",
+    ):
+        """
+        Converts text to speech audio using the xAI TTS API.
+        """
+        await ctx.defer()
+
+        try:
+            if len(text) > TTS_MAX_CHARS:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description=f"Text exceeds the {TTS_MAX_CHARS:,} character limit ({len(text):,} characters provided).",
+                        color=Colour.red(),
+                    )
+                )
+                return
+
+            self.logger.info(
+                f"Generating TTS with voice={voice}, language={language}, format={output_format}"
+            )
+            audio_bytes = await self._generate_tts(text, voice, language, output_format)
+
+            description = f"**Text:** {truncate_text(text, 2000)}\n"
+            description += f"**Voice:** {voice}\n"
+            description += f"**Language:** {language}\n"
+            description += f"**Format:** {output_format}\n"
+
+            embed = Embed(
+                title="Text-to-Speech Generation",
+                description=description,
+                color=Colour.dark_teal(),
+            )
+            data = io.BytesIO(audio_bytes)
+            await ctx.send_followup(
+                embed=embed, file=File(data, f"speech.{output_format}")
+            )
+            self.logger.info("Successfully generated and sent TTS audio")
+
+        except Exception as e:
+            description = format_xai_error(e)
+            self.logger.error(
+                f"TTS generation failed: {description}", exc_info=True
             )
             await ctx.send_followup(
                 embed=Embed(title="Error", description=description, color=Colour.red())

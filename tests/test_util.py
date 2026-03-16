@@ -218,6 +218,20 @@ class TestModelLists:
             assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
 
 
+class TestTTSConstants:
+    """Tests for TTS-related constants."""
+
+    def test_tts_voices_contains_all_voices(self):
+        from src.util import TTS_VOICES
+
+        assert TTS_VOICES == ["eve", "ara", "rex", "sal", "leo"]
+
+    def test_tts_voices_has_five_entries(self):
+        from src.util import TTS_VOICES
+
+        assert len(TTS_VOICES) == 5
+
+
 class TestToolHelpers:
     """Tests for tool helper constants and functions."""
 
