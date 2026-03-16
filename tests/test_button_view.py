@@ -147,3 +147,27 @@ class TestButtonView:
             "Collections config missing"
             in interaction.response.send_message.call_args.args[0]
         )
+
+    @pytest.mark.asyncio
+    async def test_stop_button_calls_end_conversation(self, cog, conversation_starter):
+        """Stop button should call end_conversation to clean up files."""
+        from src.button_view import ButtonView
+
+        cog.end_conversation = AsyncMock()
+
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=111,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.stop_button.callback(interaction)
+
+        cog.end_conversation.assert_awaited_once_with(111)
+        call_args = interaction.response.send_message.call_args
+        assert "Conversation ended" in call_args.args[0]

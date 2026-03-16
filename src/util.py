@@ -92,6 +92,7 @@ class Conversation:
 
     params: ChatCompletionParameters
     chat: Any  # The xai_sdk Chat object
+    file_ids: list[str] = field(default_factory=list)
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_TEXT_SIZE) -> list[str]:
