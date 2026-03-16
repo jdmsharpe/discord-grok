@@ -1,7 +1,7 @@
 import asyncio
 import io
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, TypedDict, cast
 
 import aiohttp
@@ -31,6 +31,9 @@ from util import (
     TOOL_COLLECTIONS_SEARCH,
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
+    calculate_cost,
+    calculate_image_cost,
+    calculate_video_cost,
     chunk_text,
     format_xai_error,
     truncate_text,
@@ -134,6 +137,31 @@ def append_sources_embed(embeds: list[Embed], citations: list[str]) -> None:
     )
 
 
+def append_pricing_embed(
+    embeds: list[Embed],
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    daily_cost: float,
+) -> None:
+    """Append a compact pricing embed showing cost and token usage."""
+    cost = calculate_cost(model, input_tokens, output_tokens)
+    description = (
+        f"{model} · ${cost:.4f} · {input_tokens:,} in / {output_tokens:,} out · daily ${daily_cost:.2f}"
+    )
+    embeds.append(Embed(description=description, color=Colour.orange()))
+
+
+def append_generation_pricing_embed(
+    embeds: list[Embed],
+    cost: float,
+    daily_cost: float,
+) -> None:
+    """Append a compact pricing embed for image/video generation."""
+    description = f"${cost:.4f} · daily ${daily_cost:.2f}"
+    embeds.append(Embed(description=description, color=Colour.orange()))
+
+
 class xAIAPI(commands.Cog):
     grok = SlashCommandGroup("grok", "xAI Grok commands", guild_ids=GUILD_IDS)
 
@@ -158,6 +186,8 @@ class xAIAPI(commands.Cog):
         self.message_to_conversation_id: dict[int, int] = {}
         # Dictionary to store UI views for each conversation
         self.views = {}
+        # Daily cost tracking: (user_id, date_iso) -> cumulative cost
+        self.daily_costs: dict[tuple[int, str], float] = {}
         self._http_session: aiohttp.ClientSession | None = None
         self._session_lock = asyncio.Lock()
 
@@ -168,6 +198,21 @@ class xAIAPI(commands.Cog):
             if self._http_session is None or self._http_session.closed:
                 self._http_session = aiohttp.ClientSession()
             return self._http_session
+
+    def _track_daily_cost(
+        self, user_id: int, model: str, input_tokens: int, output_tokens: int
+    ) -> float:
+        """Add this request's cost to the user's daily total and return the new daily total."""
+        cost = calculate_cost(model, input_tokens, output_tokens)
+        key = (user_id, date.today().isoformat())
+        self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
+        return self.daily_costs[key]
+
+    def _track_daily_cost_flat(self, user_id: int, cost: float) -> float:
+        """Add a flat cost to the user's daily total and return the new daily total."""
+        key = (user_id, date.today().isoformat())
+        self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
+        return self.daily_costs[key]
 
     async def _fetch_attachment_bytes(self, attachment: Attachment) -> bytes | None:
         session = await self._get_http_session()
@@ -351,6 +396,11 @@ class xAIAPI(commands.Cog):
             reasoning_text = response.reasoning_content or ""
             tool_info = extract_tool_info(response)
 
+            # Extract token usage (xAI SDK uses prompt_tokens/completion_tokens)
+            usage = getattr(response, "usage", None)
+            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(usage, "completion_tokens", 0) or 0
+
             # Stop typing as soon as we have the response
             if typing_task:
                 typing_task.cancel()
@@ -362,6 +412,12 @@ class xAIAPI(commands.Cog):
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
             append_sources_embed(embeds, tool_info["citations"])
+            daily_cost = self._track_daily_cost(
+                message.author.id, params.model, input_tokens, output_tokens
+            )
+            append_pricing_embed(
+                embeds, params.model, input_tokens, output_tokens, daily_cost
+            )
 
             view = self.views.get(message.author)
             main_conversation_id = params.conversation_id
@@ -881,6 +937,11 @@ class xAIAPI(commands.Cog):
             reasoning_text = response.reasoning_content or ""
             tool_info = extract_tool_info(response)
 
+            # Extract token usage (xAI SDK uses prompt_tokens/completion_tokens)
+            usage = getattr(response, "usage", None)
+            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            output_tokens = getattr(usage, "completion_tokens", 0) or 0
+
             # Add assistant response to chat history
             chat.append(response)
 
@@ -913,6 +974,12 @@ class xAIAPI(commands.Cog):
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
             append_sources_embed(embeds, tool_info["citations"])
+            daily_cost = self._track_daily_cost(
+                ctx.author.id, model, input_tokens, output_tokens
+            )
+            append_pricing_embed(
+                embeds, model, input_tokens, output_tokens, daily_cost
+            )
 
             if len(embeds) == 1:
                 await ctx.send_followup("No response generated.")
@@ -1016,6 +1083,9 @@ class xAIAPI(commands.Cog):
                 aspect_ratio=cast(ImageAspectRatio, aspect_ratio),
             )
 
+            image_cost = calculate_image_cost(model)
+            daily_cost = self._track_daily_cost_flat(ctx.author.id, image_cost)
+
             if result.url:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(result.url) as resp:
@@ -1034,7 +1104,9 @@ class xAIAPI(commands.Cog):
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
-                await ctx.send_followup(embed=embed, file=file)
+                embeds = [embed]
+                append_generation_pricing_embed(embeds, image_cost, daily_cost)
+                await ctx.send_followup(embeds=embeds, file=file)
                 self.logger.info("Successfully generated and sent image")
 
             elif result.base64:
@@ -1053,7 +1125,9 @@ class xAIAPI(commands.Cog):
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
-                await ctx.send_followup(embed=embed, file=file)
+                embeds = [embed]
+                append_generation_pricing_embed(embeds, image_cost, daily_cost)
+                await ctx.send_followup(embeds=embeds, file=file)
                 self.logger.info("Successfully generated and sent image")
 
             else:
@@ -1132,6 +1206,9 @@ class xAIAPI(commands.Cog):
                         raise Exception(f"Failed to download video: HTTP {resp.status}")
                     video_bytes = await resp.read()
 
+            video_cost = calculate_video_cost(duration)
+            daily_cost = self._track_daily_cost_flat(ctx.author.id, video_cost)
+
             data = io.BytesIO(video_bytes)
             description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
             description += f"**Aspect Ratio:** {aspect_ratio}\n"
@@ -1143,7 +1220,9 @@ class xAIAPI(commands.Cog):
                 description=description,
                 color=Colour.dark_teal(),
             )
-            await ctx.send_followup(embed=embed, file=File(data, "video.mp4"))
+            embeds = [embed]
+            append_generation_pricing_embed(embeds, video_cost, daily_cost)
+            await ctx.send_followup(embeds=embeds, file=File(data, "video.mp4"))
             self.logger.info("Successfully generated and sent video")
 
         except Exception as e:

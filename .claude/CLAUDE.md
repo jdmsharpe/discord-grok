@@ -43,6 +43,11 @@ discord-grok/
 
 ### `src/util.py`
 
+- Pricing
+  - `MODEL_PRICING` maps chat models to `(input_cost, output_cost)` per million tokens
+  - `IMAGE_PRICING` maps image models to flat per-image cost
+  - `VIDEO_PRICING_PER_SECOND` flat per-second video cost
+  - `calculate_cost()`, `calculate_image_cost()`, `calculate_video_cost()`
 - `ChatCompletionParameters`
   - Stores conversational model settings and Discord conversation metadata
   - Includes `tools` for active tool configuration in ongoing conversations
@@ -86,6 +91,13 @@ Main Discord cog class: `xAIAPI`
   - `xai_file(file_id)` is included in message content parts (triggers server-side `attachment_search`)
   - `_cleanup_conversation_files()` deletes all tracked files from xAI on conversation end
   - `end_conversation()` removes the conversation and cleans up files
+- Pricing and token usage:
+  - Token usage extracted via `response.usage.prompt_tokens` / `response.usage.completion_tokens` (xAI SDK uses OpenAI-style naming, not `input_tokens`/`output_tokens`)
+  - `append_pricing_embed()` shows per-request cost, token counts, and daily cumulative cost for chat
+  - `append_generation_pricing_embed()` shows flat cost for image/video generation
+  - `_track_daily_cost()` accumulates token-based costs per `(user_id, date)`
+  - `_track_daily_cost_flat()` accumulates flat costs (image/video) per `(user_id, date)`
+  - `self.daily_costs` dict keyed by `(user_id, date_iso_str)`
 
 ### `src/button_view.py`
 

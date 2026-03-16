@@ -36,6 +36,10 @@ def mock_xai_client():
         mock_response.id = "resp_01XFDUDYJgAACzvnptvVoYEL"
         mock_response.role = "assistant"
         mock_response.finish_reason = "stop"
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 25
+        mock_usage.completion_tokens = 50
+        mock_response.usage = mock_usage
 
         mock_chat.sample = AsyncMock(return_value=mock_response)
         mock_chat.append = MagicMock()
