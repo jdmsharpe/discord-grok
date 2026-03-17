@@ -73,22 +73,67 @@ class TestTrackDailyCost:
 class TestExtractToolInfo:
     """Tests for extract_tool_info helper."""
 
-    def test_extract_tool_info_deduplicates_citations(self):
+    def test_fallback_deduplicates_and_classifies_citations(self):
+        """When inline_citations is absent, falls back to response.citations."""
         from src.xai_api import extract_tool_info
 
         response = MagicMock()
+        response.inline_citations = None
         response.citations = [
             "https://x.ai/news",
             "https://x.ai/news",
+            "https://x.com/i/status/123",
             "collections://collection_1/files/file_1",
         ]
 
         result = extract_tool_info(response)
 
         assert result["citations"] == [
-            "https://x.ai/news",
-            "collections://collection_1/files/file_1",
+            {"url": "https://x.ai/news", "source": "web"},
+            {"url": "https://x.com/i/status/123", "source": "x"},
+            {"url": "collections://collection_1/files/file_1", "source": "collections"},
         ]
+
+    def test_inline_citations_web_and_x(self):
+        """Structured inline_citations are preferred and typed correctly."""
+        from src.xai_api import extract_tool_info
+
+        web_cit = MagicMock()
+        web_cit.HasField = lambda f: f == "web_citation"
+        web_cit.web_citation.url = "https://example.com/article"
+
+        x_cit = MagicMock()
+        x_cit.HasField = lambda f: f == "x_citation"
+        x_cit.x_citation.url = "https://x.com/i/status/456"
+
+        response = MagicMock()
+        response.inline_citations = [web_cit, x_cit]
+
+        result = extract_tool_info(response)
+
+        assert result["citations"] == [
+            {"url": "https://example.com/article", "source": "web"},
+            {"url": "https://x.com/i/status/456", "source": "x"},
+        ]
+
+    def test_inline_citations_deduplicates(self):
+        """Duplicate URLs in inline_citations are deduplicated."""
+        from src.xai_api import extract_tool_info
+
+        cit1 = MagicMock()
+        cit1.HasField = lambda f: f == "web_citation"
+        cit1.web_citation.url = "https://example.com"
+
+        cit2 = MagicMock()
+        cit2.HasField = lambda f: f == "web_citation"
+        cit2.web_citation.url = "https://example.com"
+
+        response = MagicMock()
+        response.inline_citations = [cit1, cit2]
+
+        result = extract_tool_info(response)
+
+        assert len(result["citations"]) == 1
 
 
 class TestAppendReasoningEmbeds:
