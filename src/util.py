@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from discord import Member, User
-from xai_sdk.tools import code_execution, web_search, x_search
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
@@ -109,11 +108,11 @@ AVAILABLE_TOOLS = {
     TOOL_COLLECTIONS_SEARCH: "Collections Search",
 }
 
-# Tool builders that don't require runtime configuration.
-TOOL_BUILDERS: dict[str, Callable[[], Any]] = {
-    TOOL_WEB_SEARCH: web_search,
-    TOOL_X_SEARCH: x_search,
-    TOOL_CODE_EXECUTION: code_execution,
+# Tool builders that produce Responses API JSON tool dicts.
+TOOL_BUILDERS: dict[str, Callable[..., dict[str, Any]]] = {
+    TOOL_WEB_SEARCH: lambda **kw: {"type": "web_search", **kw},
+    TOOL_X_SEARCH: lambda **kw: {"type": "x_search", **kw},
+    TOOL_CODE_EXECUTION: lambda **kw: {"type": "code_interpreter"},
 }
 
 
@@ -123,21 +122,29 @@ TOOL_USAGE_DISPLAY_NAMES: dict[str, str] = {
     "SERVER_SIDE_TOOL_X_SEARCH": "X Search",
     "SERVER_SIDE_TOOL_CODE_EXECUTION": "Code Execution",
     "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": "Collections Search",
+    "SERVER_SIDE_TOOL_CODE_INTERPRETER": "Code Execution",
+    "SERVER_SIDE_TOOL_FILE_SEARCH": "Collections Search",
     "SERVER_SIDE_TOOL_VIEW_X_VIDEO": "X Video",
     "SERVER_SIDE_TOOL_VIEW_IMAGE": "Image View",
     "SERVER_SIDE_TOOL_MCP": "MCP",
 }
 
 
-def resolve_tool_name(tool_config: Any) -> str | None:
-    """Resolve a tool proto to its tool name."""
-    which_oneof = getattr(tool_config, "WhichOneof", None)
-    if not callable(which_oneof):
-        return None
+_TOOL_TYPE_TO_CANONICAL: dict[str, str] = {
+    "web_search": TOOL_WEB_SEARCH,
+    "x_search": TOOL_X_SEARCH,
+    "code_interpreter": TOOL_CODE_EXECUTION,
+    "file_search": TOOL_COLLECTIONS_SEARCH,
+}
 
-    tool_name = which_oneof("tool")
-    if tool_name in AVAILABLE_TOOLS:
-        return tool_name
+
+def resolve_tool_name(tool_config: Any) -> str | None:
+    """Resolve a Responses API tool dict to its canonical tool name."""
+    if not isinstance(tool_config, dict):
+        return None
+    canonical = _TOOL_TYPE_TO_CANONICAL.get(tool_config.get("type"))
+    if canonical in AVAILABLE_TOOLS:
+        return canonical
     return None
 
 
@@ -169,7 +176,8 @@ class Conversation:
     """A dataclass to store conversation state."""
 
     params: ChatCompletionParameters
-    chat: Any  # The xai_sdk Chat object
+    previous_response_id: str | None = None
+    response_id_history: list[str] = field(default_factory=list)
     file_ids: list[str] = field(default_factory=list)
 
 

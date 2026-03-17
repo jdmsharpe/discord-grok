@@ -19,37 +19,42 @@ def mock_bot():
     return bot
 
 
+MOCK_RESPONSES_API_RESPONSE: dict = {
+    "id": "resp_01XFDUDYJgAACzvnptvVoYEL",
+    "output": [
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "output_text",
+                    "text": "Hello! How can I help you today?",
+                    "annotations": [],
+                }
+            ],
+        }
+    ],
+    "usage": {
+        "input_tokens": 25,
+        "output_tokens": 50,
+        "total_tokens": 75,
+        "input_tokens_details": {
+            "cached_tokens": 0,
+            "image_tokens": 0,
+            "text_tokens": 25,
+        },
+        "output_tokens_details": {
+            "reasoning_tokens": 0,
+        },
+    },
+    "server_side_tool_usage": {},
+}
+
+
 @pytest.fixture
 def mock_xai_client():
-    """Create a mock xAI SDK AsyncClient."""
+    """Create a mock xAI SDK AsyncClient (files, image, video only)."""
     with patch("xai_sdk.AsyncClient") as mock_class:
         client = MagicMock()
-
-        # Mock chat.create -> Chat object -> sample() -> Response
-        mock_chat = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = "Hello! How can I help you today?"
-        mock_response.reasoning_content = ""
-        mock_response.citations = []
-        mock_response.server_side_tool_usage = {}
-        mock_response.tool_calls = []
-        mock_response.id = "resp_01XFDUDYJgAACzvnptvVoYEL"
-        mock_response.role = "assistant"
-        mock_response.finish_reason = "stop"
-        mock_usage = MagicMock()
-        mock_usage.prompt_tokens = 25
-        mock_usage.completion_tokens = 50
-        mock_usage.reasoning_tokens = 0
-        mock_usage.cached_prompt_text_tokens = 0
-        mock_usage.prompt_image_tokens = 0
-        mock_response.usage = mock_usage
-
-        mock_chat.sample = AsyncMock(return_value=mock_response)
-        mock_chat.append = MagicMock()
-        mock_chat.messages = []
-
-        client.chat = MagicMock()
-        client.chat.create = MagicMock(return_value=mock_chat)
 
         # Mock image.sample
         mock_image_response = MagicMock()

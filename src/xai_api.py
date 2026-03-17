@@ -1,15 +1,14 @@
 import asyncio
 import io
 import logging
+import re
 from datetime import date, datetime
 from typing import Any, Literal, TypedDict, cast
 
 import aiohttp
 
 from xai_sdk import AsyncClient
-from xai_sdk.chat import file as xai_file, image, system, user
 from xai_sdk.image import ImageAspectRatio
-from xai_sdk.tools import collections_search as collections_search_tool
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
 from discord import (
@@ -45,11 +44,13 @@ from util import (
 
 TTS_API_URL = "https://api.x.ai/v1/tts"
 TTS_MAX_CHARS = 15_000
+RESPONSES_API_URL = "https://api.x.ai/v1/responses"
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MiB xAI image understanding limit
 MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
-INLINE_CITATION_INCLUDE = "inline_citations"
+
+_CITATION_MARKER_RE = re.compile(r"\[\[\d+\]\]\([^)]+\)")
 
 
 class CitationInfo(TypedDict):
@@ -90,7 +91,7 @@ def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
             Embed(
                 title="Response" + (f" (Part {index})" if index > 1 else ""),
                 description=chunk,
-                color=Colour.dark_teal(),
+                color=Colour(0x000000),
             )
         )
 
@@ -104,68 +105,23 @@ def _classify_citation_url(url: str) -> Literal["web", "x", "collections"]:
     return "web"
 
 
-def extract_tool_info(response: Any) -> ToolInfo:
-    """Extract structured citation data from an xAI SDK response.
-
-    Prefers ``response.inline_citations`` (typed web/x citation objects)
-    and falls back to ``response.citations`` (flat URL list).
-    """
+def extract_tool_info(response_json: dict[str, Any]) -> ToolInfo:
+    """Extract structured citation data from a Responses API JSON response."""
     citations: list[CitationInfo] = []
     seen_urls: set[str] = set()
 
-    # Prefer structured inline citations when available
-    inline_citations = getattr(response, "inline_citations", None)
-    if inline_citations:
-        for citation in inline_citations:
-            url: str | None = None
-            source: Literal["web", "x", "collections"] = "web"
-
-            if hasattr(citation, "HasField"):
-                if citation.HasField("x_citation"):
-                    url = citation.x_citation.url
-                    source = "x"
-                elif citation.HasField("web_citation"):
-                    url = citation.web_citation.url
-                    source = "web"
-            else:
-                # Fallback for plain attribute access
-                x_cit = getattr(citation, "x_citation", None)
-                web_cit = getattr(citation, "web_citation", None)
-                if x_cit and getattr(x_cit, "url", None):
-                    url = x_cit.url
-                    source = "x"
-                elif web_cit and getattr(web_cit, "url", None):
-                    url = web_cit.url
-                    source = "web"
-
-            if not url:
-                continue
-            url = str(url).strip()
-            if not url or url in seen_urls:
-                continue
-            seen_urls.add(url)
-            citations.append({"url": url, "source": source})
-
-        return {"citations": citations}
-
-    # Fallback: flat response.citations list
-    citations_value = getattr(response, "citations", [])
-    if citations_value is None:
-        citation_items: list[Any] = []
-    elif isinstance(citations_value, (list, tuple, set)):
-        citation_items = list(citations_value)
-    else:
-        try:
-            citation_items = list(citations_value)
-        except TypeError:
-            citation_items = []
-
-    for citation in citation_items:
-        citation_url = str(citation).strip()
-        if not citation_url or citation_url in seen_urls:
-            continue
-        seen_urls.add(citation_url)
-        citations.append({"url": citation_url, "source": _classify_citation_url(citation_url)})
+    for output_item in response_json.get("output", []):
+        for content_part in output_item.get("content", []) if isinstance(output_item, dict) else []:
+            for annotation in content_part.get("annotations", []) if isinstance(content_part, dict) else []:
+                if not isinstance(annotation, dict):
+                    continue
+                if annotation.get("type") != "url_citation":
+                    continue
+                url = str(annotation.get("url", "")).strip()
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                citations.append({"url": url, "source": _classify_citation_url(url)})
 
     return {"citations": citations}
 
@@ -367,6 +323,130 @@ class xAIAPI(commands.Cog):
                 )
             return await resp.read()
 
+    async def _call_responses_api(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Call the xAI Responses API and return the parsed JSON response."""
+        session = await self._get_http_session()
+        async with session.post(
+            RESPONSES_API_URL,
+            headers={
+                "Authorization": f"Bearer {XAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        ) as resp:
+            if resp.status != 200:
+                error_body = await resp.text()
+                raise Exception(
+                    f"Responses API error (HTTP {resp.status}): {error_body}"
+                )
+            return await resp.json()
+
+    def _build_responses_payload(
+        self,
+        model: str,
+        input_messages: list[dict[str, Any]],
+        *,
+        previous_response_id: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        frequency_penalty: float | None = None,
+        presence_penalty: float | None = None,
+        reasoning_effort: str | None = None,
+        agent_count: int | None = None,
+    ) -> dict[str, Any]:
+        """Build a JSON payload for the Responses API."""
+        payload: dict[str, Any] = {
+            "model": model,
+            "input": input_messages,
+            "store": True,
+        }
+        if previous_response_id:
+            payload["previous_response_id"] = previous_response_id
+        if tools:
+            payload["tools"] = tools
+        if tools or model in MULTI_AGENT_MODELS:
+            payload["include"] = ["reasoning.encrypted_content"]
+        if max_output_tokens is not None:
+            payload["max_output_tokens"] = max_output_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if frequency_penalty is not None:
+            payload["frequency_penalty"] = frequency_penalty
+        if presence_penalty is not None:
+            payload["presence_penalty"] = presence_penalty
+        if reasoning_effort is not None:
+            payload["reasoning_effort"] = reasoning_effort
+        if agent_count is not None:
+            payload["agent_count"] = agent_count
+        return payload
+
+    @staticmethod
+    def _build_user_message(content_parts: list[Any]) -> dict[str, Any]:
+        """Build a user message from a list of content parts."""
+        if len(content_parts) == 1 and isinstance(content_parts[0], str):
+            return {"role": "user", "content": content_parts[0]}
+        content = []
+        for part in content_parts:
+            if isinstance(part, str):
+                content.append({"type": "input_text", "text": part})
+            elif isinstance(part, dict):
+                content.append(part)
+        return {"role": "user", "content": content}
+
+    @staticmethod
+    def _extract_response_text(response_json: dict[str, Any]) -> tuple[str, str]:
+        """Extract response text and reasoning text from a Responses API response."""
+        response_text = ""
+        reasoning_text = ""
+        for output_item in response_json.get("output", []):
+            if not isinstance(output_item, dict):
+                continue
+            if output_item.get("type") == "reasoning":
+                for part in output_item.get("summary", []):
+                    if isinstance(part, dict) and part.get("type") == "summary_text":
+                        reasoning_text += part.get("text", "")
+            elif output_item.get("role") == "assistant":
+                for content_part in output_item.get("content", []):
+                    if isinstance(content_part, dict) and content_part.get("type") == "output_text":
+                        response_text += content_part.get("text", "")
+        response_text = _CITATION_MARKER_RE.sub("", response_text).strip()
+        return response_text or "No response.", reasoning_text
+
+    @staticmethod
+    def _extract_usage(response_json: dict[str, Any]) -> dict[str, int]:
+        """Extract token usage from a Responses API response.
+
+        The Responses API uses ``input_tokens`` / ``output_tokens`` and
+        ``input_tokens_details`` / ``output_tokens_details``.  We also
+        accept the Chat Completions names as a fallback.
+        """
+        usage = response_json.get("usage", {})
+        input_details = (
+            usage.get("input_tokens_details")
+            or usage.get("prompt_tokens_details")
+            or {}
+        )
+        output_details = (
+            usage.get("output_tokens_details")
+            or usage.get("completion_tokens_details")
+            or {}
+        )
+        return {
+            "input_tokens": (
+                usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+            ),
+            "output_tokens": (
+                usage.get("output_tokens") or usage.get("completion_tokens") or 0
+            ),
+            "reasoning_tokens": output_details.get("reasoning_tokens", 0) or 0,
+            "cached_tokens": input_details.get("cached_tokens", 0) or 0,
+            "image_tokens": input_details.get("image_tokens", 0) or 0,
+        }
+
     async def _fetch_attachment_bytes(self, attachment: Attachment) -> bytes | None:
         session = await self._get_http_session()
         try:
@@ -456,9 +536,9 @@ class xAIAPI(commands.Cog):
         selected_tool_names: list[str],
         x_search_kwargs: dict[str, Any] | None = None,
         web_search_kwargs: dict[str, Any] | None = None,
-    ) -> tuple[list[Any], str | None]:
-        """Build tool payloads for the selected tool names."""
-        tools: list[Any] = []
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Build Responses API tool dicts for the selected tool names."""
+        tools: list[dict[str, Any]] = []
 
         for tool_name in selected_tool_names:
             if tool_name == TOOL_COLLECTIONS_SEARCH:
@@ -467,21 +547,23 @@ class xAIAPI(commands.Cog):
                         [],
                         "Collections search requires XAI_COLLECTION_IDS to be set in your .env.",
                     )
-                tools.append(
-                    collections_search_tool(collection_ids=XAI_COLLECTION_IDS.copy())
-                )
+                tools.append({
+                    "type": "file_search",
+                    "vector_store_ids": XAI_COLLECTION_IDS.copy(),
+                })
                 continue
 
             if tool_name == TOOL_X_SEARCH and x_search_kwargs:
-                tool_builder = TOOL_BUILDERS.get(tool_name)
-                if tool_builder is not None:
-                    tools.append(tool_builder(**x_search_kwargs))
+                # Convert datetime objects to ISO strings for REST
+                kw = dict(x_search_kwargs)
+                for date_key in ("from_date", "to_date"):
+                    if isinstance(kw.get(date_key), datetime):
+                        kw[date_key] = kw[date_key].isoformat()
+                tools.append({"type": "x_search", **kw})
                 continue
 
             if tool_name == TOOL_WEB_SEARCH and web_search_kwargs:
-                tool_builder = TOOL_BUILDERS.get(tool_name)
-                if tool_builder is not None:
-                    tools.append(tool_builder(**web_search_kwargs))
+                tools.append({"type": "web_search", **web_search_kwargs})
                 continue
 
             tool_builder = TOOL_BUILDERS.get(tool_name)
@@ -490,19 +572,6 @@ class xAIAPI(commands.Cog):
             tools.append(tool_builder())
 
         return tools, None
-
-    def _apply_tools_to_chat(self, chat: Any, tools: list[Any]) -> None:
-        """Apply the current tool set to a mutable xAI chat request."""
-        chat_proto = getattr(chat, "proto", None)
-        if chat_proto is None:
-            return
-
-        try:
-            chat_proto.ClearField("tools")
-            if tools:
-                chat_proto.tools.extend(tools)
-        except Exception as error:
-            self.logger.warning("Unable to update chat tools dynamically: %s", error)
 
     async def handle_new_message_in_conversation(
         self, message, conversation: Conversation
@@ -515,7 +584,6 @@ class xAIAPI(commands.Cog):
             conversation: The conversation object.
         """
         params = conversation.params
-        chat = conversation.chat
 
         self.logger.info(
             f"Handling new message in conversation {params.conversation_id}."
@@ -530,7 +598,7 @@ class xAIAPI(commands.Cog):
             typing_task = asyncio.create_task(self.keep_typing(message.channel))
 
             # Build user message content
-            content_parts = []
+            content_parts: list[Any] = []
             if message.content:
                 content_parts.append(message.content)
             if message.attachments:
@@ -543,38 +611,52 @@ class xAIAPI(commands.Cog):
                                 attachment.size,
                             )
                             continue
-                        content_parts.append(image(attachment.url, detail="high"))
+                        content_parts.append({"type": "input_image", "image_url": attachment.url, "detail": "high"})
                     else:
                         file_id = await self._upload_file_attachment(attachment)
                         if file_id:
                             conversation.file_ids.append(file_id)
-                            content_parts.append(xai_file(file_id))
+                            content_parts.append({"type": "input_file", "file_id": file_id})
 
-            if content_parts:
-                chat.append(user(*content_parts))
+            if not content_parts:
+                return
 
-            self._apply_tools_to_chat(chat, params.tools)
-            response = await chat.sample()
-            response_text = response.content or "No response."
-            reasoning_text = response.reasoning_content or ""
-            tool_info = extract_tool_info(response)
+            input_messages = [self._build_user_message(content_parts)]
+            payload = self._build_responses_payload(
+                model=params.model,
+                input_messages=input_messages,
+                previous_response_id=conversation.previous_response_id,
+                tools=params.tools or None,
+                max_output_tokens=params.max_tokens,
+                temperature=params.temperature,
+                top_p=params.top_p,
+                frequency_penalty=params.frequency_penalty,
+                presence_penalty=params.presence_penalty,
+                reasoning_effort=params.reasoning_effort,
+                agent_count=params.agent_count,
+            )
+            response_json = await self._call_responses_api(payload)
+            response_text, reasoning_text = self._extract_response_text(response_json)
+            tool_info = extract_tool_info(response_json)
 
-            # Extract token usage (xAI SDK uses prompt_tokens/completion_tokens)
-            usage = getattr(response, "usage", None)
-            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            output_tokens = getattr(usage, "completion_tokens", 0) or 0
-            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
-            cached_tokens = getattr(usage, "cached_prompt_text_tokens", 0) or 0
-            image_tokens = getattr(usage, "prompt_image_tokens", 0) or 0
-            tool_usage = getattr(response, "server_side_tool_usage", None) or {}
+            usage = self._extract_usage(response_json)
+            input_tokens = usage["input_tokens"]
+            output_tokens = usage["output_tokens"]
+            reasoning_tokens = usage["reasoning_tokens"]
+            cached_tokens = usage["cached_tokens"]
+            image_tokens = usage["image_tokens"]
+            tool_usage = response_json.get("server_side_tool_usage", {})
 
             # Stop typing as soon as we have the response
             if typing_task:
                 typing_task.cancel()
                 typing_task = None
 
-            # Add assistant response to chat history
-            chat.append(response)
+            # Update conversation state
+            response_id = response_json.get("id")
+            if response_id:
+                conversation.response_id_history.append(response_id)
+                conversation.previous_response_id = response_id
 
             append_reasoning_embeds(embeds, reasoning_text)
             append_response_embeds(embeds, response_text)
@@ -1123,9 +1205,9 @@ class xAIAPI(commands.Cog):
                 return
 
             # Build initial messages
-            initial_messages = []
+            initial_messages: list[dict[str, Any]] = []
             if system_prompt:
-                initial_messages.append(system(system_prompt))
+                initial_messages.append({"role": "system", "content": system_prompt})
 
             # Build user message content parts
             uploaded_file_ids: list[str] = []
@@ -1138,56 +1220,37 @@ class xAIAPI(commands.Cog):
                             ephemeral=True,
                         )
                         return
-                    content_parts.append(image(attachment.url, detail="high"))
+                    content_parts.append({"type": "input_image", "image_url": attachment.url, "detail": "high"})
                 else:
                     file_id = await self._upload_file_attachment(attachment)
                     if file_id:
                         uploaded_file_ids.append(file_id)
-                        content_parts.append(xai_file(file_id))
-            initial_messages.append(user(*content_parts))
+                        content_parts.append({"type": "input_file", "file_id": file_id})
+            initial_messages.append(self._build_user_message(content_parts))
 
-            # Build create kwargs
-            create_kwargs = {
-                "model": model,
-                "messages": initial_messages,
-                "include": [INLINE_CITATION_INCLUDE],
-            }
-            if max_tokens is not None:
-                create_kwargs["max_tokens"] = max_tokens
-            if temperature is not None:
-                create_kwargs["temperature"] = temperature
-            if top_p is not None:
-                create_kwargs["top_p"] = top_p
-            if frequency_penalty is not None:
-                create_kwargs["frequency_penalty"] = frequency_penalty
-            if presence_penalty is not None:
-                create_kwargs["presence_penalty"] = presence_penalty
-            if reasoning_effort is not None:
-                create_kwargs["reasoning_effort"] = reasoning_effort
-            if is_multi_agent:
-                if agent_count is not None:
-                    create_kwargs["agent_count"] = agent_count
-            if tools:
-                create_kwargs["tools"] = tools
-            if is_multi_agent or tools:
-                create_kwargs["use_encrypted_content"] = True
-            chat = self.client.chat.create(**create_kwargs)
-            response = await chat.sample()
-            response_text = response.content or "No response."
-            reasoning_text = response.reasoning_content or ""
-            tool_info = extract_tool_info(response)
+            payload = self._build_responses_payload(
+                model=model,
+                input_messages=initial_messages,
+                tools=tools or None,
+                max_output_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                frequency_penalty=frequency_penalty,
+                presence_penalty=presence_penalty,
+                reasoning_effort=reasoning_effort,
+                agent_count=agent_count if is_multi_agent else None,
+            )
+            response_json = await self._call_responses_api(payload)
+            response_text, reasoning_text = self._extract_response_text(response_json)
+            tool_info = extract_tool_info(response_json)
 
-            # Extract token usage (xAI SDK uses prompt_tokens/completion_tokens)
-            usage = getattr(response, "usage", None)
-            input_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            output_tokens = getattr(usage, "completion_tokens", 0) or 0
-            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
-            cached_tokens = getattr(usage, "cached_prompt_text_tokens", 0) or 0
-            image_tokens = getattr(usage, "prompt_image_tokens", 0) or 0
-            tool_usage = getattr(response, "server_side_tool_usage", None) or {}
-
-            # Add assistant response to chat history
-            chat.append(response)
+            usage = self._extract_usage(response_json)
+            input_tokens = usage["input_tokens"]
+            output_tokens = usage["output_tokens"]
+            reasoning_tokens = usage["reasoning_tokens"]
+            cached_tokens = usage["cached_tokens"]
+            image_tokens = usage["image_tokens"]
+            tool_usage = response_json.get("server_side_tool_usage", {})
 
             # Build description embed
             truncated_prompt = truncate_text(prompt, 2000)
@@ -1262,6 +1325,7 @@ class xAIAPI(commands.Cog):
             self.last_view_messages[ctx.author] = msg
 
             # Store the conversation
+            response_id = response_json.get("id")
             params = ChatCompletionParameters(
                 model=model,
                 system=system_prompt,
@@ -1280,7 +1344,10 @@ class xAIAPI(commands.Cog):
                 conversation_id=main_conversation_id,
             )
             conversation = Conversation(
-                params=params, chat=chat, file_ids=uploaded_file_ids
+                params=params,
+                previous_response_id=response_id,
+                response_id_history=[response_id] if response_id else [],
+                file_ids=uploaded_file_ids,
             )
             self.conversations[main_conversation_id] = conversation
 

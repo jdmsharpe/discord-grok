@@ -109,7 +109,6 @@ class ButtonView(View):
             return
 
         conversation.params.tools = tools
-        self.cog._apply_tools_to_chat(conversation.chat, tools)
 
         selected_tool_names = {
             tool_name
@@ -140,7 +139,8 @@ class ButtonView(View):
             interaction (Interaction): The interaction object.
         """
         logging.info("Regenerate button clicked.")
-        removed_entries = []
+        saved_response_id: str | None = None
+        saved_previous_id: str | None = None
 
         try:
             if interaction.user != self.conversation_starter:
@@ -158,22 +158,28 @@ class ButtonView(View):
 
             await interaction.response.defer(ephemeral=True)
 
-            messages = conversation.chat.messages
-            if len(messages) < 2:
+            if not conversation.response_id_history:
                 await interaction.followup.send(
                     "Not enough history to regenerate yet.", ephemeral=True
                 )
                 return
 
-            # Remove the last assistant + user messages from the Chat object
-            removed_entries = [messages[-2], messages[-1]]
-            messages.pop()
-            messages.pop()
+            # Save state for rollback
+            saved_response_id = conversation.response_id_history[-1]
+            saved_previous_id = conversation.previous_response_id
+
+            # Rewind: pop the last response
+            conversation.response_id_history.pop()
+            conversation.previous_response_id = (
+                conversation.response_id_history[-1]
+                if conversation.response_id_history
+                else None
+            )
 
             channel = interaction.channel
             if not hasattr(channel, "history"):
-                messages.append(removed_entries[0])
-                messages.append(removed_entries[1])
+                conversation.response_id_history.append(saved_response_id)
+                conversation.previous_response_id = saved_previous_id
                 await interaction.followup.send(
                     "Couldn't find the message to regenerate.", ephemeral=True
                 )
@@ -191,8 +197,8 @@ class ButtonView(View):
             )
 
             if user_message is None:
-                messages.append(removed_entries[0])
-                messages.append(removed_entries[1])
+                conversation.response_id_history.append(saved_response_id)
+                conversation.previous_response_id = saved_previous_id
                 await interaction.followup.send(
                     "Couldn't find the message to regenerate.", ephemeral=True
                 )
@@ -210,11 +216,11 @@ class ButtonView(View):
                 exc_info=True,
             )
 
-            if removed_entries:
+            if saved_response_id is not None:
                 conversation = self.cog.conversations.get(self.conversation_id)
                 if conversation is not None:
-                    for entry in removed_entries:
-                        conversation.chat.messages.append(entry)
+                    conversation.response_id_history.append(saved_response_id)
+                    conversation.previous_response_id = saved_previous_id
 
             if interaction.response.is_done():
                 await interaction.followup.send(

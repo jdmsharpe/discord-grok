@@ -1,5 +1,3 @@
-from xai_sdk.tools import collections_search as collections_search_tool
-
 from src.util import (
     CHUNK_TEXT_SIZE,
     IMAGE_PRICING,
@@ -274,11 +272,12 @@ class TestToolHelpers:
         )
 
     def test_resolve_tool_name_for_collections_search(self):
-        tool = collections_search_tool(collection_ids=["collection_123"])
+        tool = {"type": "file_search", "vector_store_ids": ["collection_123"]}
         assert resolve_tool_name(tool) == TOOL_COLLECTIONS_SEARCH
 
     def test_resolve_tool_name_unknown(self):
         assert resolve_tool_name(object()) is None
+        assert resolve_tool_name({"type": "unknown_tool"}) is None
 
 
 class TestPricing:
@@ -335,29 +334,44 @@ class TestConversation:
     """Tests for the Conversation dataclass."""
 
     def test_conversation_creation(self):
-        """Conversation should store params and chat object."""
+        """Conversation should store params and response ID state."""
         params = ChatCompletionParameters(model="grok-3")
-        mock_chat = object()
-        conv = Conversation(params=params, chat=mock_chat)
+        conv = Conversation(params=params)
 
         assert conv.params == params
-        assert conv.chat is mock_chat
+        assert conv.previous_response_id is None
+        assert conv.response_id_history == []
         assert conv.file_ids == []
 
-    def test_conversation_with_file_ids(self):
-        """Conversation should store file IDs."""
+    def test_conversation_with_response_id(self):
+        """Conversation should store response ID and history."""
         params = ChatCompletionParameters(model="grok-3")
         conv = Conversation(
-            params=params, chat=object(), file_ids=["file-1", "file-2"]
+            params=params,
+            previous_response_id="resp_123",
+            response_id_history=["resp_123"],
+            file_ids=["file-1", "file-2"],
         )
+        assert conv.previous_response_id == "resp_123"
+        assert conv.response_id_history == ["resp_123"]
         assert conv.file_ids == ["file-1", "file-2"]
 
     def test_default_file_ids_isolated(self):
         """Default file_ids list should not be shared across instances."""
         params = ChatCompletionParameters(model="grok-3")
-        conv_one = Conversation(params=params, chat=object())
+        conv_one = Conversation(params=params)
         conv_one.file_ids.append("file-1")
 
-        conv_two = Conversation(params=params, chat=object())
+        conv_two = Conversation(params=params)
         assert conv_two.file_ids == []
         assert conv_one.file_ids is not conv_two.file_ids
+
+    def test_default_response_id_history_isolated(self):
+        """Default response_id_history should not be shared across instances."""
+        params = ChatCompletionParameters(model="grok-3")
+        conv_one = Conversation(params=params)
+        conv_one.response_id_history.append("resp_1")
+
+        conv_two = Conversation(params=params)
+        assert conv_two.response_id_history == []
+        assert conv_one.response_id_history is not conv_two.response_id_history

@@ -19,7 +19,6 @@ class TestButtonView:
         cog = MagicMock()
         cog.conversations = {}
         cog.resolve_selected_tools = MagicMock(return_value=([], None))
-        cog._apply_tools_to_chat = MagicMock()
 
         conversation = MagicMock()
         conversation.params = MagicMock()
@@ -27,7 +26,8 @@ class TestButtonView:
         conversation.params.tools = []
         conversation.params.x_search_kwargs = {"enable_image_understanding": True}
         conversation.params.web_search_kwargs = {"allowed_domains": ["example.com"]}
-        conversation.chat = MagicMock()
+        conversation.previous_response_id = "resp_001"
+        conversation.response_id_history = ["resp_001"]
         cog.conversations[111] = conversation
         return cog
 
@@ -97,9 +97,6 @@ class TestButtonView:
             ["web_search", "code_execution"],
             x_search_kwargs={"enable_image_understanding": True},
             web_search_kwargs={"allowed_domains": ["example.com"]},
-        )
-        cog._apply_tools_to_chat.assert_called_once_with(
-            conversation.chat, selected_tools
         )
 
         call_args = interaction.response.send_message.call_args
