@@ -178,7 +178,7 @@ def append_sources_embed(embeds: list[Embed], citations: list[CitationInfo]) -> 
         Embed(
             title="Sources",
             description=description,
-            color=Colour.dark_teal(),
+            color=Colour(0x000000),
         )
     )
 
@@ -216,7 +216,7 @@ def append_pricing_embed(
             )
             tool_parts.append(f"{name} \u00d7{count}")
         description += "\n" + " \u00b7 ".join(tool_parts)
-    embeds.append(Embed(description=description, color=Colour.dark_teal()))
+    embeds.append(Embed(description=description, color=Colour(0x000000)))
 
 
 def append_generation_pricing_embed(
@@ -226,7 +226,7 @@ def append_generation_pricing_embed(
 ) -> None:
     """Append a compact pricing embed for image/video generation."""
     description = f"${cost:.4f} · daily ${daily_cost:.2f}"
-    embeds.append(Embed(description=description, color=Colour.dark_teal()))
+    embeds.append(Embed(description=description, color=Colour(0x000000)))
 
 
 class xAIAPI(commands.Cog):
