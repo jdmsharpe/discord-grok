@@ -59,8 +59,9 @@ All commands are grouped under `/grok` for clean namespacing.
 
 - **`/grok tts`**: Convert text to speech audio
 - Five expressive voices: Eve, Ara, Rex, Sal, Leo
-- 20+ supported languages via BCP-47 codes
-- Output formats: MP3, WAV
+- 20+ supported languages via BCP-47 codes, plus automatic language detection (`auto`, default)
+- Output codecs: MP3, WAV, PCM, μ-law, A-law
+- Configurable sample rate (8–48 kHz) and bit rate (32–192 kbps, MP3 only)
 - Supports xAI speech tags for expressive delivery (pauses, whispers, emphasis, etc.)
 - Maximum 15,000 characters per request
 

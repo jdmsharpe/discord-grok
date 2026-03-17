@@ -300,15 +300,26 @@ class xAIAPI(commands.Cog):
                 pass  # Message may have been deleted or is no longer editable
 
     async def _generate_tts(
-        self, text: str, voice_id: str, language: str, codec: str
+        self,
+        text: str,
+        voice_id: str,
+        language: str,
+        codec: str,
+        sample_rate: int | None = None,
+        bit_rate: int | None = None,
     ) -> bytes:
         """Call the xAI TTS REST endpoint and return raw audio bytes."""
         session = await self._get_http_session()
+        output_format: dict[str, Any] = {"codec": codec}
+        if sample_rate is not None:
+            output_format["sample_rate"] = sample_rate
+        if bit_rate is not None and codec == "mp3":
+            output_format["bit_rate"] = bit_rate
         payload: dict[str, Any] = {
             "text": text,
             "voice_id": voice_id,
             "language": language,
-            "output_format": {"codec": codec},
+            "output_format": output_format,
         }
         async with session.post(
             TTS_API_URL,
@@ -1591,18 +1602,48 @@ class xAIAPI(commands.Cog):
     )
     @option(
         "language",
-        description="BCP-47 language code, e.g. en, zh, ja, fr, de, es-ES. (default: en)",
+        description="BCP-47 language code or 'auto' for detection. e.g. en, zh, ja, fr, de. (default: auto)",
         required=False,
         type=str,
     )
     @option(
         "output_format",
-        description="Audio output format. (default: mp3)",
+        description="Audio codec. (default: mp3)",
         required=False,
         type=str,
         choices=[
             OptionChoice(name="MP3", value="mp3"),
-            OptionChoice(name="WAV", value="wav"),
+            OptionChoice(name="WAV (lossless)", value="wav"),
+            OptionChoice(name="PCM (raw)", value="pcm"),
+            OptionChoice(name="μ-law (telephony)", value="mulaw"),
+            OptionChoice(name="A-law (telephony)", value="alaw"),
+        ],
+    )
+    @option(
+        "sample_rate",
+        description="Audio sample rate in Hz. (default: 24000)",
+        required=False,
+        type=int,
+        choices=[
+            OptionChoice(name="8,000 Hz (narrowband)", value=8000),
+            OptionChoice(name="16,000 Hz (wideband)", value=16000),
+            OptionChoice(name="22,050 Hz (standard)", value=22050),
+            OptionChoice(name="24,000 Hz (high quality)", value=24000),
+            OptionChoice(name="44,100 Hz (CD quality)", value=44100),
+            OptionChoice(name="48,000 Hz (studio)", value=48000),
+        ],
+    )
+    @option(
+        "bit_rate",
+        description="MP3 bit rate in bps. Only applies to MP3 codec. (default: 128000)",
+        required=False,
+        type=int,
+        choices=[
+            OptionChoice(name="32 kbps (low)", value=32000),
+            OptionChoice(name="64 kbps (medium)", value=64000),
+            OptionChoice(name="96 kbps (standard)", value=96000),
+            OptionChoice(name="128 kbps (high)", value=128000),
+            OptionChoice(name="192 kbps (maximum)", value=192000),
         ],
     )
     async def tts(
@@ -1610,8 +1651,10 @@ class xAIAPI(commands.Cog):
         ctx: ApplicationContext,
         text: str,
         voice: str = "eve",
-        language: str = "en",
+        language: str = "auto",
         output_format: str = "mp3",
+        sample_rate: int = None,
+        bit_rate: int = None,
     ):
         """
         Converts text to speech audio using the xAI TTS API.
@@ -1632,21 +1675,29 @@ class xAIAPI(commands.Cog):
             self.logger.info(
                 f"Generating TTS with voice={voice}, language={language}, format={output_format}"
             )
-            audio_bytes = await self._generate_tts(text, voice, language, output_format)
+            audio_bytes = await self._generate_tts(
+                text, voice, language, output_format, sample_rate, bit_rate
+            )
 
             description = f"**Text:** {truncate_text(text, 2000)}\n"
             description += f"**Voice:** {voice}\n"
             description += f"**Language:** {language}\n"
-            description += f"**Format:** {output_format}\n"
+            fmt = output_format
+            if sample_rate is not None:
+                fmt += f" @ {sample_rate:,} Hz"
+            if bit_rate is not None and output_format == "mp3":
+                fmt += f" / {bit_rate // 1000} kbps"
+            description += f"**Format:** {fmt}\n"
 
             embed = Embed(
                 title="Text-to-Speech Generation",
                 description=description,
                 color=GROK_BLACK,
             )
+            ext = "ulaw" if output_format == "mulaw" else output_format
             data = io.BytesIO(audio_bytes)
             await ctx.send_followup(
-                embed=embed, file=File(data, f"speech.{output_format}")
+                embed=embed, file=File(data, f"speech.{ext}")
             )
             self.logger.info("Successfully generated and sent TTS audio")
 

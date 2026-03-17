@@ -932,11 +932,49 @@ class TestTTSCommand:
                 output_format="mp3",
             )
 
-        mock_gen.assert_awaited_once_with("Hello world", "eve", "en", "mp3")
+        mock_gen.assert_awaited_once_with("Hello world", "eve", "en", "mp3", None, None)
         mock_discord_context.send_followup.assert_called_once()
         call_kwargs = mock_discord_context.send_followup.call_args[1]
         assert call_kwargs["embed"].title == "Text-to-Speech Generation"
         assert call_kwargs["file"] is not None
+
+    @pytest.mark.asyncio
+    async def test_tts_with_sample_rate_and_bit_rate(self, cog, mock_discord_context):
+        """sample_rate and bit_rate should be forwarded to _generate_tts."""
+        with patch.object(cog, "_generate_tts", new_callable=AsyncMock) as mock_gen:
+            mock_gen.return_value = b"fake audio bytes"
+
+            await cog.tts.callback(
+                cog,
+                ctx=mock_discord_context,
+                text="Hi",
+                voice="rex",
+                language="auto",
+                output_format="mp3",
+                sample_rate=44100,
+                bit_rate=192000,
+            )
+
+        mock_gen.assert_awaited_once_with("Hi", "rex", "auto", "mp3", 44100, 192000)
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "44,100 Hz" in call_kwargs["embed"].description
+        assert "192 kbps" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_tts_mulaw_file_extension(self, cog, mock_discord_context):
+        """mulaw codec should produce a .ulaw file extension."""
+        with patch.object(cog, "_generate_tts", new_callable=AsyncMock) as mock_gen:
+            mock_gen.return_value = b"fake audio bytes"
+
+            await cog.tts.callback(
+                cog,
+                ctx=mock_discord_context,
+                text="Hello",
+                output_format="mulaw",
+            )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert call_kwargs["file"].filename == "speech.ulaw"
 
     @pytest.mark.asyncio
     async def test_tts_api_error(self, cog, mock_discord_context):
