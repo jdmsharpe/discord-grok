@@ -140,8 +140,10 @@ Main Discord cog class: `xAIAPI`
   - `_generate_tts()` calls `POST https://api.x.ai/v1/tts` directly via aiohttp (not part of xAI SDK)
   - Returns raw audio bytes; sent to Discord as a file attachment
   - Supports 5 voices: `eve`, `ara`, `rex`, `sal`, `leo`
-  - Supports BCP-47 language codes (default `en`)
-  - Output formats: `mp3` (default), `wav`
+  - Supports BCP-47 language codes and `auto` detection (default `auto`)
+  - Codecs: `mp3` (default), `wav`, `pcm`, `mulaw`, `alaw`
+  - Configurable `sample_rate` (8000–48000 Hz, default 24000) and `bit_rate` (MP3 only, 32000–192000 bps, default 128000)
+  - Supports speech tags: inline (`[pause]`, `[laugh]`, etc.) and wrapping (`<whisper>`, `<slow>`, etc.)
   - Text limit: 15,000 characters
   - Constants `TTS_API_URL` and `TTS_MAX_CHARS` defined in `xai_api.py`
 - Pricing and token usage:
@@ -198,12 +200,14 @@ Current parameter count: 23
 
 ## `/grok tts` Parameters
 
-Current parameter count: 4
+Current parameter count: 6
 
-1. `text` (max 15,000 characters)
+1. `text` (max 15,000 characters; supports speech tags like `[pause]`, `<whisper>`)
 2. `voice` (choices: eve, ara, rex, sal, leo; default: eve)
-3. `language` (free-text BCP-47 code; default: en)
-4. `output_format` (choices: mp3, wav; default: mp3)
+3. `language` (free-text BCP-47 code or `auto`; default: auto)
+4. `output_format` (choices: mp3, wav, pcm, mulaw, alaw; default: mp3)
+5. `sample_rate` (choices: 8000, 16000, 22050, 24000, 44100, 48000 Hz; default: 24000)
+6. `bit_rate` (choices: 32000, 64000, 96000, 128000, 192000 bps; MP3 only; default: 128000)
 
 ## Embed and Truncation Behavior
 
