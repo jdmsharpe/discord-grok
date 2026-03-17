@@ -83,10 +83,12 @@ def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
 
 def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
     """Append response text as Discord embeds, handling chunking for long responses."""
-    if len(response_text) > 20000:
-        response_text = (
-            response_text[:19500] + "\n\n... [Response truncated due to length]"
-        )
+    # Discord caps all embeds in a message at 6000 chars total.
+    # Reserve 500 chars headroom for sources/pricing embeds appended later.
+    existing_chars = sum(len(e.title or "") + len(e.description or "") for e in embeds)
+    available = max(500, 6000 - existing_chars - 500)
+    if len(response_text) > available:
+        response_text = response_text[: available - 40] + "\n\n... [Response truncated due to length]"
 
     for index, chunk in enumerate(chunk_text(response_text, 3500), start=1):
         embeds.append(
