@@ -46,6 +46,8 @@ TTS_API_URL = "https://api.x.ai/v1/tts"
 TTS_MAX_CHARS = 15_000
 RESPONSES_API_URL = "https://api.x.ai/v1/responses"
 
+GROK_BLACK = Colour(0x000000)
+
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MiB xAI image understanding limit
 MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
@@ -74,7 +76,7 @@ def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
         Embed(
             title="Reasoning",
             description=f"||{reasoning_text}||",
-            color=Colour.light_grey(),
+            color=GROK_BLACK,
         )
     )
 
@@ -91,7 +93,7 @@ def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
             Embed(
                 title="Response" + (f" (Part {index})" if index > 1 else ""),
                 description=chunk,
-                color=Colour(0x000000),
+                color=GROK_BLACK,
             )
         )
 
@@ -178,7 +180,7 @@ def append_sources_embed(embeds: list[Embed], citations: list[CitationInfo]) -> 
         Embed(
             title="Sources",
             description=description,
-            color=Colour(0x000000),
+            color=GROK_BLACK,
         )
     )
 
@@ -216,7 +218,7 @@ def append_pricing_embed(
             )
             tool_parts.append(f"{name} \u00d7{count}")
         description += "\n" + " \u00b7 ".join(tool_parts)
-    embeds.append(Embed(description=description, color=Colour(0x000000)))
+    embeds.append(Embed(description=description, color=GROK_BLACK))
 
 
 def append_generation_pricing_embed(
@@ -226,7 +228,7 @@ def append_generation_pricing_embed(
 ) -> None:
     """Append a compact pricing embed for image/video generation."""
     description = f"${cost:.4f} · daily ${daily_cost:.2f}"
-    embeds.append(Embed(description=description, color=Colour(0x000000)))
+    embeds.append(Embed(description=description, color=GROK_BLACK))
 
 
 class xAIAPI(commands.Cog):
@@ -1432,7 +1434,7 @@ class xAIAPI(commands.Cog):
                 embed = Embed(
                     title="Image Generation",
                     description=description,
-                    color=Colour.dark_teal(),
+                    color=GROK_BLACK,
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
@@ -1454,7 +1456,7 @@ class xAIAPI(commands.Cog):
                 embed = Embed(
                     title="Image Generation",
                     description=description,
-                    color=Colour.dark_teal(),
+                    color=GROK_BLACK,
                 )
                 file = File(data, "image.png")
                 embed.set_image(url="attachment://image.png")
@@ -1552,7 +1554,7 @@ class xAIAPI(commands.Cog):
             embed = Embed(
                 title="Video Generation",
                 description=description,
-                color=Colour.dark_teal(),
+                color=GROK_BLACK,
             )
             embeds = [embed]
             if SHOW_COST_EMBEDS:
@@ -1640,7 +1642,7 @@ class xAIAPI(commands.Cog):
             embed = Embed(
                 title="Text-to-Speech Generation",
                 description=description,
-                color=Colour.dark_teal(),
+                color=GROK_BLACK,
             )
             data = io.BytesIO(audio_bytes)
             await ctx.send_followup(
