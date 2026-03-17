@@ -25,7 +25,7 @@ class TestAppendPricingEmbed:
         assert "1,000 tokens in" in desc
         assert "500 tokens out" in desc
         assert "daily $1.50" in desc
-        assert embeds[0].colour == Colour.dark_teal()
+        assert embeds[0].colour == Colour(0x000000)
 
     def test_append_pricing_embed_with_reasoning_tokens(self):
         from src.xai_api import append_pricing_embed
