@@ -3,7 +3,7 @@
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fjdmsharpe%2Fdiscord-grok%2F&label=discord-grok&icon=github&color=%23198754&message=&style=flat&tz=UTC)
 [![CI](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml/badge.svg)](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml)
 
-A Discord bot built on [Pycord 2.0](https://github.com/Pycord-Development/pycord) that integrates xAI's Grok API via the official [xAI SDK](https://github.com/xai-org/sdk-python). It provides conversational AI, image generation, video generation, and text-to-speech accessible through Discord slash commands.
+A Discord bot built on [Pycord 2.0](https://github.com/Pycord-Development/pycord) that integrates xAI's Grok APIs. Chat uses the [xAI Responses API](https://docs.x.ai/docs/guides/responses-api) directly via aiohttp for stateful multi-turn conversations with automatic billing optimization. Image, video, and file operations use the official [xAI SDK](https://github.com/xai-org/sdk-python). It provides conversational AI, image generation, video generation, and text-to-speech accessible through Discord slash commands.
 
 ## Features
 
@@ -39,7 +39,7 @@ All commands are grouped under `/grok` for clean namespacing.
 - Source citations shown in a dedicated "Sources" embed when available
 - Per-request cost and token usage tracking with daily cumulative cost per user (includes reasoning, cached, and image token breakdowns)
 - Server-side tool usage counts shown in cost embed when tools are used
-- Agentic state preservation across multi-turn tool conversations via encrypted content
+- Stateful multi-turn conversations via xAI Responses API (`previous_response_id`) with server-side conversation storage and automatic prompt caching
 
 ### Image Generation
 

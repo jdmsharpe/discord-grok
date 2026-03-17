@@ -1,8 +1,15 @@
+import copy
+import sys
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from discord import Colour, Embed
+
+# conftest.py is auto-loaded by pytest but we need to import its constant
+sys.path.insert(0, str(Path(__file__).parent))
+from conftest import MOCK_RESPONSES_API_RESPONSE
 
 
 class TestAppendPricingEmbed:
@@ -118,20 +125,31 @@ class TestTrackDailyCost:
 class TestExtractToolInfo:
     """Tests for extract_tool_info helper."""
 
-    def test_fallback_deduplicates_and_classifies_citations(self):
-        """When inline_citations is absent, falls back to response.citations."""
+    def test_annotations_deduplicates_and_classifies_citations(self):
+        """URL citations in annotations should be deduplicated and classified."""
         from src.xai_api import extract_tool_info
 
-        response = MagicMock()
-        response.inline_citations = None
-        response.citations = [
-            "https://x.ai/news",
-            "https://x.ai/news",
-            "https://x.com/i/status/123",
-            "collections://collection_1/files/file_1",
-        ]
+        response_json = {
+            "output": [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "Some text",
+                            "annotations": [
+                                {"type": "url_citation", "url": "https://x.ai/news"},
+                                {"type": "url_citation", "url": "https://x.ai/news"},
+                                {"type": "url_citation", "url": "https://x.com/i/status/123"},
+                                {"type": "url_citation", "url": "collections://collection_1/files/file_1"},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
-        result = extract_tool_info(response)
+        result = extract_tool_info(response_json)
 
         assert result["citations"] == [
             {"url": "https://x.ai/news", "source": "web"},
@@ -139,46 +157,56 @@ class TestExtractToolInfo:
             {"url": "collections://collection_1/files/file_1", "source": "collections"},
         ]
 
-    def test_inline_citations_web_and_x(self):
-        """Structured inline_citations are preferred and typed correctly."""
+    def test_annotations_web_and_x(self):
+        """Mixed web and X citations should be classified correctly."""
         from src.xai_api import extract_tool_info
 
-        web_cit = MagicMock()
-        web_cit.HasField = lambda f: f == "web_citation"
-        web_cit.web_citation.url = "https://example.com/article"
+        response_json = {
+            "output": [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "Some text",
+                            "annotations": [
+                                {"type": "url_citation", "url": "https://example.com/article"},
+                                {"type": "url_citation", "url": "https://x.com/i/status/456"},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
-        x_cit = MagicMock()
-        x_cit.HasField = lambda f: f == "x_citation"
-        x_cit.x_citation.url = "https://x.com/i/status/456"
-
-        response = MagicMock()
-        response.inline_citations = [web_cit, x_cit]
-
-        result = extract_tool_info(response)
+        result = extract_tool_info(response_json)
 
         assert result["citations"] == [
             {"url": "https://example.com/article", "source": "web"},
             {"url": "https://x.com/i/status/456", "source": "x"},
         ]
 
-    def test_inline_citations_deduplicates(self):
-        """Duplicate URLs in inline_citations are deduplicated."""
+    def test_empty_output(self):
+        """Empty output should return no citations."""
         from src.xai_api import extract_tool_info
 
-        cit1 = MagicMock()
-        cit1.HasField = lambda f: f == "web_citation"
-        cit1.web_citation.url = "https://example.com"
+        result = extract_tool_info({"output": []})
+        assert result["citations"] == []
 
-        cit2 = MagicMock()
-        cit2.HasField = lambda f: f == "web_citation"
-        cit2.web_citation.url = "https://example.com"
+    def test_no_annotations(self):
+        """Output without annotations should return no citations."""
+        from src.xai_api import extract_tool_info
 
-        response = MagicMock()
-        response.inline_citations = [cit1, cit2]
-
-        result = extract_tool_info(response)
-
-        assert len(result["citations"]) == 1
+        response_json = {
+            "output": [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "No citations here"}],
+                }
+            ]
+        }
+        result = extract_tool_info(response_json)
+        assert result["citations"] == []
 
 
 class TestAppendReasoningEmbeds:
@@ -249,36 +277,25 @@ class TestAppendResponseEmbeds:
         assert len(total_text) < 21000
 
 
+def _make_cog(mock_bot, mock_api_response=None):
+    """Helper to create a cog with _call_responses_api mocked."""
+    with patch("xai_sdk.AsyncClient"):
+        from src.xai_api import xAIAPI
+
+        cog = xAIAPI(bot=mock_bot)
+
+    if mock_api_response is None:
+        mock_api_response = copy.deepcopy(MOCK_RESPONSES_API_RESPONSE)
+    cog._call_responses_api = AsyncMock(return_value=mock_api_response)
+    return cog
+
+
 class TestXAIAPICog:
     """Tests for the xAIAPI Discord cog."""
 
     @pytest.fixture
     def cog(self, mock_bot):
-        """Create an xAIAPI cog instance with mocked dependencies."""
-        with patch("xai_sdk.AsyncClient") as mock_client_class:
-            mock_client = MagicMock()
-
-            # Mock chat
-            mock_chat = MagicMock()
-            mock_response = MagicMock()
-            mock_response.content = "Test response"
-            mock_response.reasoning_content = ""
-            mock_response.citations = []
-            mock_response.server_side_tool_usage = {}
-            mock_response.tool_calls = []
-            mock_chat.sample = AsyncMock(return_value=mock_response)
-            mock_chat.append = MagicMock()
-            mock_chat.messages = []
-            mock_client.chat = MagicMock()
-            mock_client.chat.create = MagicMock(return_value=mock_chat)
-
-            mock_client_class.return_value = mock_client
-
-            from src.xai_api import xAIAPI
-
-            cog = xAIAPI(bot=mock_bot)
-            cog.client = mock_client
-            return cog
+        return _make_cog(mock_bot)
 
     @pytest.mark.asyncio
     async def test_cog_initialization(self, cog, mock_bot):
@@ -288,13 +305,8 @@ class TestXAIAPICog:
         assert cog.views == {}
 
     @pytest.mark.asyncio
-    async def test_chat_creates_conversation(
-        self, cog, mock_discord_context, mock_xai_client
-    ):
+    async def test_chat_creates_conversation(self, cog, mock_discord_context):
         """Test that chat command creates a conversation entry."""
-        cog.client = mock_xai_client
-
-        # Mock the channel typing context manager
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -306,19 +318,39 @@ class TestXAIAPICog:
             model="grok-3",
         )
 
-        # Verify chat was created and sampled
-        mock_xai_client.chat.create.assert_called_once()
-
-        # Verify conversation was stored
+        cog._call_responses_api.assert_called_once()
         assert len(cog.conversations) == 1
 
-    @pytest.mark.asyncio
-    async def test_chat_with_four_tools(
-        self, cog, mock_discord_context, mock_xai_client
-    ):
-        """Chat should pass the selected four tools to chat.create."""
-        cog.client = mock_xai_client
+        # Verify payload structure
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["model"] == "grok-3"
+        assert payload["store"] is True
+        assert any(
+            msg.get("role") == "user"
+            for msg in payload["input"]
+        )
 
+    @pytest.mark.asyncio
+    async def test_chat_stores_response_id(self, cog, mock_discord_context):
+        """Chat should store the response ID for multi-turn."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello!",
+            model="grok-3",
+        )
+
+        conversation = list(cog.conversations.values())[0]
+        assert conversation.previous_response_id == "resp_01XFDUDYJgAACzvnptvVoYEL"
+        assert conversation.response_id_history == ["resp_01XFDUDYJgAACzvnptvVoYEL"]
+
+    @pytest.mark.asyncio
+    async def test_chat_with_four_tools(self, cog, mock_discord_context):
+        """Chat should pass the selected four tools in the payload."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -335,17 +367,18 @@ class TestXAIAPICog:
                 collections_search=True,
             )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert "tools" in create_kwargs
-        assert len(create_kwargs["tools"]) == 4
-        tool_names = sorted(tool.WhichOneof("tool") for tool in create_kwargs["tools"])
-        assert tool_names == [
-            "code_execution",
-            "collections_search",
+        payload = cog._call_responses_api.call_args[0][0]
+        assert "tools" in payload
+        assert len(payload["tools"]) == 4
+        tool_types = sorted(t["type"] for t in payload["tools"])
+        assert tool_types == [
+            "code_interpreter",
+            "file_search",
             "web_search",
             "x_search",
         ]
-        assert create_kwargs["include"] == ["inline_citations"]
+        # Tools should trigger encrypted content include
+        assert "reasoning.encrypted_content" in payload.get("include", [])
 
     @pytest.mark.asyncio
     async def test_chat_prevents_duplicate_conversations(
@@ -360,7 +393,7 @@ class TestXAIAPICog:
             channel_id=mock_discord_context.channel.id,
             conversation_id=123,
         )
-        cog.conversations[123] = Conversation(params=existing_params, chat=MagicMock())
+        cog.conversations[123] = Conversation(params=existing_params)
 
         await cog.chat.callback(
             cog,
@@ -389,17 +422,17 @@ class TestXAIAPICog:
 
         assert error is None
         assert len(tools) == 4
-        tool_names = sorted(tool.WhichOneof("tool") for tool in tools)
-        assert tool_names == [
-            "code_execution",
-            "collections_search",
+        tool_types = sorted(t["type"] for t in tools)
+        assert tool_types == [
+            "code_interpreter",
+            "file_search",
             "web_search",
             "x_search",
         ]
 
     @pytest.mark.asyncio
     async def test_resolve_selected_tools_x_search_with_kwargs(self, cog):
-        """x_search kwargs should be forwarded to the x_search tool builder."""
+        """x_search kwargs should be included in the tool dict."""
         x_search_kw = {
             "enable_image_understanding": True,
             "allowed_x_handles": ["elonmusk"],
@@ -410,7 +443,9 @@ class TestXAIAPICog:
 
         assert error is None
         assert len(tools) == 1
-        assert tools[0].WhichOneof("tool") == "x_search"
+        assert tools[0]["type"] == "x_search"
+        assert tools[0]["enable_image_understanding"] is True
+        assert tools[0]["allowed_x_handles"] == ["elonmusk"]
 
     @pytest.mark.asyncio
     async def test_resolve_selected_tools_x_search_without_kwargs(self, cog):
@@ -419,11 +454,11 @@ class TestXAIAPICog:
 
         assert error is None
         assert len(tools) == 1
-        assert tools[0].WhichOneof("tool") == "x_search"
+        assert tools[0]["type"] == "x_search"
 
     @pytest.mark.asyncio
     async def test_resolve_selected_tools_web_search_with_kwargs(self, cog):
-        """web_search kwargs should be forwarded to the web_search tool builder."""
+        """web_search kwargs should be included in the tool dict."""
         web_search_kw = {
             "enable_image_understanding": True,
             "allowed_domains": ["example.com"],
@@ -434,7 +469,9 @@ class TestXAIAPICog:
 
         assert error is None
         assert len(tools) == 1
-        assert tools[0].WhichOneof("tool") == "web_search"
+        assert tools[0]["type"] == "web_search"
+        assert tools[0]["enable_image_understanding"] is True
+        assert tools[0]["allowed_domains"] == ["example.com"]
 
     @pytest.mark.asyncio
     async def test_resolve_selected_tools_web_search_without_kwargs(self, cog):
@@ -443,15 +480,28 @@ class TestXAIAPICog:
 
         assert error is None
         assert len(tools) == 1
-        assert tools[0].WhichOneof("tool") == "web_search"
+        assert tools[0]["type"] == "web_search"
 
     @pytest.mark.asyncio
-    async def test_chat_default_model(
-        self, cog, mock_discord_context, mock_xai_client
-    ):
-        """Chat should use grok-4.20-beta-latest-reasoning as the default model."""
-        cog.client = mock_xai_client
+    async def test_resolve_selected_tools_converts_datetime(self, cog):
+        """datetime objects in x_search kwargs should be converted to ISO strings."""
+        from datetime import datetime
 
+        x_search_kw = {
+            "from_date": datetime(2024, 1, 1),
+            "to_date": datetime(2024, 12, 31),
+        }
+        tools, error = cog.resolve_selected_tools(
+            ["x_search"], x_search_kwargs=x_search_kw
+        )
+
+        assert error is None
+        assert tools[0]["from_date"] == "2024-01-01T00:00:00"
+        assert tools[0]["to_date"] == "2024-12-31T00:00:00"
+
+    @pytest.mark.asyncio
+    async def test_chat_default_model(self, cog, mock_discord_context):
+        """Chat should use grok-4.20-beta-latest-reasoning as the default model."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -462,8 +512,8 @@ class TestXAIAPICog:
             prompt="Hello!",
         )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert create_kwargs["model"] == "grok-4.20-beta-latest-reasoning"
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["model"] == "grok-4.20-beta-latest-reasoning"
 
     @pytest.mark.asyncio
     async def test_chat_rejects_frequency_penalty_on_reasoning_model(
@@ -510,11 +560,9 @@ class TestXAIAPICog:
 
     @pytest.mark.asyncio
     async def test_chat_allows_penalty_on_non_reasoning_model(
-        self, cog, mock_discord_context, mock_xai_client
+        self, cog, mock_discord_context
     ):
         """Penalty params should be allowed for non-reasoning models."""
-        cog.client = mock_xai_client
-
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -527,8 +575,8 @@ class TestXAIAPICog:
             frequency_penalty=0.5,
         )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert create_kwargs["frequency_penalty"] == 0.5
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["frequency_penalty"] == 0.5
 
     @pytest.mark.asyncio
     async def test_chat_rejects_reasoning_effort_on_unsupported_model(
@@ -552,11 +600,9 @@ class TestXAIAPICog:
 
     @pytest.mark.asyncio
     async def test_chat_passes_reasoning_effort_for_supported_model(
-        self, cog, mock_discord_context, mock_xai_client
+        self, cog, mock_discord_context
     ):
         """reasoning_effort should be passed to the API for grok-3-mini."""
-        cog.client = mock_xai_client
-
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -569,8 +615,8 @@ class TestXAIAPICog:
             reasoning_effort="high",
         )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert create_kwargs["reasoning_effort"] == "high"
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["reasoning_effort"] == "high"
 
     @pytest.mark.asyncio
     async def test_chat_rejects_max_tokens_on_multi_agent(
@@ -616,11 +662,9 @@ class TestXAIAPICog:
 
     @pytest.mark.asyncio
     async def test_chat_passes_agent_count_for_multi_agent(
-        self, cog, mock_discord_context, mock_xai_client
+        self, cog, mock_discord_context
     ):
-        """agent_count should be passed to chat.create for multi-agent models."""
-        cog.client = mock_xai_client
-
+        """agent_count should be passed to the API for multi-agent models."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -633,17 +677,15 @@ class TestXAIAPICog:
             agent_count=16,
         )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert create_kwargs["agent_count"] == 16
-        assert create_kwargs["use_encrypted_content"] is True
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["agent_count"] == 16
+        assert "reasoning.encrypted_content" in payload["include"]
 
     @pytest.mark.asyncio
     async def test_chat_multi_agent_sets_encrypted_content(
-        self, cog, mock_discord_context, mock_xai_client
+        self, cog, mock_discord_context
     ):
-        """Multi-agent model should always set use_encrypted_content=True."""
-        cog.client = mock_xai_client
-
+        """Multi-agent model should always set include with encrypted content."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -655,17 +697,15 @@ class TestXAIAPICog:
             model="grok-4.20-multi-agent-beta-latest",
         )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert create_kwargs["use_encrypted_content"] is True
-        assert "agent_count" not in create_kwargs
+        payload = cog._call_responses_api.call_args[0][0]
+        assert "reasoning.encrypted_content" in payload["include"]
+        assert "agent_count" not in payload
 
     @pytest.mark.asyncio
     async def test_chat_tools_set_encrypted_content(
-        self, cog, mock_discord_context, mock_xai_client
+        self, cog, mock_discord_context
     ):
-        """Tool-using conversations should set use_encrypted_content=True."""
-        cog.client = mock_xai_client
-
+        """Tool-using conversations should include encrypted content."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -678,8 +718,8 @@ class TestXAIAPICog:
             web_search=True,
         )
 
-        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
-        assert create_kwargs["use_encrypted_content"] is True
+        payload = cog._call_responses_api.call_args[0][0]
+        assert "reasoning.encrypted_content" in payload["include"]
 
     def test_chat_model_choices_match_grok_models(self, cog):
         """Chat command model choices should match GROK_MODELS."""
@@ -736,6 +776,122 @@ class TestXAIAPICog:
 
         with pytest.raises(asyncio.CancelledError):
             await task
+
+
+class TestResponseParsing:
+    """Tests for response parsing helpers."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        return _make_cog(mock_bot)
+
+    def test_extract_response_text_basic(self, cog):
+        text, reasoning = cog._extract_response_text(MOCK_RESPONSES_API_RESPONSE)
+        assert text == "Hello! How can I help you today?"
+        assert reasoning == ""
+
+    def test_extract_response_text_strips_citation_markers(self, cog):
+        response = {
+            "output": [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "xAI is building AI [[1]](https://x.ai/) systems.",
+                        }
+                    ],
+                }
+            ]
+        }
+        text, _ = cog._extract_response_text(response)
+        assert "[[1]]" not in text
+        assert "xAI is building AI" in text
+
+    def test_extract_response_text_with_reasoning(self, cog):
+        response = {
+            "output": [
+                {
+                    "type": "reasoning",
+                    "summary": [
+                        {"type": "summary_text", "text": "Thinking step 1."},
+                        {"type": "summary_text", "text": " Thinking step 2."},
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "output_text", "text": "The answer is 42."},
+                    ],
+                },
+            ]
+        }
+        text, reasoning = cog._extract_response_text(response)
+        assert text == "The answer is 42."
+        assert reasoning == "Thinking step 1. Thinking step 2."
+
+    def test_extract_usage(self, cog):
+        usage = cog._extract_usage(MOCK_RESPONSES_API_RESPONSE)
+        assert usage["input_tokens"] == 25
+        assert usage["output_tokens"] == 50
+        assert usage["reasoning_tokens"] == 0
+        assert usage["cached_tokens"] == 0
+        assert usage["image_tokens"] == 0
+
+    def test_extract_usage_with_details(self, cog):
+        """Responses API field names (input_tokens_details, output_tokens_details)."""
+        response = {
+            "usage": {
+                "input_tokens": 199,
+                "output_tokens": 530,
+                "input_tokens_details": {
+                    "cached_tokens": 163,
+                    "image_tokens": 50,
+                },
+                "output_tokens_details": {
+                    "reasoning_tokens": 310,
+                },
+            }
+        }
+        usage = cog._extract_usage(response)
+        assert usage["input_tokens"] == 199
+        assert usage["output_tokens"] == 530
+        assert usage["reasoning_tokens"] == 310
+
+    def test_extract_usage_fallback_field_names(self, cog):
+        """Chat Completions field names should still work as fallback."""
+        response = {
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 200,
+                "prompt_tokens_details": {
+                    "cached_tokens": 50,
+                },
+                "completion_tokens_details": {
+                    "reasoning_tokens": 30,
+                },
+            }
+        }
+        usage = cog._extract_usage(response)
+        assert usage["input_tokens"] == 100
+        assert usage["output_tokens"] == 200
+        assert usage["reasoning_tokens"] == 30
+        assert usage["cached_tokens"] == 50
+
+    def test_build_user_message_text_only(self, cog):
+        msg = cog._build_user_message(["Hello!"])
+        assert msg == {"role": "user", "content": "Hello!"}
+
+    def test_build_user_message_multimodal(self, cog):
+        msg = cog._build_user_message([
+            "Describe this",
+            {"type": "input_image", "image_url": "https://example.com/img.png", "detail": "high"},
+        ])
+        assert msg["role"] == "user"
+        assert isinstance(msg["content"], list)
+        assert len(msg["content"]) == 2
+        assert msg["content"][0] == {"type": "input_text", "text": "Describe this"}
+        assert msg["content"][1]["type"] == "input_image"
 
 
 class TestTTSCommand:
@@ -811,37 +967,11 @@ class TestFileUploadAndCleanup:
     """Tests for the xAI Files API integration."""
 
     @pytest.fixture
-    def cog(self, mock_bot):
-        """Create an xAIAPI cog instance with mocked dependencies."""
-        with patch("xai_sdk.AsyncClient") as mock_client_class:
-            mock_client = MagicMock()
-
-            mock_chat = MagicMock()
-            mock_response = MagicMock()
-            mock_response.content = "Test response"
-            mock_response.reasoning_content = ""
-            mock_response.citations = []
-            mock_chat.sample = AsyncMock(return_value=mock_response)
-            mock_chat.append = MagicMock()
-            mock_chat.messages = []
-            mock_client.chat = MagicMock()
-            mock_client.chat.create = MagicMock(return_value=mock_chat)
-
-            # Mock files API
-            mock_uploaded_file = MagicMock()
-            mock_uploaded_file.id = "file-abc123"
-            mock_uploaded_file.filename = "document.pdf"
-            mock_client.files = MagicMock()
-            mock_client.files.upload = AsyncMock(return_value=mock_uploaded_file)
-            mock_client.files.delete = AsyncMock()
-
-            mock_client_class.return_value = mock_client
-
-            from src.xai_api import xAIAPI
-
-            cog = xAIAPI(bot=mock_bot)
-            cog.client = mock_client
-            return cog
+    def cog(self, mock_bot, mock_xai_client):
+        """Create a cog with files API mocked."""
+        cog = _make_cog(mock_bot)
+        cog.client = mock_xai_client
+        return cog
 
     @pytest.mark.asyncio
     async def test_upload_file_attachment_success(self, cog, mock_file_attachment):
@@ -895,7 +1025,6 @@ class TestFileUploadAndCleanup:
 
         conversation = Conversation(
             params=ChatCompletionParameters(model="grok-3"),
-            chat=MagicMock(),
             file_ids=["file-1", "file-2", "file-3"],
         )
 
@@ -914,7 +1043,6 @@ class TestFileUploadAndCleanup:
 
         conversation = Conversation(
             params=ChatCompletionParameters(model="grok-3"),
-            chat=MagicMock(),
             file_ids=["file-1", "file-2"],
         )
         cog.client.files.delete.side_effect = [Exception("Failed"), None]
@@ -931,7 +1059,6 @@ class TestFileUploadAndCleanup:
 
         conversation = Conversation(
             params=ChatCompletionParameters(model="grok-3"),
-            chat=MagicMock(),
             file_ids=["file-1"],
         )
         cog.conversations[999] = conversation
@@ -949,11 +1076,9 @@ class TestFileUploadAndCleanup:
 
     @pytest.mark.asyncio
     async def test_chat_with_file_attachment(
-        self, cog, mock_discord_context, mock_xai_client, mock_file_attachment
+        self, cog, mock_discord_context, mock_file_attachment
     ):
         """Chat command with a non-image attachment should upload to xAI Files API."""
-        cog.client = mock_xai_client
-
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
