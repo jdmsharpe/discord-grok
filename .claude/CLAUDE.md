@@ -99,8 +99,9 @@ Main Discord cog class: `xAIAPI`
   - `resolve_selected_tools()` builds tool protos
   - `collections_search` is guarded by `XAI_COLLECTION_IDS`
   - `chat.create(... include=["inline_citations"])` enabled in chat
-  - `extract_tool_info()` reads `response.citations`
-  - `append_sources_embed()` renders source URLs (including `collections://...` citations)
+  - `CitationInfo` TypedDict stores `url` + `source` (`"web"`, `"x"`, `"collections"`)
+  - `extract_tool_info()` prefers `response.inline_citations` (structured web/x citation objects), falls back to `response.citations` with URL-based classification
+  - `append_sources_embed()` groups citations by source type with headings when mixed (Web, X Posts, Collections)
   - `_apply_tools_to_chat()` updates tools dynamically when toggled mid-conversation
 - Multi-agent flow:
   - Multi-agent models automatically get `use_encrypted_content=True` for proper multi-turn context
@@ -198,7 +199,8 @@ Current parameter count: 4
   - Video prompt: 2,000 chars
   - TTS text: 2,000 chars
 - Sources embed:
-  - Up to 8 citation lines
+  - Up to 8 citation lines per source type
+  - Grouped by source type (Web, X Posts, Collections) with headings when multiple types present
   - HTTP citations are rendered as links
   - Non-HTTP citations (e.g., `collections://...`) are rendered as code text
 

@@ -2,7 +2,7 @@ import asyncio
 import io
 import logging
 from datetime import date, datetime
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
 import aiohttp
 
@@ -51,8 +51,13 @@ MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
 INLINE_CITATION_INCLUDE = "inline_citations"
 
 
+class CitationInfo(TypedDict):
+    url: str
+    source: Literal["web", "x", "collections"]
+
+
 class ToolInfo(TypedDict):
-    citations: list[str]
+    citations: list[CitationInfo]
 
 
 def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
@@ -89,11 +94,60 @@ def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
         )
 
 
-def extract_tool_info(response: Any) -> ToolInfo:
-    """Extract citation links from an xAI SDK response."""
-    citations: list[str] = []
-    seen_citations: set[str] = set()
+def _classify_citation_url(url: str) -> Literal["web", "x", "collections"]:
+    """Classify a citation URL into its source type."""
+    if url.startswith("collections://"):
+        return "collections"
+    if url.startswith("https://x.com/") or url.startswith("https://twitter.com/"):
+        return "x"
+    return "web"
 
+
+def extract_tool_info(response: Any) -> ToolInfo:
+    """Extract structured citation data from an xAI SDK response.
+
+    Prefers ``response.inline_citations`` (typed web/x citation objects)
+    and falls back to ``response.citations`` (flat URL list).
+    """
+    citations: list[CitationInfo] = []
+    seen_urls: set[str] = set()
+
+    # Prefer structured inline citations when available
+    inline_citations = getattr(response, "inline_citations", None)
+    if inline_citations:
+        for citation in inline_citations:
+            url: str | None = None
+            source: Literal["web", "x", "collections"] = "web"
+
+            if hasattr(citation, "HasField"):
+                if citation.HasField("x_citation"):
+                    url = citation.x_citation.url
+                    source = "x"
+                elif citation.HasField("web_citation"):
+                    url = citation.web_citation.url
+                    source = "web"
+            else:
+                # Fallback for plain attribute access
+                x_cit = getattr(citation, "x_citation", None)
+                web_cit = getattr(citation, "web_citation", None)
+                if x_cit and getattr(x_cit, "url", None):
+                    url = x_cit.url
+                    source = "x"
+                elif web_cit and getattr(web_cit, "url", None):
+                    url = web_cit.url
+                    source = "web"
+
+            if not url:
+                continue
+            url = str(url).strip()
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            citations.append({"url": url, "source": source})
+
+        return {"citations": citations}
+
+    # Fallback: flat response.citations list
     citations_value = getattr(response, "citations", [])
     if citations_value is None:
         citation_items: list[Any] = []
@@ -107,31 +161,59 @@ def extract_tool_info(response: Any) -> ToolInfo:
 
     for citation in citation_items:
         citation_url = str(citation).strip()
-        if not citation_url or citation_url in seen_citations:
+        if not citation_url or citation_url in seen_urls:
             continue
-        seen_citations.add(citation_url)
-        citations.append(citation_url)
+        seen_urls.add(citation_url)
+        citations.append({"url": citation_url, "source": _classify_citation_url(citation_url)})
 
     return {"citations": citations}
 
 
-def append_sources_embed(embeds: list[Embed], citations: list[str]) -> None:
-    """Append a compact sources embed for tool-backed responses."""
+def append_sources_embed(embeds: list[Embed], citations: list[CitationInfo]) -> None:
+    """Append a compact sources embed for tool-backed responses, grouped by type."""
     if not citations or len(embeds) >= 10:
         return
 
-    source_lines: list[str] = []
-    for index, citation_url in enumerate(citations[:8], start=1):
-        if citation_url.startswith("http://") or citation_url.startswith("https://"):
-            citation_title = truncate_text(
-                citation_url.removeprefix("https://").removeprefix("http://"),
-                120,
-            )
-            source_lines.append(f"{index}. [{citation_title}]({citation_url})")
+    web: list[CitationInfo] = []
+    x: list[CitationInfo] = []
+    collections: list[CitationInfo] = []
+    for cit in citations:
+        if cit["source"] == "x":
+            x.append(cit)
+        elif cit["source"] == "collections":
+            collections.append(cit)
         else:
-            source_lines.append(f"{index}. `{truncate_text(citation_url, 300)}`")
+            web.append(cit)
 
-    description = "\n".join(source_lines)
+    parts: list[str] = []
+
+    def _format_link_group(
+        heading: str | None, items: list[CitationInfo], limit: int = 8
+    ) -> None:
+        if not items:
+            return
+        lines: list[str] = []
+        if heading:
+            lines.append(f"**{heading}**")
+        for index, cit in enumerate(items[:limit], start=1):
+            url = cit["url"]
+            if url.startswith("http://") or url.startswith("https://"):
+                title = truncate_text(
+                    url.removeprefix("https://").removeprefix("http://"), 120
+                )
+                lines.append(f"{index}. [{title}]({url})")
+            else:
+                lines.append(f"{index}. `{truncate_text(url, 300)}`")
+        parts.append("\n".join(lines))
+
+    # If only one type exists, skip the heading for a cleaner look
+    has_multiple_types = sum(bool(g) for g in (web, x, collections)) > 1
+
+    _format_link_group("Web" if has_multiple_types else None, web)
+    _format_link_group("X Posts" if has_multiple_types else None, x)
+    _format_link_group("Collections" if has_multiple_types else None, collections)
+
+    description = "\n\n".join(parts)
     if len(description) > 4000:
         description = truncate_text(description, 3990)
 
