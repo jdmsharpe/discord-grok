@@ -37,7 +37,9 @@ All commands are grouped under `/grok` for clean namespacing.
   - X search: date range filter, allowed/excluded handles, image and video understanding
   - Web search: allowed/excluded domains, image understanding
 - Source citations shown in a dedicated "Sources" embed when available
-- Per-request cost and token usage tracking with daily cumulative cost per user
+- Per-request cost and token usage tracking with daily cumulative cost per user (includes reasoning, cached, and image token breakdowns)
+- Server-side tool usage counts shown in cost embed when tools are used
+- Agentic state preservation across multi-turn tool conversations via encrypted content
 
 ### Image Generation
 

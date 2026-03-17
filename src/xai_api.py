@@ -32,6 +32,7 @@ from util import (
     REASONING_EFFORT_MODELS,
     TOOL_BUILDERS,
     TOOL_COLLECTIONS_SEARCH,
+    TOOL_USAGE_DISPLAY_NAMES,
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
     calculate_cost,
@@ -233,13 +234,32 @@ def append_pricing_embed(
     output_tokens: int,
     daily_cost: float,
     reasoning_tokens: int = 0,
+    cached_tokens: int = 0,
+    image_tokens: int = 0,
+    tool_usage: dict[str, int] | None = None,
 ) -> None:
     """Append a compact pricing embed showing cost and token usage."""
-    cost = calculate_cost(model, input_tokens, output_tokens)
-    token_info = f"{input_tokens:,} tokens in / {output_tokens:,} tokens out"
+    cost = calculate_cost(model, input_tokens, output_tokens, reasoning_tokens)
+    in_qualifiers = []
+    if cached_tokens > 0:
+        in_qualifiers.append(f"{cached_tokens:,} cached")
+    if image_tokens > 0:
+        in_qualifiers.append(f"{image_tokens:,} image")
+    token_info = f"{input_tokens:,} tokens in"
+    if in_qualifiers:
+        token_info += f" ({', '.join(in_qualifiers)})"
+    token_info += f" / {output_tokens:,} tokens out"
     if reasoning_tokens > 0:
         token_info += f" ({reasoning_tokens:,} reasoning)"
     description = f"${cost:.4f} · {token_info} · daily ${daily_cost:.2f}"
+    if tool_usage:
+        tool_parts = []
+        for key, count in tool_usage.items():
+            name = TOOL_USAGE_DISPLAY_NAMES.get(
+                key, key.replace("SERVER_SIDE_TOOL_", "").replace("_", " ").title()
+            )
+            tool_parts.append(f"{name} \u00d7{count}")
+        description += "\n" + " \u00b7 ".join(tool_parts)
     embeds.append(Embed(description=description, color=Colour.dark_teal()))
 
 
@@ -293,10 +313,15 @@ class xAIAPI(commands.Cog):
             return self._http_session
 
     def _track_daily_cost(
-        self, user_id: int, model: str, input_tokens: int, output_tokens: int
+        self,
+        user_id: int,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        reasoning_tokens: int = 0,
     ) -> float:
         """Add this request's cost to the user's daily total and return the new daily total."""
-        cost = calculate_cost(model, input_tokens, output_tokens)
+        cost = calculate_cost(model, input_tokens, output_tokens, reasoning_tokens)
         key = (user_id, date.today().isoformat())
         self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
         return self.daily_costs[key]
@@ -539,6 +564,9 @@ class xAIAPI(commands.Cog):
             input_tokens = getattr(usage, "prompt_tokens", 0) or 0
             output_tokens = getattr(usage, "completion_tokens", 0) or 0
             reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
+            cached_tokens = getattr(usage, "cached_prompt_text_tokens", 0) or 0
+            image_tokens = getattr(usage, "prompt_image_tokens", 0) or 0
+            tool_usage = getattr(response, "server_side_tool_usage", None) or {}
 
             # Stop typing as soon as we have the response
             if typing_task:
@@ -553,11 +581,19 @@ class xAIAPI(commands.Cog):
 
             append_sources_embed(embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
-                message.author.id, params.model, input_tokens, output_tokens
+                message.author.id, params.model, input_tokens, output_tokens, reasoning_tokens
             )
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
-                    embeds, params.model, input_tokens, output_tokens, daily_cost, reasoning_tokens
+                    embeds,
+                    params.model,
+                    input_tokens,
+                    output_tokens,
+                    daily_cost,
+                    reasoning_tokens,
+                    cached_tokens,
+                    image_tokens,
+                    tool_usage,
                 )
 
             view = self.views.get(message.author)
@@ -1129,11 +1165,12 @@ class xAIAPI(commands.Cog):
             if reasoning_effort is not None:
                 create_kwargs["reasoning_effort"] = reasoning_effort
             if is_multi_agent:
-                create_kwargs["use_encrypted_content"] = True
                 if agent_count is not None:
                     create_kwargs["agent_count"] = agent_count
             if tools:
                 create_kwargs["tools"] = tools
+            if is_multi_agent or tools:
+                create_kwargs["use_encrypted_content"] = True
             chat = self.client.chat.create(**create_kwargs)
             response = await chat.sample()
             response_text = response.content or "No response."
@@ -1145,6 +1182,9 @@ class xAIAPI(commands.Cog):
             input_tokens = getattr(usage, "prompt_tokens", 0) or 0
             output_tokens = getattr(usage, "completion_tokens", 0) or 0
             reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
+            cached_tokens = getattr(usage, "cached_prompt_text_tokens", 0) or 0
+            image_tokens = getattr(usage, "prompt_image_tokens", 0) or 0
+            tool_usage = getattr(response, "server_side_tool_usage", None) or {}
 
             # Add assistant response to chat history
             chat.append(response)
@@ -1184,11 +1224,19 @@ class xAIAPI(commands.Cog):
 
             append_sources_embed(embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
-                ctx.author.id, model, input_tokens, output_tokens
+                ctx.author.id, model, input_tokens, output_tokens, reasoning_tokens
             )
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
-                    embeds, model, input_tokens, output_tokens, daily_cost, reasoning_tokens
+                    embeds,
+                    model,
+                    input_tokens,
+                    output_tokens,
+                    daily_cost,
+                    reasoning_tokens,
+                    cached_tokens,
+                    image_tokens,
+                    tool_usage,
                 )
 
             if len(embeds) == 1:

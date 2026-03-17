@@ -40,6 +40,8 @@ def mock_xai_client():
         mock_usage.prompt_tokens = 25
         mock_usage.completion_tokens = 50
         mock_usage.reasoning_tokens = 0
+        mock_usage.cached_prompt_text_tokens = 0
+        mock_usage.prompt_image_tokens = 0
         mock_response.usage = mock_usage
 
         mock_chat.sample = AsyncMock(return_value=mock_response)
