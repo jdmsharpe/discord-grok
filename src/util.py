@@ -31,10 +31,15 @@ IMAGE_PRICING: dict[str, float] = {
 VIDEO_PRICING_PER_SECOND: float = 0.05
 
 
-def calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+def calculate_cost(
+    model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0
+) -> float:
     """Calculate the cost in dollars for a given model and token usage."""
     input_price, output_price = MODEL_PRICING.get(model, (2.00, 6.00))
-    return (input_tokens / 1_000_000) * input_price + (output_tokens / 1_000_000) * output_price
+    return (
+        (input_tokens / 1_000_000) * input_price
+        + ((output_tokens + reasoning_tokens) / 1_000_000) * output_price
+    )
 
 
 def calculate_image_cost(model: str) -> float:
@@ -109,6 +114,18 @@ TOOL_BUILDERS: dict[str, Callable[[], Any]] = {
     TOOL_WEB_SEARCH: web_search,
     TOOL_X_SEARCH: x_search,
     TOOL_CODE_EXECUTION: code_execution,
+}
+
+
+# Display names for server_side_tool_usage keys.
+TOOL_USAGE_DISPLAY_NAMES: dict[str, str] = {
+    "SERVER_SIDE_TOOL_WEB_SEARCH": "Web Search",
+    "SERVER_SIDE_TOOL_X_SEARCH": "X Search",
+    "SERVER_SIDE_TOOL_CODE_EXECUTION": "Code Execution",
+    "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": "Collections Search",
+    "SERVER_SIDE_TOOL_VIEW_X_VIDEO": "X Video",
+    "SERVER_SIDE_TOOL_VIEW_IMAGE": "Image View",
+    "SERVER_SIDE_TOOL_MCP": "MCP",
 }
 
 

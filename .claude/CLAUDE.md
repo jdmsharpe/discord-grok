@@ -61,7 +61,7 @@ discord-grok/
   - `MODEL_PRICING` maps chat models to `(input_cost, output_cost)` per million tokens
   - `IMAGE_PRICING` maps image models to flat per-image cost
   - `VIDEO_PRICING_PER_SECOND` flat per-second video cost
-  - `calculate_cost()`, `calculate_image_cost()`, `calculate_video_cost()`
+  - `calculate_cost()` includes `reasoning_tokens` parameter (billed at output rate), `calculate_image_cost()`, `calculate_video_cost()`
 - `ChatCompletionParameters`
   - Stores conversational model settings and Discord conversation metadata
   - Includes `tools` for active tool configuration in ongoing conversations
@@ -72,6 +72,7 @@ discord-grok/
   - `TOOL_WEB_SEARCH`, `TOOL_X_SEARCH`, `TOOL_CODE_EXECUTION`, `TOOL_COLLECTIONS_SEARCH`
   - `AVAILABLE_TOOLS` maps tool constants to display names for the Discord UI
   - `TOOL_BUILDERS` for tool proto creation
+  - `TOOL_USAGE_DISPLAY_NAMES` maps `server_side_tool_usage` keys to human-readable names
   - `resolve_tool_name()` to map tool protos back to canonical names
 - Text helpers
   - `chunk_text()`
@@ -103,8 +104,10 @@ Main Discord cog class: `xAIAPI`
   - `extract_tool_info()` prefers `response.inline_citations` (structured web/x citation objects), falls back to `response.citations` with URL-based classification
   - `append_sources_embed()` groups citations by source type with headings when mixed (Web, X Posts, Collections)
   - `_apply_tools_to_chat()` updates tools dynamically when toggled mid-conversation
+- Agentic state preservation:
+  - `use_encrypted_content=True` is set for all tool-using conversations AND multi-agent models
+  - Preserves reasoning, server-side tool call history, and tool results across multi-turn conversations
 - Multi-agent flow:
-  - Multi-agent models automatically get `use_encrypted_content=True` for proper multi-turn context
   - `agent_count` (4 or 16) is passed to `chat.create()` when specified
   - `max_tokens` is rejected for multi-agent models (not supported by the API)
   - `agent_count` is rejected for non-multi-agent models
@@ -126,12 +129,13 @@ Main Discord cog class: `xAIAPI`
   - Text limit: 15,000 characters
   - Constants `TTS_API_URL` and `TTS_MAX_CHARS` defined in `xai_api.py`
 - Pricing and token usage:
-  - Token usage extracted via `response.usage.prompt_tokens` / `response.usage.completion_tokens` (xAI SDK uses OpenAI-style naming, not `input_tokens`/`output_tokens`)
-  - `append_pricing_embed()` shows per-request cost, token counts, and daily cumulative cost for chat
+  - Token usage extracted via `response.usage`: `prompt_tokens`, `completion_tokens`, `reasoning_tokens`, `cached_prompt_text_tokens`, `prompt_image_tokens`
+  - `response.server_side_tool_usage` extracted for tool call counts (e.g. `{"SERVER_SIDE_TOOL_WEB_SEARCH": 3}`)
+  - `append_pricing_embed()` shows per-request cost, token counts (with cached/image/reasoning breakdowns), daily cumulative cost, and optional tool usage line
   - `append_generation_pricing_embed()` shows flat cost for image/video generation
   - `SHOW_COST_EMBEDS` is checked at each call site (not inside the helper functions)
   - Sources and cost embeds are included in the main response message (after response/reasoning embeds, before the ButtonView)
-  - `_track_daily_cost()` accumulates token-based costs per `(user_id, date)`
+  - `_track_daily_cost()` accumulates token-based costs (including reasoning tokens) per `(user_id, date)`
   - `_track_daily_cost_flat()` accumulates flat costs (image/video) per `(user_id, date)`
   - `self.daily_costs` dict keyed by `(user_id, date_iso_str)`
 

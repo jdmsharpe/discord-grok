@@ -308,6 +308,13 @@ class TestPricing:
         cost = calculate_cost("unknown-model", 1_000_000, 1_000_000)
         assert cost == 2.00 + 6.00
 
+    def test_calculate_cost_with_reasoning_tokens(self):
+        """Reasoning tokens should be billed at the output rate."""
+        # grok-3: $3/M in, $15/M out
+        cost = calculate_cost("grok-3", 1_000_000, 500_000, reasoning_tokens=500_000)
+        # 1M in * $3 + (500k out + 500k reasoning) * $15
+        assert cost == 3.00 + 15.00
+
     def test_calculate_cost_zero_tokens(self):
         """Zero tokens should return zero cost."""
         assert calculate_cost("grok-3", 0, 0) == 0.0

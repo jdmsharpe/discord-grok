@@ -35,6 +35,46 @@ class TestAppendPricingEmbed:
         append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, reasoning_tokens=0)
         assert "reasoning" not in embeds[0].description
 
+    def test_append_pricing_embed_with_cached_tokens(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, cached_tokens=300)
+        assert "300 cached" in embeds[0].description
+
+    def test_append_pricing_embed_with_image_tokens(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, image_tokens=200)
+        assert "200 image" in embeds[0].description
+
+    def test_append_pricing_embed_hides_zero_cached_and_image_tokens(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, cached_tokens=0, image_tokens=0)
+        assert "cached" not in embeds[0].description
+        assert "image" not in embeds[0].description
+
+    def test_append_pricing_embed_with_tool_usage(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        tool_usage = {"SERVER_SIDE_TOOL_WEB_SEARCH": 3, "SERVER_SIDE_TOOL_X_SEARCH": 2}
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, tool_usage=tool_usage)
+        desc = embeds[0].description
+        assert "Web Search \u00d73" in desc
+        assert "X Search \u00d72" in desc
+        assert "\n" in desc
+
+    def test_append_pricing_embed_no_tool_usage_line(self):
+        from src.xai_api import append_pricing_embed
+
+        embeds: list[Embed] = []
+        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, tool_usage={})
+        assert "\n" not in embeds[0].description
+
     def test_append_generation_pricing_embed(self):
         from src.xai_api import append_generation_pricing_embed
 
@@ -62,6 +102,11 @@ class TestTrackDailyCost:
         assert daily == pytest.approx(3.00)
         daily = cog._track_daily_cost(1, "grok-3", 0, 1_000_000)
         assert daily == pytest.approx(18.00)
+
+    def test_track_daily_cost_includes_reasoning_tokens(self, cog):
+        # grok-3: $3/M in, $15/M out; reasoning billed at output rate
+        daily = cog._track_daily_cost(1, "grok-3", 0, 0, reasoning_tokens=1_000_000)
+        assert daily == pytest.approx(15.00)
 
     def test_track_daily_cost_flat(self, cog):
         daily = cog._track_daily_cost_flat(1, 0.07)
@@ -613,6 +658,28 @@ class TestXAIAPICog:
         create_kwargs = mock_xai_client.chat.create.call_args.kwargs
         assert create_kwargs["use_encrypted_content"] is True
         assert "agent_count" not in create_kwargs
+
+    @pytest.mark.asyncio
+    async def test_chat_tools_set_encrypted_content(
+        self, cog, mock_discord_context, mock_xai_client
+    ):
+        """Tool-using conversations should set use_encrypted_content=True."""
+        cog.client = mock_xai_client
+
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Search for news",
+            model="grok-4.20-beta-latest-reasoning",
+            web_search=True,
+        )
+
+        create_kwargs = mock_xai_client.chat.create.call_args.kwargs
+        assert create_kwargs["use_encrypted_content"] is True
 
     def test_chat_model_choices_match_grok_models(self, cog):
         """Chat command model choices should match GROK_MODELS."""
