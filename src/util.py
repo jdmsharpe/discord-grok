@@ -193,13 +193,11 @@ class ChatCompletionParameters:
     """A dataclass to store the parameters for a chat completion."""
 
     model: str
-    system: str | None = None
     temperature: float | None = None
     top_p: float | None = None
     max_tokens: int | None = None
     frequency_penalty: float | None = None
     presence_penalty: float | None = None
-    seed: int | None = None
     reasoning_effort: str | None = None
     agent_count: int | None = None
     tools: list[Any] = field(default_factory=list)
