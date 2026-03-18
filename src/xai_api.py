@@ -684,7 +684,7 @@ class xAIAPI(commands.Cog):
                 )
 
             self.logger.info(
-                "chat cost | user=%s model=%s input=%d cached=%d output=%d "
+                "COST | command=chat user=%s model=%s input=%d cached=%d output=%d "
                 "reasoning=%d image=%d tool_usage=%s cost=%.6f daily=%.4f",
                 message.author.id,
                 params.model,
@@ -1318,7 +1318,7 @@ class xAIAPI(commands.Cog):
                 )
 
             self.logger.info(
-                "chat cost | user=%s model=%s input=%d cached=%d output=%d "
+                "COST | command=chat user=%s model=%s input=%d cached=%d output=%d "
                 "reasoning=%d image=%d tool_usage=%s cost=%.6f daily=%.4f",
                 ctx.author.id,
                 model,
@@ -1447,7 +1447,7 @@ class xAIAPI(commands.Cog):
             daily_cost = self._track_daily_cost(ctx.author.id, image_cost)
 
             self.logger.info(
-                "image cost | user=%s model=%s cost=%.6f daily=%.4f",
+                "COST | command=image user=%s model=%s cost=%.6f daily=%.4f",
                 ctx.author.id,
                 model,
                 image_cost,
@@ -1579,7 +1579,7 @@ class xAIAPI(commands.Cog):
             daily_cost = self._track_daily_cost(ctx.author.id, video_cost)
 
             self.logger.info(
-                "video cost | user=%s duration=%ds cost=%.6f daily=%.4f",
+                "COST | command=video user=%s duration=%ds cost=%.6f daily=%.4f",
                 ctx.author.id,
                 duration,
                 video_cost,
@@ -1713,7 +1713,7 @@ class xAIAPI(commands.Cog):
             daily_cost = self._track_daily_cost(ctx.author.id, tts_cost)
 
             self.logger.info(
-                "tts cost | user=%s voice=%s chars=%d cost=%.6f daily=%.4f",
+                "COST | command=tts user=%s voice=%s chars=%d cost=%.6f daily=%.4f",
                 ctx.author.id,
                 voice,
                 len(text),
