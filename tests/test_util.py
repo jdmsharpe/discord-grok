@@ -139,13 +139,11 @@ class TestChatCompletionParameters:
         """Default values should be set correctly."""
         params = ChatCompletionParameters(model="grok-3")
         assert params.model == "grok-3"
-        assert params.system is None
         assert params.temperature is None
         assert params.top_p is None
         assert params.max_tokens is None
         assert params.frequency_penalty is None
         assert params.presence_penalty is None
-        assert params.seed is None
         assert params.reasoning_effort is None
         assert params.agent_count is None
         assert params.tools == []
@@ -159,13 +157,11 @@ class TestChatCompletionParameters:
         """All parameters should be stored correctly."""
         params = ChatCompletionParameters(
             model="grok-4.20-beta-latest-reasoning",
-            system="You are helpful.",
             temperature=0.7,
             top_p=0.9,
             max_tokens=2048,
             frequency_penalty=0.5,
             presence_penalty=0.3,
-            seed=42,
             reasoning_effort="high",
             tools=[
                 TOOL_BUILDERS[TOOL_WEB_SEARCH](),
@@ -174,13 +170,11 @@ class TestChatCompletionParameters:
             ],
         )
         assert params.model == "grok-4.20-beta-latest-reasoning"
-        assert params.system == "You are helpful."
         assert params.temperature == 0.7
         assert params.top_p == 0.9
         assert params.max_tokens == 2048
         assert params.frequency_penalty == 0.5
         assert params.presence_penalty == 0.3
-        assert params.seed == 42
         assert params.reasoning_effort == "high"
         assert len(params.tools) == 3
         assert resolve_tool_name(params.tools[0]) == TOOL_WEB_SEARCH

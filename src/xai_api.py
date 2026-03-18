@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import io
 import logging
 import re
@@ -261,8 +262,6 @@ class xAIAPI(commands.Cog):
 
         # Dictionary to store conversation state for each chat interaction
         self.conversations: dict[int, Conversation] = {}
-        # Dictionary to map any message ID to the main conversation ID for tracking
-        self.message_to_conversation_id: dict[int, int] = {}
         # Dictionary to store UI views for each conversation
         self.views = {}
         # Last message with a ButtonView attached, keyed by user — used to strip old buttons
@@ -742,9 +741,6 @@ class xAIAPI(commands.Cog):
             if embeds:
                 try:
                     reply_message = await message.reply(embeds=embeds, view=view)
-                    self.message_to_conversation_id[reply_message.id] = (
-                        main_conversation_id
-                    )
                     self.last_view_messages[message.author] = reply_message
                 except Exception as embed_error:
                     self.logger.warning(f"Embed failed, sending as text: {embed_error}")
@@ -752,9 +748,6 @@ class xAIAPI(commands.Cog):
                     reply_message = await message.reply(
                         content=f"**Response:**\n{safe_response_text[:1900]}{'...' if len(safe_response_text) > 1900 else ''}",
                         view=view,
-                    )
-                    self.message_to_conversation_id[reply_message.id] = (
-                        main_conversation_id
                     )
                     self.last_view_messages[message.author] = reply_message
 
@@ -1394,14 +1387,12 @@ class xAIAPI(commands.Cog):
             self.views[ctx.author] = view
 
             msg = await ctx.send_followup(embeds=embeds, view=view)
-            self.message_to_conversation_id[msg.id] = main_conversation_id
             self.last_view_messages[ctx.author] = msg
 
             # Store the conversation
             response_id = response_json.get("id")
             params = ChatCompletionParameters(
                 model=model,
-                system=system_prompt,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=top_p,
@@ -1524,7 +1515,6 @@ class xAIAPI(commands.Cog):
                 self.logger.info("Successfully generated and sent image")
 
             elif result.base64:
-                import base64
                 image_bytes = base64.b64decode(result.base64)
                 data = io.BytesIO(image_bytes)
 
