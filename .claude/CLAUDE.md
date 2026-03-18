@@ -151,7 +151,7 @@ Main Discord cog class: `xAIAPI`
   - Supports speech tags: inline (`[pause]`, `[laugh]`, etc.) and wrapping (`<whisper>`, `<slow>`, etc.)
   - Text limit: 15,000 characters
   - Constants `TTS_API_URL` and `TTS_MAX_CHARS` defined in `xai_api.py`
-  - Cost tracked via `calculate_tts_cost()` and `_track_daily_cost_flat()`; shown via `append_generation_pricing_embed()`
+  - Cost tracked via `calculate_tts_cost()` and `_track_daily_cost()`; shown via `append_generation_pricing_embed()`
 - Pricing and token usage:
   - Token usage extracted via `_extract_usage()` from JSON: `usage.input_tokens`, `usage.output_tokens`, `usage.input_tokens_details.cached_tokens`, `usage.output_tokens_details.reasoning_tokens`, etc.
   - `server_side_tool_usage` extracted from top-level response JSON (e.g. `{"SERVER_SIDE_TOOL_WEB_SEARCH": 3}`)
@@ -159,8 +159,7 @@ Main Discord cog class: `xAIAPI`
   - `append_generation_pricing_embed()` shows flat cost for image/video/TTS generation
   - `SHOW_COST_EMBEDS` is checked at each call site (not inside the helper functions)
   - Sources and cost embeds are included in the main response message (after response/reasoning embeds, before the ButtonView)
-  - `_track_daily_cost()` accumulates token-based costs (with cached token discounts and tool invocation costs) per `(user_id, date)`
-  - `_track_daily_cost_flat()` accumulates flat costs (image/video/TTS) per `(user_id, date)`
+  - `_track_daily_cost()` accumulates any cost (token-based or flat) per `(user_id, date)`; cost is pre-computed at each call site
   - `self.daily_costs` dict keyed by `(user_id, date_iso_str)`
   - Persistent `self.logger.info()` at every API call site (chat x2, image, video, TTS) logging user, model, token counts, cost, and daily total
 

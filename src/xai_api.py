@@ -192,7 +192,7 @@ def append_sources_embed(embeds: list[Embed], citations: list[CitationInfo]) -> 
 
 def append_pricing_embed(
     embeds: list[Embed],
-    model: str,
+    cost: float,
     input_tokens: int,
     output_tokens: int,
     daily_cost: float,
@@ -202,11 +202,7 @@ def append_pricing_embed(
     tool_usage: dict[str, int] | None = None,
 ) -> None:
     """Append a compact pricing embed showing cost and token usage."""
-    token_cost = calculate_cost(
-        model, input_tokens, output_tokens, reasoning_tokens, cached_tokens
-    )
     tool_cost = calculate_tool_cost(tool_usage) if tool_usage else 0.0
-    cost = token_cost + tool_cost
     in_qualifiers = []
     if cached_tokens > 0:
         in_qualifiers.append(f"{cached_tokens:,} cached")
@@ -279,28 +275,8 @@ class xAIAPI(commands.Cog):
                 self._http_session = aiohttp.ClientSession()
             return self._http_session
 
-    def _track_daily_cost(
-        self,
-        user_id: int,
-        model: str,
-        input_tokens: int,
-        output_tokens: int,
-        reasoning_tokens: int = 0,
-        cached_tokens: int = 0,
-        tool_usage: dict[str, int] | None = None,
-    ) -> float:
-        """Add this request's cost to the user's daily total and return the new daily total."""
-        cost = calculate_cost(
-            model, input_tokens, output_tokens, reasoning_tokens, cached_tokens
-        )
-        if tool_usage:
-            cost += calculate_tool_cost(tool_usage)
-        key = (user_id, date.today().isoformat())
-        self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
-        return self.daily_costs[key]
-
-    def _track_daily_cost_flat(self, user_id: int, cost: float) -> float:
-        """Add a flat cost to the user's daily total and return the new daily total."""
+    def _track_daily_cost(self, user_id: int, cost: float) -> float:
+        """Add a cost to the user's daily total and return the new daily total."""
         key = (user_id, date.today().isoformat())
         self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
         return self.daily_costs[key]
@@ -690,19 +666,14 @@ class xAIAPI(commands.Cog):
             append_response_embeds(embeds, response_text)
 
             append_sources_embed(embeds, tool_info["citations"])
-            daily_cost = self._track_daily_cost(
-                message.author.id,
-                params.model,
-                input_tokens,
-                output_tokens,
-                reasoning_tokens,
-                cached_tokens,
-                tool_usage,
-            )
+            request_cost = calculate_cost(
+                params.model, input_tokens, output_tokens, reasoning_tokens, cached_tokens
+            ) + calculate_tool_cost(tool_usage or {})
+            daily_cost = self._track_daily_cost(message.author.id, request_cost)
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
                     embeds,
-                    params.model,
+                    request_cost,
                     input_tokens,
                     output_tokens,
                     daily_cost,
@@ -723,8 +694,7 @@ class xAIAPI(commands.Cog):
                 reasoning_tokens,
                 image_tokens,
                 tool_usage or {},
-                calculate_cost(params.model, input_tokens, output_tokens, reasoning_tokens, cached_tokens)
-                + calculate_tool_cost(tool_usage or {}),
+                request_cost,
                 daily_cost,
             )
 
@@ -1330,19 +1300,14 @@ class xAIAPI(commands.Cog):
             append_response_embeds(embeds, response_text)
 
             append_sources_embed(embeds, tool_info["citations"])
-            daily_cost = self._track_daily_cost(
-                ctx.author.id,
-                model,
-                input_tokens,
-                output_tokens,
-                reasoning_tokens,
-                cached_tokens,
-                tool_usage,
-            )
+            request_cost = calculate_cost(
+                model, input_tokens, output_tokens, reasoning_tokens, cached_tokens
+            ) + calculate_tool_cost(tool_usage or {})
+            daily_cost = self._track_daily_cost(ctx.author.id, request_cost)
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
                     embeds,
-                    model,
+                    request_cost,
                     input_tokens,
                     output_tokens,
                     daily_cost,
@@ -1363,8 +1328,7 @@ class xAIAPI(commands.Cog):
                 reasoning_tokens,
                 image_tokens,
                 tool_usage or {},
-                calculate_cost(model, input_tokens, output_tokens, reasoning_tokens, cached_tokens)
-                + calculate_tool_cost(tool_usage or {}),
+                request_cost,
                 daily_cost,
             )
 
@@ -1480,7 +1444,7 @@ class xAIAPI(commands.Cog):
             )
 
             image_cost = calculate_image_cost(model)
-            daily_cost = self._track_daily_cost_flat(ctx.author.id, image_cost)
+            daily_cost = self._track_daily_cost(ctx.author.id, image_cost)
 
             self.logger.info(
                 "image cost | user=%s model=%s cost=%.6f daily=%.4f",
@@ -1612,7 +1576,7 @@ class xAIAPI(commands.Cog):
                     video_bytes = await resp.read()
 
             video_cost = calculate_video_cost(duration)
-            daily_cost = self._track_daily_cost_flat(ctx.author.id, video_cost)
+            daily_cost = self._track_daily_cost(ctx.author.id, video_cost)
 
             self.logger.info(
                 "video cost | user=%s duration=%ds cost=%.6f daily=%.4f",
@@ -1746,7 +1710,7 @@ class xAIAPI(commands.Cog):
             )
 
             tts_cost = calculate_tts_cost(len(text))
-            daily_cost = self._track_daily_cost_flat(ctx.author.id, tts_cost)
+            daily_cost = self._track_daily_cost(ctx.author.id, tts_cost)
 
             self.logger.info(
                 "tts cost | user=%s voice=%s chars=%d cost=%.6f daily=%.4f",
