@@ -517,7 +517,8 @@ class xAIAPI(commands.Cog):
         if conversation is not None:
             starter = conversation.params.conversation_starter
             if starter is not None:
-                self.last_view_messages.pop(starter, None)
+                await self._strip_previous_view(starter)
+                self.views.pop(starter, None)
             await self._cleanup_conversation_files(conversation)
 
     def cog_unload(self):
@@ -726,8 +727,9 @@ class xAIAPI(commands.Cog):
                 self.logger.warning("No embeds to send in the reply.")
                 await message.reply(
                     content="An error occurred: No content to send.",
-                    view=view,
                 )
+                if conversation.params.conversation_id is not None:
+                    await self.end_conversation(conversation.params.conversation_id)
 
         except Exception as e:
             description = format_xai_error(e)
@@ -740,6 +742,8 @@ class xAIAPI(commands.Cog):
             await message.reply(
                 embed=Embed(title="Error", description=description, color=Colour.red())
             )
+            if conversation.params.conversation_id is not None:
+                await self.end_conversation(conversation.params.conversation_id)
 
         finally:
             if typing_task:
@@ -1040,6 +1044,7 @@ class xAIAPI(commands.Cog):
                 )
                 return
 
+        main_conversation_id: int | None = None
         try:
             typing_task = asyncio.create_task(self.keep_typing(ctx.channel))
 
@@ -1388,6 +1393,11 @@ class xAIAPI(commands.Cog):
             await ctx.send_followup(
                 embed=Embed(title="Error", description=description, color=Colour.red())
             )
+            # Clean up buttons and state if the conversation was partially created
+            await self._strip_previous_view(ctx.author)
+            self.views.pop(ctx.author, None)
+            if main_conversation_id is not None:
+                self.conversations.pop(main_conversation_id, None)
 
         finally:
             if typing_task:
