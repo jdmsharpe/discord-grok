@@ -140,7 +140,7 @@ Main Discord cog class: `xAIAPI`
   - Uploaded file IDs are tracked in `Conversation.file_ids`
   - Files are sent as `{"type": "input_file", "file_id": id}` content parts (triggers server-side `attachment_search`)
   - `_cleanup_conversation_files()` deletes all tracked files from xAI on conversation end
-  - `end_conversation()` removes the conversation and cleans up files
+  - `end_conversation()` removes the conversation, strips buttons from the last message, cleans up views, and deletes uploaded files
 - TTS flow (xAI TTS REST API):
   - `_generate_tts()` calls `POST https://api.x.ai/v1/tts` directly via aiohttp (not part of xAI SDK)
   - Returns raw audio bytes; sent to Discord as a file attachment
