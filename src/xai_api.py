@@ -684,8 +684,8 @@ class xAIAPI(commands.Cog):
                 )
 
             self.logger.info(
-                "COST | command=chat user=%s model=%s input=%d cached=%d output=%d "
-                "reasoning=%d image=%d tool_usage=%s cost=%.6f daily=%.4f",
+                "COST | command=chat | user=%s | model=%s | input=%d | cached=%d | output=%d"
+                " | reasoning=%d | image=%d | tool_usage=%s | cost=$%.4f | daily=$%.4f",
                 message.author.id,
                 params.model,
                 input_tokens,
@@ -1318,8 +1318,8 @@ class xAIAPI(commands.Cog):
                 )
 
             self.logger.info(
-                "COST | command=chat user=%s model=%s input=%d cached=%d output=%d "
-                "reasoning=%d image=%d tool_usage=%s cost=%.6f daily=%.4f",
+                "COST | command=chat | user=%s | model=%s | input=%d | cached=%d | output=%d"
+                " | reasoning=%d | image=%d | tool_usage=%s | cost=$%.4f | daily=$%.4f",
                 ctx.author.id,
                 model,
                 input_tokens,
@@ -1447,7 +1447,7 @@ class xAIAPI(commands.Cog):
             daily_cost = self._track_daily_cost(ctx.author.id, image_cost)
 
             self.logger.info(
-                "COST | command=image user=%s model=%s cost=%.6f daily=%.4f",
+                "COST | command=image | user=%s | model=%s | cost=$%.4f | daily=$%.4f",
                 ctx.author.id,
                 model,
                 image_cost,
@@ -1579,7 +1579,7 @@ class xAIAPI(commands.Cog):
             daily_cost = self._track_daily_cost(ctx.author.id, video_cost)
 
             self.logger.info(
-                "COST | command=video user=%s duration=%ds cost=%.6f daily=%.4f",
+                "COST | command=video | user=%s | duration=%ds | cost=$%.4f | daily=$%.4f",
                 ctx.author.id,
                 duration,
                 video_cost,
@@ -1713,7 +1713,7 @@ class xAIAPI(commands.Cog):
             daily_cost = self._track_daily_cost(ctx.author.id, tts_cost)
 
             self.logger.info(
-                "COST | command=tts user=%s voice=%s chars=%d cost=%.6f daily=%.4f",
+                "COST | command=tts | user=%s | voice=%s | chars=%d | cost=$%.4f | daily=$%.4f",
                 ctx.author.id,
                 voice,
                 len(text),
