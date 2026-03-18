@@ -163,6 +163,7 @@ TOOL_USAGE_DISPLAY_NAMES: dict[str, str] = {
     "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": "Collections Search",
     "SERVER_SIDE_TOOL_CODE_INTERPRETER": "Code Execution",
     "SERVER_SIDE_TOOL_FILE_SEARCH": "Collections Search",
+    "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH": "Attachment Search",
     "SERVER_SIDE_TOOL_VIEW_X_VIDEO": "X Video",
     "SERVER_SIDE_TOOL_VIEW_IMAGE": "Image View",
     "SERVER_SIDE_TOOL_MCP": "MCP",
