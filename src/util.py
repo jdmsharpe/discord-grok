@@ -5,19 +5,19 @@ from discord import Member, User
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
-# Per-million-token pricing: (input_cost, output_cost)
-MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "grok-4.20-multi-agent-beta-latest": (2.00, 6.00),
-    "grok-4.20-beta-latest-reasoning": (2.00, 6.00),
-    "grok-4.20-beta-latest-non-reasoning": (2.00, 6.00),
-    "grok-4-1-fast-reasoning": (0.20, 0.50),
-    "grok-4-1-fast-non-reasoning": (0.20, 0.50),
-    "grok-code-fast-1": (0.20, 1.50),
-    "grok-4-fast-reasoning": (0.20, 0.50),
-    "grok-4-fast-non-reasoning": (0.20, 0.50),
-    "grok-4-0709": (3.00, 15.00),
-    "grok-3-mini": (0.30, 0.50),
-    "grok-3": (3.00, 15.00),
+# Per-million-token pricing: (input_cost, cached_input_cost, output_cost)
+MODEL_PRICING: dict[str, tuple[float, float, float]] = {
+    "grok-4.20-multi-agent-beta-latest": (2.00, 0.20, 6.00),
+    "grok-4.20-beta-latest-reasoning": (2.00, 0.20, 6.00),
+    "grok-4.20-beta-latest-non-reasoning": (2.00, 0.20, 6.00),
+    "grok-4-1-fast-reasoning": (0.20, 0.05, 0.50),
+    "grok-4-1-fast-non-reasoning": (0.20, 0.05, 0.50),
+    "grok-code-fast-1": (0.20, 0.02, 1.50),
+    "grok-4-fast-reasoning": (0.20, 0.05, 0.50),
+    "grok-4-fast-non-reasoning": (0.20, 0.05, 0.50),
+    "grok-4-0709": (3.00, 0.75, 15.00),
+    "grok-3-mini": (0.30, 0.07, 0.50),
+    "grok-3": (3.00, 0.75, 15.00),
 }
 
 # Flat per-image pricing
@@ -29,16 +29,55 @@ IMAGE_PRICING: dict[str, float] = {
 # Per-second video pricing
 VIDEO_PRICING_PER_SECOND: float = 0.05
 
+# Per-1k-invocations pricing for server-side tools
+TOOL_INVOCATION_PRICING: dict[str, float] = {
+    "SERVER_SIDE_TOOL_WEB_SEARCH": 5.00,
+    "SERVER_SIDE_TOOL_X_SEARCH": 5.00,
+    "SERVER_SIDE_TOOL_CODE_EXECUTION": 5.00,
+    "SERVER_SIDE_TOOL_CODE_INTERPRETER": 5.00,
+    "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": 2.50,
+    "SERVER_SIDE_TOOL_FILE_SEARCH": 2.50,
+    "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH": 10.00,
+}
+
+# TTS pricing: dollars per million characters
+TTS_PRICING_PER_MILLION_CHARS: float = 4.20
+
 
 def calculate_cost(
-    model: str, input_tokens: int, output_tokens: int, reasoning_tokens: int = 0
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    reasoning_tokens: int = 0,
+    cached_tokens: int = 0,
 ) -> float:
-    """Calculate the cost in dollars for a given model and token usage."""
-    input_price, output_price = MODEL_PRICING.get(model, (2.00, 6.00))
+    """Calculate the cost in dollars for a given model and token usage.
+
+    Cached tokens are a subset of input_tokens billed at a discounted rate.
+    """
+    input_price, cached_price, output_price = MODEL_PRICING.get(
+        model, (2.00, 0.20, 6.00)
+    )
+    non_cached = input_tokens - cached_tokens
     return (
-        (input_tokens / 1_000_000) * input_price
+        (non_cached / 1_000_000) * input_price
+        + (cached_tokens / 1_000_000) * cached_price
         + ((output_tokens + reasoning_tokens) / 1_000_000) * output_price
     )
+
+
+def calculate_tool_cost(tool_usage: dict[str, int]) -> float:
+    """Calculate the cost in dollars for server-side tool invocations."""
+    total = 0.0
+    for key, count in tool_usage.items():
+        per_1k = TOOL_INVOCATION_PRICING.get(key, 0.0)
+        total += (count / 1_000) * per_1k
+    return total
+
+
+def calculate_tts_cost(character_count: int) -> float:
+    """Calculate the cost in dollars for a TTS generation."""
+    return (character_count / 1_000_000) * TTS_PRICING_PER_MILLION_CHARS
 
 
 def calculate_image_cost(model: str) -> float:

@@ -36,6 +36,8 @@ from util import (
     TOOL_X_SEARCH,
     calculate_cost,
     calculate_image_cost,
+    calculate_tool_cost,
+    calculate_tts_cost,
     calculate_video_cost,
     chunk_text,
     format_xai_error,
@@ -199,7 +201,11 @@ def append_pricing_embed(
     tool_usage: dict[str, int] | None = None,
 ) -> None:
     """Append a compact pricing embed showing cost and token usage."""
-    cost = calculate_cost(model, input_tokens, output_tokens, reasoning_tokens)
+    token_cost = calculate_cost(
+        model, input_tokens, output_tokens, reasoning_tokens, cached_tokens
+    )
+    tool_cost = calculate_tool_cost(tool_usage) if tool_usage else 0.0
+    cost = token_cost + tool_cost
     in_qualifiers = []
     if cached_tokens > 0:
         in_qualifiers.append(f"{cached_tokens:,} cached")
@@ -219,6 +225,8 @@ def append_pricing_embed(
                 key, key.replace("SERVER_SIDE_TOOL_", "").replace("_", " ").title()
             )
             tool_parts.append(f"{name} \u00d7{count}")
+        if tool_cost > 0:
+            tool_parts.append(f"tool cost ${tool_cost:.4f}")
         description += "\n" + " \u00b7 ".join(tool_parts)
     embeds.append(Embed(description=description, color=GROK_BLACK))
 
@@ -279,9 +287,15 @@ class xAIAPI(commands.Cog):
         input_tokens: int,
         output_tokens: int,
         reasoning_tokens: int = 0,
+        cached_tokens: int = 0,
+        tool_usage: dict[str, int] | None = None,
     ) -> float:
         """Add this request's cost to the user's daily total and return the new daily total."""
-        cost = calculate_cost(model, input_tokens, output_tokens, reasoning_tokens)
+        cost = calculate_cost(
+            model, input_tokens, output_tokens, reasoning_tokens, cached_tokens
+        )
+        if tool_usage:
+            cost += calculate_tool_cost(tool_usage)
         key = (user_id, date.today().isoformat())
         self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
         return self.daily_costs[key]
@@ -678,7 +692,13 @@ class xAIAPI(commands.Cog):
 
             append_sources_embed(embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
-                message.author.id, params.model, input_tokens, output_tokens, reasoning_tokens
+                message.author.id,
+                params.model,
+                input_tokens,
+                output_tokens,
+                reasoning_tokens,
+                cached_tokens,
+                tool_usage,
             )
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
@@ -692,6 +712,22 @@ class xAIAPI(commands.Cog):
                     image_tokens,
                     tool_usage,
                 )
+
+            self.logger.info(
+                "chat cost | user=%s model=%s input=%d cached=%d output=%d "
+                "reasoning=%d image=%d tool_usage=%s cost=%.6f daily=%.4f",
+                message.author.id,
+                params.model,
+                input_tokens,
+                cached_tokens,
+                output_tokens,
+                reasoning_tokens,
+                image_tokens,
+                tool_usage or {},
+                calculate_cost(params.model, input_tokens, output_tokens, reasoning_tokens, cached_tokens)
+                + calculate_tool_cost(tool_usage or {}),
+                daily_cost,
+            )
 
             view = self.views.get(message.author)
             main_conversation_id = params.conversation_id
@@ -1302,7 +1338,13 @@ class xAIAPI(commands.Cog):
 
             append_sources_embed(embeds, tool_info["citations"])
             daily_cost = self._track_daily_cost(
-                ctx.author.id, model, input_tokens, output_tokens, reasoning_tokens
+                ctx.author.id,
+                model,
+                input_tokens,
+                output_tokens,
+                reasoning_tokens,
+                cached_tokens,
+                tool_usage,
             )
             if SHOW_COST_EMBEDS:
                 append_pricing_embed(
@@ -1316,6 +1358,22 @@ class xAIAPI(commands.Cog):
                     image_tokens,
                     tool_usage,
                 )
+
+            self.logger.info(
+                "chat cost | user=%s model=%s input=%d cached=%d output=%d "
+                "reasoning=%d image=%d tool_usage=%s cost=%.6f daily=%.4f",
+                ctx.author.id,
+                model,
+                input_tokens,
+                cached_tokens,
+                output_tokens,
+                reasoning_tokens,
+                image_tokens,
+                tool_usage or {},
+                calculate_cost(model, input_tokens, output_tokens, reasoning_tokens, cached_tokens)
+                + calculate_tool_cost(tool_usage or {}),
+                daily_cost,
+            )
 
             if len(embeds) == 1:
                 await ctx.send_followup("No response generated.")
@@ -1432,6 +1490,14 @@ class xAIAPI(commands.Cog):
 
             image_cost = calculate_image_cost(model)
             daily_cost = self._track_daily_cost_flat(ctx.author.id, image_cost)
+
+            self.logger.info(
+                "image cost | user=%s model=%s cost=%.6f daily=%.4f",
+                ctx.author.id,
+                model,
+                image_cost,
+                daily_cost,
+            )
 
             if result.url:
                 async with aiohttp.ClientSession() as session:
@@ -1558,6 +1624,14 @@ class xAIAPI(commands.Cog):
             video_cost = calculate_video_cost(duration)
             daily_cost = self._track_daily_cost_flat(ctx.author.id, video_cost)
 
+            self.logger.info(
+                "video cost | user=%s duration=%ds cost=%.6f daily=%.4f",
+                ctx.author.id,
+                duration,
+                video_cost,
+                daily_cost,
+            )
+
             data = io.BytesIO(video_bytes)
             description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
             description += f"**Aspect Ratio:** {aspect_ratio}\n"
@@ -1681,6 +1755,18 @@ class xAIAPI(commands.Cog):
                 text, voice, language, output_format, sample_rate, bit_rate
             )
 
+            tts_cost = calculate_tts_cost(len(text))
+            daily_cost = self._track_daily_cost_flat(ctx.author.id, tts_cost)
+
+            self.logger.info(
+                "tts cost | user=%s voice=%s chars=%d cost=%.6f daily=%.4f",
+                ctx.author.id,
+                voice,
+                len(text),
+                tts_cost,
+                daily_cost,
+            )
+
             description = f"**Text:** {truncate_text(text, 2000)}\n"
             description += f"**Voice:** {voice}\n"
             description += f"**Language:** {language}\n"
@@ -1691,15 +1777,19 @@ class xAIAPI(commands.Cog):
                 fmt += f" / {bit_rate // 1000} kbps"
             description += f"**Format:** {fmt}\n"
 
-            embed = Embed(
-                title="Text-to-Speech Generation",
-                description=description,
-                color=GROK_BLACK,
-            )
+            embeds = [
+                Embed(
+                    title="Text-to-Speech Generation",
+                    description=description,
+                    color=GROK_BLACK,
+                )
+            ]
+            if SHOW_COST_EMBEDS:
+                append_generation_pricing_embed(embeds, tts_cost, daily_cost)
             ext = "ulaw" if output_format == "mulaw" else output_format
             data = io.BytesIO(audio_bytes)
             await ctx.send_followup(
-                embed=embed, file=File(data, f"speech.{ext}")
+                embeds=embeds, file=File(data, f"speech.{ext}")
             )
             self.logger.info("Successfully generated and sent TTS audio")
 

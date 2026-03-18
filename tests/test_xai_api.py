@@ -71,9 +71,11 @@ class TestAppendPricingEmbed:
         tool_usage = {"SERVER_SIDE_TOOL_WEB_SEARCH": 3, "SERVER_SIDE_TOOL_X_SEARCH": 2}
         append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, tool_usage=tool_usage)
         desc = embeds[0].description
+        assert desc is not None
         assert "Web Search \u00d73" in desc
         assert "X Search \u00d72" in desc
         assert "\n" in desc
+        assert "tool cost" in desc
 
     def test_append_pricing_embed_no_tool_usage_line(self):
         from src.xai_api import append_pricing_embed
@@ -104,7 +106,7 @@ class TestTrackDailyCost:
             return cog
 
     def test_track_daily_cost_accumulates(self, cog):
-        # grok-3: $3/M in, $15/M out
+        # grok-3: $3/M in, $0.75/M cached, $15/M out
         daily = cog._track_daily_cost(1, "grok-3", 1_000_000, 0)
         assert daily == pytest.approx(3.00)
         daily = cog._track_daily_cost(1, "grok-3", 0, 1_000_000)
@@ -114,6 +116,20 @@ class TestTrackDailyCost:
         # grok-3: $3/M in, $15/M out; reasoning billed at output rate
         daily = cog._track_daily_cost(1, "grok-3", 0, 0, reasoning_tokens=1_000_000)
         assert daily == pytest.approx(15.00)
+
+    def test_track_daily_cost_with_cached_tokens(self, cog):
+        # grok-3: 1M in, 500k cached → 500k * $3 + 500k * $0.75 = $1.875
+        daily = cog._track_daily_cost(
+            1, "grok-3", 1_000_000, 0, cached_tokens=500_000
+        )
+        assert daily == pytest.approx(1.50 + 0.375)
+
+    def test_track_daily_cost_with_tool_usage(self, cog):
+        # grok-3: 0 tokens + 1 web search ($5/1k = $0.005)
+        daily = cog._track_daily_cost(
+            1, "grok-3", 0, 0, tool_usage={"SERVER_SIDE_TOOL_WEB_SEARCH": 1}
+        )
+        assert daily == pytest.approx(0.005)
 
     def test_track_daily_cost_flat(self, cog):
         daily = cog._track_daily_cost_flat(1, 0.07)
@@ -935,7 +951,7 @@ class TestTTSCommand:
         mock_gen.assert_awaited_once_with("Hello world", "eve", "en", "mp3", None, None)
         mock_discord_context.send_followup.assert_called_once()
         call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert call_kwargs["embed"].title == "Text-to-Speech Generation"
+        assert call_kwargs["embeds"][0].title == "Text-to-Speech Generation"
         assert call_kwargs["file"] is not None
 
     @pytest.mark.asyncio
@@ -957,8 +973,8 @@ class TestTTSCommand:
 
         mock_gen.assert_awaited_once_with("Hi", "rex", "auto", "mp3", 44100, 192000)
         call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert "44,100 Hz" in call_kwargs["embed"].description
-        assert "192 kbps" in call_kwargs["embed"].description
+        assert "44,100 Hz" in call_kwargs["embeds"][0].description
+        assert "192 kbps" in call_kwargs["embeds"][0].description
 
     @pytest.mark.asyncio
     async def test_tts_mulaw_file_extension(self, cog, mock_discord_context):

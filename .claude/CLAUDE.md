@@ -63,10 +63,15 @@ discord-grok/
   - `REASONING_EFFORT_MODELS` set of models that accept `reasoning_effort` (`grok-3-mini` only)
   - `MULTI_AGENT_MODELS` set of models that support `agent_count` and have special constraints (no `max_tokens`)
 - Pricing
-  - `MODEL_PRICING` maps chat models to `(input_cost, output_cost)` per million tokens
+  - `MODEL_PRICING` maps chat models to `(input_cost, cached_input_cost, output_cost)` per million tokens
   - `IMAGE_PRICING` maps image models to flat per-image cost
   - `VIDEO_PRICING_PER_SECOND` flat per-second video cost
-  - `calculate_cost()` includes `reasoning_tokens` parameter (billed at output rate), `calculate_image_cost()`, `calculate_video_cost()`
+  - `TOOL_INVOCATION_PRICING` maps `SERVER_SIDE_TOOL_*` keys to per-1k-invocations cost ($5 web/x/code, $10 attachment, $2.50 collections)
+  - `TTS_PRICING_PER_MILLION_CHARS` TTS cost at $4.20 per million characters
+  - `calculate_cost()` includes `reasoning_tokens` (billed at output rate) and `cached_tokens` (billed at discounted cached rate) parameters
+  - `calculate_tool_cost()` sums per-invocation costs from `server_side_tool_usage` dict
+  - `calculate_tts_cost()` character-based TTS cost
+  - `calculate_image_cost()`, `calculate_video_cost()`
 - `ChatCompletionParameters`
   - Stores conversational model settings and Discord conversation metadata
   - Includes `tools` (list of JSON dicts) for active tool configuration in ongoing conversations
@@ -146,16 +151,18 @@ Main Discord cog class: `xAIAPI`
   - Supports speech tags: inline (`[pause]`, `[laugh]`, etc.) and wrapping (`<whisper>`, `<slow>`, etc.)
   - Text limit: 15,000 characters
   - Constants `TTS_API_URL` and `TTS_MAX_CHARS` defined in `xai_api.py`
+  - Cost tracked via `calculate_tts_cost()` and `_track_daily_cost_flat()`; shown via `append_generation_pricing_embed()`
 - Pricing and token usage:
   - Token usage extracted via `_extract_usage()` from JSON: `usage.input_tokens`, `usage.output_tokens`, `usage.input_tokens_details.cached_tokens`, `usage.output_tokens_details.reasoning_tokens`, etc.
   - `server_side_tool_usage` extracted from top-level response JSON (e.g. `{"SERVER_SIDE_TOOL_WEB_SEARCH": 3}`)
-  - `append_pricing_embed()` shows per-request cost, token counts (with cached/image/reasoning breakdowns), daily cumulative cost, and optional tool usage line
-  - `append_generation_pricing_embed()` shows flat cost for image/video generation
+  - `append_pricing_embed()` shows per-request cost (tokens + tool invocations), token counts (with cached/image/reasoning breakdowns), daily cumulative cost, and optional tool usage line with tool invocation cost
+  - `append_generation_pricing_embed()` shows flat cost for image/video/TTS generation
   - `SHOW_COST_EMBEDS` is checked at each call site (not inside the helper functions)
   - Sources and cost embeds are included in the main response message (after response/reasoning embeds, before the ButtonView)
-  - `_track_daily_cost()` accumulates token-based costs (including reasoning tokens) per `(user_id, date)`
-  - `_track_daily_cost_flat()` accumulates flat costs (image/video) per `(user_id, date)`
+  - `_track_daily_cost()` accumulates token-based costs (with cached token discounts and tool invocation costs) per `(user_id, date)`
+  - `_track_daily_cost_flat()` accumulates flat costs (image/video/TTS) per `(user_id, date)`
   - `self.daily_costs` dict keyed by `(user_id, date_iso_str)`
+  - Persistent `self.logger.info()` at every API call site (chat x2, image, video, TTS) logging user, model, token counts, cost, and daily total
 
 ### `src/button_view.py`
 
