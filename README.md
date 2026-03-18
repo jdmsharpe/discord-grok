@@ -37,8 +37,9 @@ All commands are grouped under `/grok` for clean namespacing.
   - X search: date range filter, allowed/excluded handles, image and video understanding
   - Web search: allowed/excluded domains, image understanding
 - Source citations shown in a dedicated "Sources" embed when available
-- Per-request cost and token usage tracking with daily cumulative cost per user (includes reasoning, cached, and image token breakdowns)
-- Server-side tool usage counts shown in cost embed when tools are used
+- Per-request cost and token usage tracking with daily cumulative cost per user (includes reasoning, cached, and image token breakdowns, cached token discounts, tool invocation costs, and TTS character-based costs)
+- Server-side tool usage counts and invocation costs shown in cost embed when tools are used
+- Persistent cost logging via Python logger at every API call site (chat, image, video, TTS)
 - Stateful multi-turn conversations via xAI Responses API (`previous_response_id`) with server-side conversation storage and automatic prompt caching
 
 ### Image Generation

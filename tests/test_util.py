@@ -1,7 +1,11 @@
+import pytest
+
 from src.util import (
     CHUNK_TEXT_SIZE,
     IMAGE_PRICING,
     MODEL_PRICING,
+    TOOL_INVOCATION_PRICING,
+    TTS_PRICING_PER_MILLION_CHARS,
     VIDEO_PRICING_PER_SECOND,
     ChatCompletionParameters,
     Conversation,
@@ -12,6 +16,8 @@ from src.util import (
     TOOL_X_SEARCH,
     calculate_cost,
     calculate_image_cost,
+    calculate_tool_cost,
+    calculate_tts_cost,
     calculate_video_cost,
     chunk_text,
     format_xai_error,
@@ -324,6 +330,77 @@ class TestPricing:
 
     def test_calculate_image_cost_unknown_model(self):
         assert calculate_image_cost("unknown") == 0.07
+
+    def test_calculate_cost_with_cached_tokens(self):
+        """Cached tokens should be billed at the discounted rate."""
+        # grok-3: $3/M in, $0.75/M cached, $15/M out
+        # 1M input with 500k cached: 500k * $3 + 500k * $0.75 + 0 out
+        cost = calculate_cost("grok-3", 1_000_000, 0, cached_tokens=500_000)
+        assert cost == pytest.approx(1.50 + 0.375)
+
+    def test_calculate_cost_all_cached(self):
+        """If all input tokens are cached, only cached rate applies."""
+        # grok-3: $0.75/M cached
+        cost = calculate_cost("grok-3", 1_000_000, 0, cached_tokens=1_000_000)
+        assert cost == pytest.approx(0.75)
+
+    def test_model_pricing_has_three_values(self):
+        """Each MODEL_PRICING entry should be a 3-tuple (input, cached, output)."""
+        for model, prices in MODEL_PRICING.items():
+            assert len(prices) == 3, f"{model} pricing should have 3 values"
+
+    def test_calculate_tool_cost_known_tools(self):
+        """Tool invocations should be billed at per-1k rates."""
+        # 1000 web searches at $5/1k = $5
+        cost = calculate_tool_cost({"SERVER_SIDE_TOOL_WEB_SEARCH": 1000})
+        assert cost == pytest.approx(5.00)
+
+    def test_calculate_tool_cost_fractional(self):
+        """Fewer than 1k invocations should cost proportionally."""
+        # 1 web search at $5/1k = $0.005
+        cost = calculate_tool_cost({"SERVER_SIDE_TOOL_WEB_SEARCH": 1})
+        assert cost == pytest.approx(0.005)
+
+    def test_calculate_tool_cost_multiple_tools(self):
+        """Multiple tool types should sum their costs."""
+        cost = calculate_tool_cost({
+            "SERVER_SIDE_TOOL_WEB_SEARCH": 1000,
+            "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": 1000,
+        })
+        assert cost == pytest.approx(5.00 + 2.50)
+
+    def test_calculate_tool_cost_unknown_tool(self):
+        """Unknown tool keys should contribute zero cost."""
+        cost = calculate_tool_cost({"SERVER_SIDE_TOOL_UNKNOWN": 100})
+        assert cost == 0.0
+
+    def test_calculate_tool_cost_empty(self):
+        """Empty tool usage should return zero."""
+        assert calculate_tool_cost({}) == 0.0
+
+    def test_tool_invocation_pricing_keys(self):
+        """TOOL_INVOCATION_PRICING should cover known server-side tools."""
+        assert "SERVER_SIDE_TOOL_WEB_SEARCH" in TOOL_INVOCATION_PRICING
+        assert "SERVER_SIDE_TOOL_X_SEARCH" in TOOL_INVOCATION_PRICING
+        assert "SERVER_SIDE_TOOL_CODE_EXECUTION" in TOOL_INVOCATION_PRICING
+        assert "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH" in TOOL_INVOCATION_PRICING
+        assert "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH" in TOOL_INVOCATION_PRICING
+
+    def test_calculate_tts_cost(self):
+        """TTS cost should be based on character count."""
+        # 1M chars at $4.20/M = $4.20
+        cost = calculate_tts_cost(1_000_000)
+        assert cost == pytest.approx(TTS_PRICING_PER_MILLION_CHARS)
+
+    def test_calculate_tts_cost_small(self):
+        """Small TTS should be proportional."""
+        # 100 chars at $4.20/M
+        cost = calculate_tts_cost(100)
+        assert cost == pytest.approx(100 / 1_000_000 * TTS_PRICING_PER_MILLION_CHARS)
+
+    def test_calculate_tts_cost_zero(self):
+        """Zero characters should return zero cost."""
+        assert calculate_tts_cost(0) == 0.0
 
     def test_calculate_video_cost(self):
         assert calculate_video_cost(5) == 5 * VIDEO_PRICING_PER_SECOND
