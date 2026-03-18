@@ -19,7 +19,7 @@ class TestAppendPricingEmbed:
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50)
         assert len(embeds) == 1
         desc = embeds[0].description
         assert "1,000 tokens in" in desc
@@ -31,7 +31,7 @@ class TestAppendPricingEmbed:
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3-mini", 1000, 500, 1.50, reasoning_tokens=200)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=200)
         assert len(embeds) == 1
         assert "200 reasoning" in embeds[0].description
 
@@ -39,28 +39,28 @@ class TestAppendPricingEmbed:
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, reasoning_tokens=0)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=0)
         assert "reasoning" not in embeds[0].description
 
     def test_append_pricing_embed_with_cached_tokens(self):
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, cached_tokens=300)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=300)
         assert "300 cached" in embeds[0].description
 
     def test_append_pricing_embed_with_image_tokens(self):
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, image_tokens=200)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, image_tokens=200)
         assert "200 image" in embeds[0].description
 
     def test_append_pricing_embed_hides_zero_cached_and_image_tokens(self):
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, cached_tokens=0, image_tokens=0)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=0, image_tokens=0)
         assert "cached" not in embeds[0].description
         assert "image" not in embeds[0].description
 
@@ -69,7 +69,7 @@ class TestAppendPricingEmbed:
 
         embeds: list[Embed] = []
         tool_usage = {"SERVER_SIDE_TOOL_WEB_SEARCH": 3, "SERVER_SIDE_TOOL_X_SEARCH": 2}
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, tool_usage=tool_usage)
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage=tool_usage)
         desc = embeds[0].description
         assert desc is not None
         assert "Web Search \u00d73" in desc
@@ -81,7 +81,7 @@ class TestAppendPricingEmbed:
         from src.xai_api import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, "grok-3", 1000, 500, 1.50, tool_usage={})
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage={})
         assert "\n" not in embeds[0].description
 
     def test_append_generation_pricing_embed(self):
@@ -95,7 +95,7 @@ class TestAppendPricingEmbed:
 
 
 class TestTrackDailyCost:
-    """Tests for the _track_daily_cost methods."""
+    """Tests for the _track_daily_cost method."""
 
     @pytest.fixture
     def cog(self, mock_bot):
@@ -106,36 +106,15 @@ class TestTrackDailyCost:
             return cog
 
     def test_track_daily_cost_accumulates(self, cog):
-        # grok-3: $3/M in, $0.75/M cached, $15/M out
-        daily = cog._track_daily_cost(1, "grok-3", 1_000_000, 0)
+        daily = cog._track_daily_cost(1, 3.00)
         assert daily == pytest.approx(3.00)
-        daily = cog._track_daily_cost(1, "grok-3", 0, 1_000_000)
+        daily = cog._track_daily_cost(1, 15.00)
         assert daily == pytest.approx(18.00)
 
-    def test_track_daily_cost_includes_reasoning_tokens(self, cog):
-        # grok-3: $3/M in, $15/M out; reasoning billed at output rate
-        daily = cog._track_daily_cost(1, "grok-3", 0, 0, reasoning_tokens=1_000_000)
-        assert daily == pytest.approx(15.00)
-
-    def test_track_daily_cost_with_cached_tokens(self, cog):
-        # grok-3: 1M in, 500k cached → 500k * $3 + 500k * $0.75 = $1.875
-        daily = cog._track_daily_cost(
-            1, "grok-3", 1_000_000, 0, cached_tokens=500_000
-        )
-        assert daily == pytest.approx(1.50 + 0.375)
-
-    def test_track_daily_cost_with_tool_usage(self, cog):
-        # grok-3: 0 tokens + 1 web search ($5/1k = $0.005)
-        daily = cog._track_daily_cost(
-            1, "grok-3", 0, 0, tool_usage={"SERVER_SIDE_TOOL_WEB_SEARCH": 1}
-        )
-        assert daily == pytest.approx(0.005)
-
-    def test_track_daily_cost_flat(self, cog):
-        daily = cog._track_daily_cost_flat(1, 0.07)
-        assert daily == pytest.approx(0.07)
-        daily = cog._track_daily_cost_flat(1, 0.02)
-        assert daily == pytest.approx(0.09)
+    def test_track_daily_cost_isolates_users(self, cog):
+        cog._track_daily_cost(1, 5.00)
+        daily = cog._track_daily_cost(2, 3.00)
+        assert daily == pytest.approx(3.00)
 
 
 class TestExtractToolInfo:
