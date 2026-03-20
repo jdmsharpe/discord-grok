@@ -79,7 +79,7 @@ def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
         Embed(
             title="Reasoning",
             description=f"||{reasoning_text}||",
-            color=GROK_BLACK,
+            color=Colour.light_grey(),
         )
     )
 
