@@ -14,7 +14,7 @@ All commands are grouped under `/grok` for clean namespacing.
 - **`/grok chat`**: Have multi-turn conversations with Grok AI models
 - Support for multiple Grok models:
   - Grok 4.20 Multi-Agent
-  - Grok 4.20 (Default) / Grok 4.20 Non-Reasoning
+  - Grok 4.20 (Reasoning (Default) / Non-Reasoning)
   - Grok 4.1 Fast (Reasoning / Non-Reasoning)
   - Grok Code Fast 1
   - Grok 4 Fast (Reasoning / Non-Reasoning)
