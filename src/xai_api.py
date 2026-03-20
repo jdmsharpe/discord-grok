@@ -3,6 +3,7 @@ import base64
 import io
 import logging
 import re
+import uuid
 from datetime import date, datetime
 from typing import Any, Literal, TypedDict, cast
 
@@ -351,6 +352,7 @@ class xAIAPI(commands.Cog):
         input_messages: list[dict[str, Any]],
         *,
         previous_response_id: str | None = None,
+        prompt_cache_key: str | None = None,
         tools: list[dict[str, Any]] | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
@@ -366,6 +368,8 @@ class xAIAPI(commands.Cog):
             "input": input_messages,
             "store": True,
         }
+        if prompt_cache_key:
+            payload["prompt_cache_key"] = prompt_cache_key
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if tools:
@@ -631,6 +635,7 @@ class xAIAPI(commands.Cog):
                 model=params.model,
                 input_messages=input_messages,
                 previous_response_id=conversation.previous_response_id,
+                prompt_cache_key=conversation.prompt_cache_key,
                 tools=params.tools or None,
                 max_output_tokens=params.max_tokens,
                 temperature=params.temperature,
@@ -1247,9 +1252,11 @@ class xAIAPI(commands.Cog):
                         content_parts.append({"type": "input_file", "file_id": file_id})
             initial_messages.append(self._build_user_message(content_parts))
 
+            prompt_cache_key = str(uuid.uuid4())
             payload = self._build_responses_payload(
                 model=model,
                 input_messages=initial_messages,
+                prompt_cache_key=prompt_cache_key,
                 tools=tools or None,
                 max_output_tokens=max_tokens,
                 temperature=temperature,
@@ -1381,6 +1388,7 @@ class xAIAPI(commands.Cog):
                 previous_response_id=response_id,
                 response_id_history=[response_id] if response_id else [],
                 file_ids=uploaded_file_ids,
+                prompt_cache_key=prompt_cache_key,
             )
             self.conversations[main_conversation_id] = conversation
 

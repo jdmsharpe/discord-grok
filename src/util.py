@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -217,6 +218,7 @@ class Conversation:
     previous_response_id: str | None = None
     response_id_history: list[str] = field(default_factory=list)
     file_ids: list[str] = field(default_factory=list)
+    prompt_cache_key: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_TEXT_SIZE) -> list[str]:
