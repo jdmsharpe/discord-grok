@@ -355,7 +355,7 @@ class TestXAIAPICog:
                 cog,
                 ctx=mock_discord_context,
                 prompt="Tool test",
-                model="grok-4.20-beta-latest-reasoning",
+                model="grok-4.20",
                 web_search=True,
                 x_search=True,
                 code_execution=True,
@@ -496,7 +496,7 @@ class TestXAIAPICog:
 
     @pytest.mark.asyncio
     async def test_chat_default_model(self, cog, mock_discord_context):
-        """Chat should use grok-4.20-beta-latest-reasoning as the default model."""
+        """Chat should use grok-4.20 as the default model."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -508,7 +508,7 @@ class TestXAIAPICog:
         )
 
         payload = cog._call_responses_api.call_args[0][0]
-        assert payload["model"] == "grok-4.20-beta-latest-reasoning"
+        assert payload["model"] == "grok-4.20"
 
     @pytest.mark.asyncio
     async def test_chat_rejects_frequency_penalty_on_reasoning_model(
@@ -566,7 +566,7 @@ class TestXAIAPICog:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-4.20-beta-latest-non-reasoning",
+            model="grok-4.20-non-reasoning",
             frequency_penalty=0.5,
         )
 
@@ -626,7 +626,7 @@ class TestXAIAPICog:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-4.20-multi-agent-beta-latest",
+            model="grok-4.20-multi-agent",
             max_tokens=1024,
         )
 
@@ -668,7 +668,7 @@ class TestXAIAPICog:
             cog,
             ctx=mock_discord_context,
             prompt="Research quantum computing",
-            model="grok-4.20-multi-agent-beta-latest",
+            model="grok-4.20-multi-agent",
             agent_count=16,
         )
 
@@ -689,7 +689,7 @@ class TestXAIAPICog:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-4.20-multi-agent-beta-latest",
+            model="grok-4.20-multi-agent",
         )
 
         payload = cog._call_responses_api.call_args[0][0]
@@ -709,7 +709,7 @@ class TestXAIAPICog:
             cog,
             ctx=mock_discord_context,
             prompt="Search for news",
-            model="grok-4.20-beta-latest-reasoning",
+            model="grok-4.20",
             web_search=True,
         )
 
