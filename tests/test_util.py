@@ -156,7 +156,7 @@ class TestChatCompletionParameters:
     def test_all_params_set(self):
         """All parameters should be stored correctly."""
         params = ChatCompletionParameters(
-            model="grok-4.20-beta-latest-reasoning",
+            model="grok-4.20",
             temperature=0.7,
             top_p=0.9,
             max_tokens=2048,
@@ -169,7 +169,7 @@ class TestChatCompletionParameters:
                 TOOL_BUILDERS[TOOL_CODE_EXECUTION](),
             ],
         )
-        assert params.model == "grok-4.20-beta-latest-reasoning"
+        assert params.model == "grok-4.20"
         assert params.temperature == 0.7
         assert params.top_p == 0.9
         assert params.max_tokens == 2048
@@ -195,12 +195,12 @@ class TestModelLists:
     """Tests for the model list constants."""
 
     def test_grok_models_contains_new_4_20_models(self):
-        """GROK_MODELS should include all grok-4.20 beta models."""
+        """GROK_MODELS should include all grok-4.20 GA models."""
         from src.util import GROK_MODELS
 
-        assert "grok-4.20-multi-agent-beta-latest" in GROK_MODELS
-        assert "grok-4.20-beta-latest-reasoning" in GROK_MODELS
-        assert "grok-4.20-beta-latest-non-reasoning" in GROK_MODELS
+        assert "grok-4.20-multi-agent" in GROK_MODELS
+        assert "grok-4.20" in GROK_MODELS
+        assert "grok-4.20-non-reasoning" in GROK_MODELS
 
     def test_grok_models_no_deprecated(self):
         """GROK_MODELS should not contain deprecated grok-2 models."""
@@ -241,7 +241,7 @@ class TestReasoningConstants:
     def test_multi_agent_models(self):
         from src.util import MULTI_AGENT_MODELS
 
-        assert "grok-4.20-multi-agent-beta-latest" in MULTI_AGENT_MODELS
+        assert "grok-4.20-multi-agent" in MULTI_AGENT_MODELS
         for model in MULTI_AGENT_MODELS:
             assert "multi-agent" in model
 

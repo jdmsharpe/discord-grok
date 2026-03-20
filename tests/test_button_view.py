@@ -22,7 +22,7 @@ class TestButtonView:
 
         conversation = MagicMock()
         conversation.params = MagicMock()
-        conversation.params.model = "grok-4.20-beta-latest-reasoning"
+        conversation.params.model = "grok-4.20"
         conversation.params.tools = []
         conversation.params.x_search_kwargs = {"enable_image_understanding": True}
         conversation.params.web_search_kwargs = {"allowed_domains": ["example.com"]}

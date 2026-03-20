@@ -7,9 +7,9 @@ CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
 # Per-million-token pricing: (input_cost, cached_input_cost, output_cost)
 MODEL_PRICING: dict[str, tuple[float, float, float]] = {
-    "grok-4.20-multi-agent-beta-latest": (2.00, 0.20, 6.00),
-    "grok-4.20-beta-latest-reasoning": (2.00, 0.20, 6.00),
-    "grok-4.20-beta-latest-non-reasoning": (2.00, 0.20, 6.00),
+    "grok-4.20-multi-agent": (2.00, 0.20, 6.00),
+    "grok-4.20": (2.00, 0.20, 6.00),
+    "grok-4.20-non-reasoning": (2.00, 0.20, 6.00),
     "grok-4-1-fast-reasoning": (0.20, 0.05, 0.50),
     "grok-4-1-fast-non-reasoning": (0.20, 0.05, 0.50),
     "grok-code-fast-1": (0.20, 0.02, 1.50),
@@ -92,9 +92,9 @@ def calculate_video_cost(duration: int) -> float:
 
 # All available Grok language models
 GROK_MODELS = [
-    "grok-4.20-multi-agent-beta-latest",
-    "grok-4.20-beta-latest-reasoning",
-    "grok-4.20-beta-latest-non-reasoning",
+    "grok-4.20-multi-agent",
+    "grok-4.20",
+    "grok-4.20-non-reasoning",
     "grok-4-1-fast-reasoning",
     "grok-4-1-fast-non-reasoning",
     "grok-code-fast-1",
@@ -122,7 +122,7 @@ TTS_VOICES = ["eve", "ara", "rex", "sal", "leo"]
 # Models that support frequency_penalty and presence_penalty parameters.
 # Reasoning models do NOT support these parameters.
 PENALTY_SUPPORTED_MODELS: set[str] = {
-    "grok-4.20-beta-latest-non-reasoning",
+    "grok-4.20-non-reasoning",
     "grok-4-1-fast-non-reasoning",
     "grok-4-fast-non-reasoning",
 }
@@ -131,7 +131,7 @@ PENALTY_SUPPORTED_MODELS: set[str] = {
 REASONING_EFFORT_MODELS: set[str] = {"grok-3-mini"}
 
 # Multi-agent models that support agent_count and have special parameter constraints.
-MULTI_AGENT_MODELS: set[str] = {"grok-4.20-multi-agent-beta-latest"}
+MULTI_AGENT_MODELS: set[str] = {"grok-4.20-multi-agent"}
 
 # Built-in tools supported by /grok chat.
 TOOL_WEB_SEARCH = "web_search"
