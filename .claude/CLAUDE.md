@@ -75,6 +75,26 @@ Current parameter count: 23
 22. `web_search_excluded_domains` (comma-separated, max 5, mutually exclusive with allowed)
 23. `web_search_images` (enable image understanding during web browsing)
 
+## `/grok image` Parameters
+
+Current parameter count: 5
+
+1. `prompt`
+2. `model` (choices: grok-imagine-image-pro (default), grok-imagine-image)
+3. `aspect_ratio` (13 choices matching `ImageAspectRatio`; default: 1:1)
+4. `resolution` (choices: 1k, 2k; default: not set (API default 1k))
+5. `attachment` (image to edit/remix; triggers Image Editing mode; passes Discord CDN URL as `image_url` to SDK)
+
+## `/grok video` Parameters
+
+Current parameter count: 5
+
+1. `prompt`
+2. `aspect_ratio` (7 choices matching `VideoAspectRatio`; default: 16:9)
+3. `duration` (1-15 seconds; default: 5)
+4. `resolution` (choices: 720p (default), 480p)
+5. `attachment` (image for first frame; triggers Image-to-Video mode; passes Discord CDN URL as `image_url` to SDK)
+
 ## `/grok tts` Parameters
 
 Current parameter count: 6
