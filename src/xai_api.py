@@ -10,7 +10,7 @@ from typing import Any, Literal, TypedDict, cast
 import aiohttp
 
 from xai_sdk import AsyncClient
-from xai_sdk.image import ImageAspectRatio
+from xai_sdk.image import ImageAspectRatio, ImageResolution
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
 from discord import (
@@ -1413,7 +1413,7 @@ class xAIAPI(commands.Cog):
 
     @grok.command(
         name="image",
-        description="Generates an image from a prompt.",
+        description="Generates or edits an image from a prompt.",
     )
     @option("prompt", description="Prompt", required=True, type=str)
     @option(
@@ -1439,7 +1439,29 @@ class xAIAPI(commands.Cog):
             OptionChoice(name="3:4", value="3:4"),
             OptionChoice(name="3:2", value="3:2"),
             OptionChoice(name="2:3", value="2:3"),
+            OptionChoice(name="2:1", value="2:1"),
+            OptionChoice(name="1:2", value="1:2"),
+            OptionChoice(name="20:9 (Ultrawide)", value="20:9"),
+            OptionChoice(name="9:20", value="9:20"),
+            OptionChoice(name="19.5:9 (Mobile)", value="19.5:9"),
+            OptionChoice(name="9:19.5", value="9:19.5"),
         ],
+    )
+    @option(
+        "resolution",
+        description="Image resolution. (default: 1k)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="1k", value="1k"),
+            OptionChoice(name="2k", value="2k"),
+        ],
+    )
+    @option(
+        "attachment",
+        description="Image to edit or remix.",
+        required=False,
+        type=Attachment,
     )
     async def image(
         self,
@@ -1447,19 +1469,30 @@ class xAIAPI(commands.Cog):
         prompt: str,
         model: str = "grok-imagine-image-pro",
         aspect_ratio: str = "1:1",
+        resolution: str | None = None,
+        attachment: Attachment | None = None,
     ):
         """
-        Generates an image given a prompt using Grok Imagine.
+        Generates or edits an image given a prompt using Grok Imagine.
         """
         await ctx.defer()
 
         try:
-            self.logger.info(f"Generating image with model {model}")
-            result = await self.client.image.sample(
-                prompt=prompt,
-                model=model,
-                aspect_ratio=cast(ImageAspectRatio, aspect_ratio),
-            )
+            is_editing = attachment is not None
+            mode = "Image Editing" if is_editing else "Image Generation"
+            self.logger.info(f"Generating image with model {model} (mode={mode})")
+
+            sample_kwargs: dict[str, Any] = {
+                "prompt": prompt,
+                "model": model,
+                "aspect_ratio": cast(ImageAspectRatio, aspect_ratio),
+            }
+            if resolution is not None:
+                sample_kwargs["resolution"] = cast(ImageResolution, resolution)
+            if is_editing:
+                sample_kwargs["image_url"] = str(attachment.url)
+
+            result = await self.client.image.sample(**sample_kwargs)
 
             image_cost = calculate_image_cost(model)
             daily_cost = self._track_daily_cost(ctx.author.id, image_cost)
@@ -1478,47 +1511,30 @@ class xAIAPI(commands.Cog):
                         if resp.status != 200:
                             raise Exception(f"Failed to download image: HTTP {resp.status}")
                         data = io.BytesIO(await resp.read())
-
-                description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
-                description += f"**Model:** {model}\n"
-                description += f"**Aspect Ratio:** {aspect_ratio}\n"
-
-                embed = Embed(
-                    title="Image Generation",
-                    description=description,
-                    color=GROK_BLACK,
-                )
-                file = File(data, "image.png")
-                embed.set_image(url="attachment://image.png")
-                embeds = [embed]
-                if SHOW_COST_EMBEDS:
-                    append_generation_pricing_embed(embeds, image_cost, daily_cost)
-                await ctx.send_followup(embeds=embeds, file=file)
-                self.logger.info("Successfully generated and sent image")
-
             elif result.base64:
-                image_bytes = base64.b64decode(result.base64)
-                data = io.BytesIO(image_bytes)
-
-                description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
-                description += f"**Model:** {model}\n"
-                description += f"**Aspect Ratio:** {aspect_ratio}\n"
-
-                embed = Embed(
-                    title="Image Generation",
-                    description=description,
-                    color=GROK_BLACK,
-                )
-                file = File(data, "image.png")
-                embed.set_image(url="attachment://image.png")
-                embeds = [embed]
-                if SHOW_COST_EMBEDS:
-                    append_generation_pricing_embed(embeds, image_cost, daily_cost)
-                await ctx.send_followup(embeds=embeds, file=file)
-                self.logger.info("Successfully generated and sent image")
-
+                data = io.BytesIO(base64.b64decode(result.base64))
             else:
                 raise Exception("No image data returned from the API.")
+
+            description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
+            description += f"**Model:** {model}\n"
+            description += f"**Mode:** {mode}\n"
+            description += f"**Aspect Ratio:** {aspect_ratio}\n"
+            if resolution is not None:
+                description += f"**Resolution:** {resolution}\n"
+
+            embed = Embed(
+                title=mode,
+                description=description,
+                color=GROK_BLACK,
+            )
+            file = File(data, "image.png")
+            embed.set_image(url="attachment://image.png")
+            embeds = [embed]
+            if SHOW_COST_EMBEDS:
+                append_generation_pricing_embed(embeds, image_cost, daily_cost)
+            await ctx.send_followup(embeds=embeds, file=file)
+            self.logger.info("Successfully generated and sent image")
 
         except Exception as e:
             description = format_xai_error(e)
@@ -1529,7 +1545,7 @@ class xAIAPI(commands.Cog):
 
     @grok.command(
         name="video",
-        description="Generates a video from a prompt.",
+        description="Generates a video from a prompt or an image.",
     )
     @option("prompt", description="Prompt", required=True, type=str)
     @option(
@@ -1543,11 +1559,13 @@ class xAIAPI(commands.Cog):
             OptionChoice(name="1:1 (Square)", value="1:1"),
             OptionChoice(name="4:3", value="4:3"),
             OptionChoice(name="3:4", value="3:4"),
+            OptionChoice(name="3:2", value="3:2"),
+            OptionChoice(name="2:3", value="2:3"),
         ],
     )
     @option(
         "duration",
-        description="Duration of the video in seconds. (default: 5)",
+        description="Duration of the video in seconds (1-15). (default: 5 seconds)",
         required=False,
         type=int,
     )
@@ -1561,6 +1579,12 @@ class xAIAPI(commands.Cog):
             OptionChoice(name="480p", value="480p"),
         ],
     )
+    @option(
+        "attachment",
+        description="Image to use as the first frame (for image-to-video).",
+        required=False,
+        type=Attachment,
+    )
     async def video(
         self,
         ctx: ApplicationContext,
@@ -1568,21 +1592,32 @@ class xAIAPI(commands.Cog):
         aspect_ratio: str = "16:9",
         duration: int = 5,
         resolution: str = "720p",
+        attachment: Attachment | None = None,
     ):
         """
         Generates a video from a prompt using Grok Imagine Video.
+        Optionally accepts an image attachment to use as the first frame.
         """
         await ctx.defer()
 
         try:
-            self.logger.info("Starting video generation with grok-imagine-video")
-            result = await self.client.video.generate(
-                prompt=prompt,
-                model="grok-imagine-video",
-                aspect_ratio=cast(VideoAspectRatio, aspect_ratio),
-                duration=duration,
-                resolution=cast(VideoResolution, resolution),
+            is_image_to_video = attachment is not None
+            mode = "Image-to-Video" if is_image_to_video else "Text-to-Video"
+            self.logger.info(
+                "Starting video generation with grok-imagine-video (mode=%s)", mode
             )
+
+            generate_kwargs: dict[str, Any] = {
+                "prompt": prompt,
+                "model": "grok-imagine-video",
+                "aspect_ratio": cast(VideoAspectRatio, aspect_ratio),
+                "duration": duration,
+                "resolution": cast(VideoResolution, resolution),
+            }
+            if is_image_to_video:
+                generate_kwargs["image_url"] = str(attachment.url)
+
+            result = await self.client.video.generate(**generate_kwargs)
 
             if not result.url:
                 raise Exception("No video URL returned from the API.")
@@ -1606,6 +1641,7 @@ class xAIAPI(commands.Cog):
 
             data = io.BytesIO(video_bytes)
             description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
+            description += f"**Mode:** {mode}\n"
             description += f"**Aspect Ratio:** {aspect_ratio}\n"
             description += f"**Duration:** {duration}s\n"
             description += f"**Resolution:** {resolution}\n"

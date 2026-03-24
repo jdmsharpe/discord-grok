@@ -44,17 +44,18 @@ All commands are grouped under `/grok` for clean namespacing.
 
 ### Image Generation
 
-- **`/grok image`**: Generate images from text prompts
+- **`/grok image`**: Generate images from text prompts, or edit/remix an existing image via attachment
 - Model options:
   - Grok Imagine Image Pro (Default)
   - Grok Imagine Image
-- Multiple aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
+- 13 aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 2:1, 1:2, 20:9, 9:20, 19.5:9, 9:19.5
+- Resolution options: 1k (default), 2k
 
 ### Video Generation
 
-- **`/grok video`**: Generate videos from text prompts
-- Customizable aspect ratio (16:9, 9:16, 1:1, 4:3, 3:4)
-- Adjustable duration and resolution (720p / 480p)
+- **`/grok video`**: Generate videos from text prompts, or from an image (image-to-video)
+- Customizable aspect ratio (16:9, 9:16, 1:1, 4:3, 3:4, 3:2, 2:3)
+- Adjustable duration (1–15 seconds) and resolution (720p / 480p)
 
 ### Text-to-Speech
 
@@ -158,7 +159,7 @@ docker-compose up -d
 - aiohttp ~3.13
 - py-cord ~2.7
 - python-dotenv ~1.2
-- xai-sdk ~1.8
+- xai-sdk ~1.10
 
 ## License
 

@@ -745,6 +745,67 @@ class TestXAIAPICog:
         choice_values = sorted(c.value for c in model_option.choices)
         assert choice_values == sorted(GROK_IMAGE_MODELS)
 
+    def test_image_aspect_ratios_match_sdk(self, cog):
+        """Image command aspect ratios should match xai-sdk ImageAspectRatio."""
+        from xai_sdk.image import ImageAspectRatio
+
+        image_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
+        )
+        ar_option = next(
+            opt for opt in image_cmd.options if opt.name == "aspect_ratio"
+        )
+        choice_values = sorted(c.value for c in ar_option.choices)
+        assert choice_values == sorted(ImageAspectRatio.__args__)
+
+    def test_image_resolution_choices_match_sdk(self, cog):
+        """Image command resolution choices should match xai-sdk ImageResolution."""
+        from xai_sdk.image import ImageResolution
+
+        image_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
+        )
+        res_option = next(
+            opt for opt in image_cmd.options if opt.name == "resolution"
+        )
+        choice_values = sorted(c.value for c in res_option.choices)
+        assert choice_values == sorted(ImageResolution.__args__)
+
+    def test_image_has_attachment_option(self, cog):
+        """Image command should have an optional attachment parameter."""
+        image_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
+        )
+        att_option = next(
+            (opt for opt in image_cmd.options if opt.name == "attachment"), None
+        )
+        assert att_option is not None
+        assert att_option.required is False
+
+    def test_video_aspect_ratios_match_sdk(self, cog):
+        """Video command aspect ratios should match xai-sdk VideoAspectRatio."""
+        from xai_sdk.video import VideoAspectRatio
+
+        video_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "video"
+        )
+        ar_option = next(
+            opt for opt in video_cmd.options if opt.name == "aspect_ratio"
+        )
+        choice_values = sorted(c.value for c in ar_option.choices)
+        assert choice_values == sorted(VideoAspectRatio.__args__)
+
+    def test_video_has_attachment_option(self, cog):
+        """Video command should have an optional attachment parameter."""
+        video_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "video"
+        )
+        att_option = next(
+            (opt for opt in video_cmd.options if opt.name == "attachment"), None
+        )
+        assert att_option is not None
+        assert att_option.required is False
+
     @pytest.mark.asyncio
     async def test_on_message_ignores_bot_messages(self, cog, mock_discord_message):
         """Test that the bot ignores its own messages."""
