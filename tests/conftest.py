@@ -62,6 +62,9 @@ def mock_xai_client():
         mock_image_response.base64 = None
         client.image = MagicMock()
         client.image.sample = AsyncMock(return_value=mock_image_response)
+        client.image.sample_batch = AsyncMock(
+            return_value=[mock_image_response, mock_image_response]
+        )
 
         # Mock video.generate
         mock_video_response = MagicMock()

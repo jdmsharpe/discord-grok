@@ -48,6 +48,7 @@ All commands are grouped under `/grok` for clean namespacing.
 - Model options:
   - Grok Imagine Image Pro (Default)
   - Grok Imagine Image
+- Batch generation: generate up to 10 images in a single request via `count` parameter
 - 13 aspect ratios: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 2:1, 1:2, 20:9, 9:20, 19.5:9, 9:19.5
 - Resolution options: 1k (default), 2k
 
