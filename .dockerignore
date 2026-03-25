@@ -9,7 +9,6 @@ __pycache__/
 .claude/
 .claudeignore
 .pytest_cache/
-tests/
 Dockerfile*
 docker-compose.yaml
 *.md
