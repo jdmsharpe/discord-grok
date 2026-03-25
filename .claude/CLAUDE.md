@@ -77,13 +77,14 @@ Current parameter count: 23
 
 ## `/grok image` Parameters
 
-Current parameter count: 5
+Current parameter count: 6
 
 1. `prompt`
 2. `model` (choices: grok-imagine-image-pro (default), grok-imagine-image)
 3. `aspect_ratio` (13 choices matching `ImageAspectRatio`; default: 1:1)
 4. `resolution` (choices: 1k, 2k; default: not set (API default 1k))
-5. `attachment` (image to edit/remix; triggers Image Editing mode; passes Discord CDN URL as `image_url` to SDK)
+5. `count` (1-10 images via `sample_batch`; default: 1; not supported in Image Editing mode)
+6. `attachment` (image to edit/remix; triggers Image Editing mode; passes Discord CDN URL as `image_url` to SDK)
 
 ## `/grok video` Parameters
 

@@ -1192,3 +1192,167 @@ class TestFileUploadAndCleanup:
         assert len(cog.conversations) == 1
         conversation = list(cog.conversations.values())[0]
         assert "file-xyz789" in conversation.file_ids
+
+
+class TestSessionManagement:
+    """Tests for shared aiohttp session and timeout configuration."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        return _make_cog(mock_bot)
+
+    @pytest.mark.asyncio
+    async def test_get_http_session_has_timeout(self, cog):
+        """Shared session should be created with explicit timeouts."""
+        session = await cog._get_http_session()
+        assert session.timeout.total == 300
+        assert session.timeout.connect == 15
+        await session.close()
+
+    @pytest.mark.asyncio
+    async def test_get_http_session_reuses_session(self, cog):
+        """Calling _get_http_session twice should return the same session."""
+        session1 = await cog._get_http_session()
+        session2 = await cog._get_http_session()
+        assert session1 is session2
+        await session1.close()
+
+
+class TestImageBatchGeneration:
+    """Tests for multi-image generation via sample_batch."""
+
+    @pytest.fixture
+    def cog(self, mock_bot, mock_xai_client):
+        """Create a cog with xAI image SDK mocked."""
+        cog = _make_cog(mock_bot)
+        cog.client = mock_xai_client
+        return cog
+
+    def test_image_has_count_option(self, cog):
+        """Image command should have a count parameter with min=1, max=10."""
+        image_cmd = next(
+            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
+        )
+        count_option = next(
+            (opt for opt in image_cmd.options if opt.name == "count"), None
+        )
+        assert count_option is not None
+        assert count_option.required is False
+        assert count_option.min_value == 1
+        assert count_option.max_value == 10
+
+    @staticmethod
+    def _mock_http_session():
+        """Create a mock HTTP session with a working async context manager for get()."""
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read = AsyncMock(return_value=b"fake image bytes")
+
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_cm
+        return mock_session
+
+    @pytest.mark.asyncio
+    async def test_image_single_calls_sample(self, cog, mock_discord_context):
+        """count=1 should call client.image.sample (not sample_batch)."""
+        with patch.object(
+            cog, "_get_http_session", new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image-pro",
+                count=1,
+            )
+
+        cog.client.image.sample.assert_awaited_once()
+        cog.client.image.sample_batch.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_image_batch_calls_sample_batch(self, cog, mock_discord_context):
+        """count>1 should call client.image.sample_batch with n=count."""
+        with patch.object(
+            cog, "_get_http_session", new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image-pro",
+                count=3,
+            )
+
+        cog.client.image.sample.assert_not_awaited()
+        cog.client.image.sample_batch.assert_awaited_once()
+        call_kwargs = cog.client.image.sample_batch.call_args
+        assert call_kwargs.kwargs["n"] == 3
+
+    @pytest.mark.asyncio
+    async def test_image_batch_sends_multiple_files(self, cog, mock_discord_context):
+        """Batch generation should send multiple File objects."""
+        with patch.object(
+            cog, "_get_http_session", new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image",
+                count=2,
+            )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        files = call_kwargs["files"]
+        assert len(files) == 2
+        assert files[0].filename == "image_1.png"
+        assert files[1].filename == "image_2.png"
+
+    @pytest.mark.asyncio
+    async def test_image_batch_cost_multiplied(self, cog, mock_discord_context):
+        """Batch generation cost should be per-image cost × count."""
+        from src.util import calculate_image_cost
+
+        with patch.object(
+            cog, "_get_http_session", new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image",
+                count=2,
+            )
+
+        expected_cost = calculate_image_cost("grok-imagine-image") * 2
+        # The daily cost tracker should reflect the multiplied cost
+        from datetime import date
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(cog.daily_costs[key] - expected_cost) < 1e-9
+
+    @pytest.mark.asyncio
+    async def test_image_batch_rejects_editing_mode(
+        self, cog, mock_discord_context, mock_attachment
+    ):
+        """count>1 with an attachment (editing mode) should return an error."""
+        await cog.image.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Edit this",
+            model="grok-imagine-image-pro",
+            count=3,
+            attachment=mock_attachment,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "not supported in Image Editing mode" in call_kwargs["embed"].description
+        cog.client.image.sample.assert_not_awaited()
+        cog.client.image.sample_batch.assert_not_awaited()

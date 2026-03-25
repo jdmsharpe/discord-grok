@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Any, Literal, TypedDict, cast
 
 import aiohttp
+from aiohttp import ClientTimeout
 
 from xai_sdk import AsyncClient
 from xai_sdk.image import ImageAspectRatio, ImageResolution
@@ -273,7 +274,9 @@ class xAIAPI(commands.Cog):
             return self._http_session
         async with self._session_lock:
             if self._http_session is None or self._http_session.closed:
-                self._http_session = aiohttp.ClientSession()
+                self._http_session = aiohttp.ClientSession(
+                    timeout=ClientTimeout(total=300, connect=15)
+                )
             return self._http_session
 
     def _track_daily_cost(self, user_id: int, cost: float) -> float:
@@ -1458,6 +1461,14 @@ class xAIAPI(commands.Cog):
         ],
     )
     @option(
+        "count",
+        description="Number of images to generate (1-10). Not supported for editing. (default: 1)",
+        required=False,
+        type=int,
+        min_value=1,
+        max_value=10,
+    )
+    @option(
         "attachment",
         description="Image to edit or remix.",
         required=False,
@@ -1470,6 +1481,7 @@ class xAIAPI(commands.Cog):
         model: str = "grok-imagine-image-pro",
         aspect_ratio: str = "1:1",
         resolution: str | None = None,
+        count: int = 1,
         attachment: Attachment | None = None,
     ):
         """
@@ -1480,7 +1492,18 @@ class xAIAPI(commands.Cog):
         try:
             is_editing = attachment is not None
             mode = "Image Editing" if is_editing else "Image Generation"
-            self.logger.info(f"Generating image with model {model} (mode={mode})")
+
+            if is_editing and count > 1:
+                await ctx.send_followup(
+                    embed=Embed(
+                        title="Error",
+                        description="Multi-image generation is not supported in Image Editing mode.",
+                        color=Colour.red(),
+                    )
+                )
+                return
+
+            self.logger.info(f"Generating image with model {model} (mode={mode}, count={count})")
 
             sample_kwargs: dict[str, Any] = {
                 "prompt": prompt,
@@ -1492,33 +1515,44 @@ class xAIAPI(commands.Cog):
             if is_editing:
                 sample_kwargs["image_url"] = str(attachment.url)
 
-            result = await self.client.image.sample(**sample_kwargs)
+            if count == 1:
+                result = await self.client.image.sample(**sample_kwargs)
+                results = [result]
+            else:
+                results = await self.client.image.sample_batch(n=count, **sample_kwargs)
 
-            image_cost = calculate_image_cost(model)
+            image_cost = calculate_image_cost(model) * len(results)
             daily_cost = self._track_daily_cost(ctx.author.id, image_cost)
 
             self.logger.info(
-                "COST | command=image | user=%s | model=%s | cost=$%.4f | daily=$%.4f",
+                "COST | command=image | user=%s | model=%s | count=%d | cost=$%.4f | daily=$%.4f",
                 ctx.author.id,
                 model,
+                len(results),
                 image_cost,
                 daily_cost,
             )
 
-            if result.url:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(result.url) as resp:
+            session = await self._get_http_session()
+            files: list[File] = []
+            for i, img_result in enumerate(results):
+                if img_result.url:
+                    async with session.get(img_result.url) as resp:
                         if resp.status != 200:
-                            raise Exception(f"Failed to download image: HTTP {resp.status}")
+                            raise Exception(f"Failed to download image {i + 1}: HTTP {resp.status}")
                         data = io.BytesIO(await resp.read())
-            elif result.base64:
-                data = io.BytesIO(base64.b64decode(result.base64))
-            else:
-                raise Exception("No image data returned from the API.")
+                elif img_result.base64:
+                    data = io.BytesIO(base64.b64decode(img_result.base64))
+                else:
+                    raise Exception(f"No image data returned for image {i + 1}.")
+                filename = f"image_{i + 1}.png" if len(results) > 1 else "image.png"
+                files.append(File(data, filename))
 
             description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
             description += f"**Model:** {model}\n"
             description += f"**Mode:** {mode}\n"
+            if count > 1:
+                description += f"**Count:** {count}\n"
             description += f"**Aspect Ratio:** {aspect_ratio}\n"
             if resolution is not None:
                 description += f"**Resolution:** {resolution}\n"
@@ -1528,13 +1562,12 @@ class xAIAPI(commands.Cog):
                 description=description,
                 color=GROK_BLACK,
             )
-            file = File(data, "image.png")
-            embed.set_image(url="attachment://image.png")
+            embed.set_image(url=f"attachment://{files[0].filename}")
             embeds = [embed]
             if SHOW_COST_EMBEDS:
                 append_generation_pricing_embed(embeds, image_cost, daily_cost)
-            await ctx.send_followup(embeds=embeds, file=file)
-            self.logger.info("Successfully generated and sent image")
+            await ctx.send_followup(embeds=embeds, files=files)
+            self.logger.info("Successfully generated and sent %d image(s)", len(results))
 
         except Exception as e:
             description = format_xai_error(e)
@@ -1622,11 +1655,11 @@ class xAIAPI(commands.Cog):
             if not result.url:
                 raise Exception("No video URL returned from the API.")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(result.url) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"Failed to download video: HTTP {resp.status}")
-                    video_bytes = await resp.read()
+            session = await self._get_http_session()
+            async with session.get(result.url) as resp:
+                if resp.status != 200:
+                    raise Exception(f"Failed to download video: HTTP {resp.status}")
+                video_bytes = await resp.read()
 
             video_cost = calculate_video_cost(duration)
             daily_cost = self._track_daily_cost(ctx.author.id, video_cost)
