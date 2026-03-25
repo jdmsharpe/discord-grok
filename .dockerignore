@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.github/
+.env
+.vscode/
+.claude/
+.claudeignore
+.pytest_cache/
+tests/
+Dockerfile*
+docker-compose.yaml
+*.md
