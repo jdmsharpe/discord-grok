@@ -17,9 +17,14 @@ from xai_sdk.video import VideoAspectRatio, VideoResolution
 from discord import (
     ApplicationContext,
     Attachment,
+    Bot,
     Colour,
     Embed,
     File,
+    Member,
+    Message,
+    TextChannel,
+    User,
 )
 from discord.commands import OptionChoice, SlashCommandGroup, option
 from discord.ext import commands
@@ -27,12 +32,14 @@ from discord.ext import commands
 from button_view import ButtonView
 from config.auth import GUILD_IDS, SHOW_COST_EMBEDS, XAI_API_KEY, XAI_COLLECTION_IDS
 from util import (
+    CHUNK_TEXT_SIZE,
     ChatCompletionParameters,
     Conversation,
+    GROK_VIDEO_MODELS,
     MULTI_AGENT_MODELS,
     PENALTY_SUPPORTED_MODELS,
     REASONING_EFFORT_MODELS,
-    TOOL_BUILDERS,
+    TOOL_CODE_EXECUTION,
     TOOL_COLLECTIONS_SEARCH,
     TOOL_USAGE_DISPLAY_NAMES,
     TOOL_WEB_SEARCH,
@@ -44,6 +51,7 @@ from util import (
     calculate_video_cost,
     chunk_text,
     format_xai_error,
+    resolve_selected_tools,
     truncate_text,
 )
 
@@ -52,6 +60,13 @@ TTS_MAX_CHARS = 15_000
 RESPONSES_API_URL = "https://api.x.ai/v1/responses"
 
 GROK_BLACK = Colour(0x000000)
+
+# Discord embed limits
+MAX_TOTAL_EMBED_CHARS = 6000
+EMBED_HEADROOM = 500  # Reserved for sources/pricing embeds appended later
+MIN_EMBED_SPACE = 500
+
+REASONING_TRUNCATION_SUFFIX = "\n\n... [reasoning truncated]"
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MiB xAI image understanding limit
@@ -74,8 +89,8 @@ def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
     if not reasoning_text:
         return
 
-    if len(reasoning_text) > 3500:
-        reasoning_text = reasoning_text[:3450] + "\n\n... [reasoning truncated]"
+    if len(reasoning_text) > CHUNK_TEXT_SIZE:
+        reasoning_text = reasoning_text[:CHUNK_TEXT_SIZE - len(REASONING_TRUNCATION_SUFFIX)] + REASONING_TRUNCATION_SUFFIX
 
     embeds.append(
         Embed(
@@ -88,14 +103,12 @@ def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
 
 def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
     """Append response text as Discord embeds, handling chunking for long responses."""
-    # Discord caps all embeds in a message at 6000 chars total.
-    # Reserve 500 chars headroom for sources/pricing embeds appended later.
     existing_chars = sum(len(e.title or "") + len(e.description or "") for e in embeds)
-    available = max(500, 6000 - existing_chars - 500)
+    available = max(MIN_EMBED_SPACE, MAX_TOTAL_EMBED_CHARS - existing_chars - EMBED_HEADROOM)
     if len(response_text) > available:
         response_text = response_text[: available - 40] + "\n\n... [Response truncated due to length]"
 
-    for index, chunk in enumerate(chunk_text(response_text, 3500), start=1):
+    for index, chunk in enumerate(chunk_text(response_text), start=1):
         embeds.append(
             Embed(
                 title="Response" + (f" (Part {index})" if index > 1 else ""),
@@ -243,7 +256,7 @@ def append_generation_pricing_embed(
 class xAIAPI(commands.Cog):
     grok = SlashCommandGroup("grok", "xAI Grok commands", guild_ids=GUILD_IDS)
 
-    def __init__(self, bot):
+    def __init__(self, bot: Bot) -> None:
         """
         Initialize the xAIAPI class.
 
@@ -252,18 +265,14 @@ class xAIAPI(commands.Cog):
         """
         self.bot = bot
         self.client = AsyncClient(api_key=XAI_API_KEY)
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
         self.logger = logging.getLogger(__name__)
 
         # Dictionary to store conversation state for each chat interaction
         self.conversations: dict[int, Conversation] = {}
         # Dictionary to store UI views for each conversation
-        self.views = {}
+        self.views: dict[Member | User, ButtonView] = {}
         # Last message with a ButtonView attached, keyed by user — used to strip old buttons
-        self.last_view_messages = {}
+        self.last_view_messages: dict[Member | User, Message] = {}
         # Daily cost tracking: (user_id, date_iso) -> cumulative cost
         self.daily_costs: dict[tuple[int, str], float] = {}
         self._http_session: aiohttp.ClientSession | None = None
@@ -285,7 +294,36 @@ class xAIAPI(commands.Cog):
         self.daily_costs[key] = self.daily_costs.get(key, 0.0) + cost
         return self.daily_costs[key]
 
-    async def _strip_previous_view(self, user) -> None:
+    def _log_chat_cost(
+        self,
+        user_id: int,
+        model: str,
+        input_tokens: int,
+        cached_tokens: int,
+        output_tokens: int,
+        reasoning_tokens: int,
+        image_tokens: int,
+        tool_usage: dict[str, int],
+        request_cost: float,
+        daily_cost: float,
+    ) -> None:
+        """Log a structured cost line for a chat API call."""
+        self.logger.info(
+            "COST | command=chat | user=%s | model=%s | input=%d | cached=%d | output=%d"
+            " | reasoning=%d | image=%d | tool_usage=%s | cost=$%.4f | daily=$%.4f",
+            user_id,
+            model,
+            input_tokens,
+            cached_tokens,
+            output_tokens,
+            reasoning_tokens,
+            image_tokens,
+            tool_usage or {},
+            request_cost,
+            daily_cost,
+        )
+
+    async def _strip_previous_view(self, user: Member | User) -> None:
         """Edit the last message that had buttons to remove its view."""
         prev = self.last_view_messages.pop(user, None)
         if prev is not None:
@@ -528,7 +566,14 @@ class xAIAPI(commands.Cog):
                 self.views.pop(starter, None)
             await self._cleanup_conversation_files(conversation)
 
-    def cog_unload(self):
+    async def _close_http_session(self) -> None:
+        """Close the shared HTTP session if open."""
+        session = self._http_session
+        if session and not session.closed:
+            await session.close()
+        self._http_session = None
+
+    def cog_unload(self) -> None:
         loop = getattr(self.bot, "loop", None)
 
         session = self._http_session
@@ -543,6 +588,11 @@ class xAIAPI(commands.Cog):
                     new_loop.close()
         self._http_session = None
 
+    @commands.Cog.listener()
+    async def on_close(self) -> None:
+        """Clean up HTTP session when the bot shuts down."""
+        await self._close_http_session()
+
     def resolve_selected_tools(
         self,
         selected_tool_names: list[str],
@@ -550,44 +600,15 @@ class xAIAPI(commands.Cog):
         web_search_kwargs: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         """Build Responses API tool dicts for the selected tool names."""
-        tools: list[dict[str, Any]] = []
-
-        for tool_name in selected_tool_names:
-            if tool_name == TOOL_COLLECTIONS_SEARCH:
-                if not XAI_COLLECTION_IDS:
-                    return (
-                        [],
-                        "Collections search requires XAI_COLLECTION_IDS to be set in your .env.",
-                    )
-                tools.append({
-                    "type": "file_search",
-                    "vector_store_ids": XAI_COLLECTION_IDS.copy(),
-                })
-                continue
-
-            if tool_name == TOOL_X_SEARCH and x_search_kwargs:
-                # Convert datetime objects to ISO strings for REST
-                kw = dict(x_search_kwargs)
-                for date_key in ("from_date", "to_date"):
-                    if isinstance(kw.get(date_key), datetime):
-                        kw[date_key] = kw[date_key].isoformat()
-                tools.append({"type": "x_search", **kw})
-                continue
-
-            if tool_name == TOOL_WEB_SEARCH and web_search_kwargs:
-                tools.append({"type": "web_search", **web_search_kwargs})
-                continue
-
-            tool_builder = TOOL_BUILDERS.get(tool_name)
-            if tool_builder is None:
-                continue
-            tools.append(tool_builder())
-
-        return tools, None
+        return resolve_selected_tools(
+            selected_tool_names, XAI_COLLECTION_IDS,
+            x_search_kwargs=x_search_kwargs,
+            web_search_kwargs=web_search_kwargs,
+        )
 
     async def handle_new_message_in_conversation(
-        self, message, conversation: Conversation
-    ):
+        self, message: Message, conversation: Conversation
+    ) -> None:
         """
         Handles a new message in an ongoing conversation.
 
@@ -692,19 +713,10 @@ class xAIAPI(commands.Cog):
                     tool_usage,
                 )
 
-            self.logger.info(
-                "COST | command=chat | user=%s | model=%s | input=%d | cached=%d | output=%d"
-                " | reasoning=%d | image=%d | tool_usage=%s | cost=$%.4f | daily=$%.4f",
-                message.author.id,
-                params.model,
-                input_tokens,
-                cached_tokens,
-                output_tokens,
-                reasoning_tokens,
-                image_tokens,
-                tool_usage or {},
-                request_cost,
-                daily_cost,
+            self._log_chat_cost(
+                message.author.id, params.model, input_tokens, cached_tokens,
+                output_tokens, reasoning_tokens, image_tokens, tool_usage,
+                request_cost, daily_cost,
             )
 
             view = self.views.get(message.author)
@@ -757,7 +769,7 @@ class xAIAPI(commands.Cog):
             if typing_task:
                 typing_task.cancel()
 
-    async def keep_typing(self, channel):
+    async def keep_typing(self, channel: Any) -> None:
         """
         Coroutine to keep the typing indicator alive in a channel.
 
@@ -776,7 +788,8 @@ class xAIAPI(commands.Cog):
         """
         Event listener that runs when the bot is ready.
         """
-        self.logger.info(f"Logged in as {self.bot.user} (ID: {self.bot.owner_id})")
+        bot_user = self.bot.user
+        self.logger.info(f"Logged in as {bot_user} (ID: {bot_user.id if bot_user else 'unknown'})")
         self.logger.info(f"Attempting to sync commands for guilds: {GUILD_IDS}")
         try:
             await self.bot.sync_commands()
@@ -787,7 +800,7 @@ class xAIAPI(commands.Cog):
             )
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: Message) -> None:
         """
         Event listener that runs when a message is sent.
         Generates a response using Grok when a new message from the conversation author is detected.
@@ -811,7 +824,7 @@ class xAIAPI(commands.Cog):
             break
 
     @commands.Cog.listener()
-    async def on_error(self, event, *args, **kwargs):
+    async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
         """
         Event listener that runs when an error occurs.
         """
@@ -825,7 +838,14 @@ class xAIAPI(commands.Cog):
         """
         Checks and reports the bot's permissions in the current channel.
         """
-        permissions = ctx.channel.permissions_for(ctx.guild.me)
+        if ctx.guild is None:
+            await ctx.respond("This command can only be used in a server.")
+            return
+        channel = ctx.channel
+        if not isinstance(channel, TextChannel):
+            await ctx.respond("Cannot check permissions in this channel type.")
+            return
+        permissions = channel.permissions_for(ctx.guild.me)
         if permissions.read_messages and permissions.read_message_history:
             await ctx.respond(
                 "Bot has permission to read messages and message history."
@@ -1027,6 +1047,7 @@ class xAIAPI(commands.Cog):
         """
         await ctx.defer()
         typing_task = None
+        uploaded_file_ids: list[str] = []
 
         if ctx.channel is None:
             await ctx.send_followup(
@@ -1123,8 +1144,9 @@ class xAIAPI(commands.Cog):
                     )
                     return
                 try:
-                    x_search_kw["from_date"] = datetime.fromisoformat(date_parts[0])
-                    x_search_kw["to_date"] = datetime.fromisoformat(date_parts[1])
+                    # Validate and store as ISO strings directly (no datetime round-trip)
+                    x_search_kw["from_date"] = datetime.fromisoformat(date_parts[0]).isoformat()
+                    x_search_kw["to_date"] = datetime.fromisoformat(date_parts[1]).isoformat()
                 except ValueError:
                     await ctx.send_followup(
                         embed=Embed(
@@ -1208,13 +1230,13 @@ class xAIAPI(commands.Cog):
 
             selected_tool_names: list[str] = []
             if web_search:
-                selected_tool_names.append("web_search")
+                selected_tool_names.append(TOOL_WEB_SEARCH)
             if x_search:
-                selected_tool_names.append("x_search")
+                selected_tool_names.append(TOOL_X_SEARCH)
             if code_execution:
-                selected_tool_names.append("code_execution")
+                selected_tool_names.append(TOOL_CODE_EXECUTION)
             if collections_search:
-                selected_tool_names.append("collections_search")
+                selected_tool_names.append(TOOL_COLLECTIONS_SEARCH)
 
             tools, tool_error = self.resolve_selected_tools(
                 selected_tool_names,
@@ -1237,7 +1259,6 @@ class xAIAPI(commands.Cog):
                 initial_messages.append({"role": "system", "content": system_prompt})
 
             # Build user message content parts
-            uploaded_file_ids: list[str] = []
             content_parts: list[Any] = [prompt]
             if attachment:
                 if attachment.content_type in SUPPORTED_IMAGE_TYPES:
@@ -1332,19 +1353,10 @@ class xAIAPI(commands.Cog):
                     tool_usage,
                 )
 
-            self.logger.info(
-                "COST | command=chat | user=%s | model=%s | input=%d | cached=%d | output=%d"
-                " | reasoning=%d | image=%d | tool_usage=%s | cost=$%.4f | daily=$%.4f",
-                ctx.author.id,
-                model,
-                input_tokens,
-                cached_tokens,
-                output_tokens,
-                reasoning_tokens,
-                image_tokens,
-                tool_usage or {},
-                request_cost,
-                daily_cost,
+            self._log_chat_cost(
+                ctx.author.id, model, input_tokens, cached_tokens,
+                output_tokens, reasoning_tokens, image_tokens, tool_usage,
+                request_cost, daily_cost,
             )
 
             if len(embeds) == 1:
@@ -1404,6 +1416,13 @@ class xAIAPI(commands.Cog):
             await ctx.send_followup(
                 embed=Embed(title="Error", description=description, color=Colour.red())
             )
+            # Clean up uploaded files that won't be tracked by a conversation
+            for fid in uploaded_file_ids:
+                try:
+                    await self.client.files.delete(fid)
+                    self.logger.info("Cleaned up orphaned xAI file %s", fid)
+                except Exception:
+                    self.logger.warning("Failed to clean up orphaned xAI file %s", fid)
             # Clean up buttons and state if the conversation was partially created
             await self._strip_previous_view(ctx.author)
             self.views.pop(ctx.author, None)
@@ -1642,7 +1661,7 @@ class xAIAPI(commands.Cog):
 
             generate_kwargs: dict[str, Any] = {
                 "prompt": prompt,
-                "model": "grok-imagine-video",
+                "model": GROK_VIDEO_MODELS[0],
                 "aspect_ratio": cast(VideoAspectRatio, aspect_ratio),
                 "duration": duration,
                 "resolution": cast(VideoResolution, resolution),
@@ -1770,8 +1789,8 @@ class xAIAPI(commands.Cog):
         voice: str = "eve",
         language: str = "auto",
         output_format: str = "mp3",
-        sample_rate: int = None,
-        bit_rate: int = None,
+        sample_rate: int | None = None,
+        bit_rate: int | None = None,
     ):
         """
         Converts text to speech audio using the xAI TTS API.

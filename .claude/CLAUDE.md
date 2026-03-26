@@ -39,13 +39,18 @@ discord-grok/
 These are non-obvious patterns worth knowing when modifying the codebase:
 
 - **Tool type mapping**: Our canonical names differ from the Responses API names. `code_execution` maps to `{"type": "code_interpreter"}`, `collections_search` maps to `{"type": "file_search", "vector_store_ids": [...]}`. The reverse mapping lives in `_TOOL_TYPE_TO_CANONICAL` in `util.py`.
-- **`TOOL_BUILDERS`** only covers 3 tools (`web_search`, `x_search`, `code_execution`). `collections_search` is built inline in `resolve_selected_tools()` because it needs `XAI_COLLECTION_IDS`.
+- **`TOOL_BUILDERS`** only covers 3 tools (`web_search`, `x_search`, `code_execution`). `collections_search` is built inline in `resolve_selected_tools()` because it needs `collection_ids`.
+- **`resolve_selected_tools()`** is a standalone function in `util.py` (not a cog method). The cog has a thin wrapper that passes `XAI_COLLECTION_IDS`. This breaks the circular coupling with `button_view.py`.
 - **Agentic state**: `include: ["reasoning.encrypted_content"]` + `store: true` is set for all tool-using conversations AND multi-agent models. This enables server-side state via `previous_response_id`.
-- **`prompt_cache_key`**: `Conversation` has a UUID field passed to the Responses API for improved cache hit rates across multi-turn conversations.
+- **`prompt_cache_key`**: `Conversation.prompt_cache_key` defaults to `""`. Callers always pass a `uuid.uuid4()` string explicitly — there is no default factory.
 - **Multi-agent constraints**: `agent_count` is only valid for `MULTI_AGENT_MODELS`. Multi-agent models reject `max_tokens`.
-- **File attachments**: Images go inline (`input_image`); non-image files are uploaded via `client.files.upload()` and sent as `input_file`. Files are cleaned up on conversation end.
+- **File attachments**: Images go inline (`input_image`); non-image files are uploaded via `client.files.upload()` and sent as `input_file`. Files are cleaned up on conversation end AND on chat error (orphaned file cleanup in the exception handler).
 - **`SHOW_COST_EMBEDS`** is checked at each call site, not inside the embed helper functions.
 - **`TOOL_USAGE_DISPLAY_NAMES`** includes server-side tool types beyond the four user-selectable tools (e.g., `VIEW_X_VIDEO`, `VIEW_IMAGE`, `MCP`, `ATTACHMENT_SEARCH`).
+- **Session lifecycle**: `aiohttp.ClientSession` is lazily created via `_get_http_session()` and cleaned up via both `cog_unload()` (cog removal) and `on_close()` (bot shutdown).
+- **Logging**: `logging.basicConfig()` is called once in `bot.py`, not in the cog constructor.
+- **Env vars**: `BOT_TOKEN` and `XAI_API_KEY` use `os.environ[]` (fail-fast `KeyError` on missing). Optional vars use `os.getenv()` with defaults.
+- **Type checking**: The codebase passes `pyright` with 0 errors. `button_view.py` uses `from __future__ import annotations` + `TYPE_CHECKING` for the `xAIAPI` forward reference.
 
 ## `/grok chat` Parameters
 
@@ -129,8 +134,8 @@ If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a u
 
 - Tool support targets exactly four built-in tools for `/grok chat`.
 - If new tools are added:
-  - Update `src/util.py` constants/builders
-  - Update `resolve_selected_tools()` in `src/xai_api.py`
-  - Update tool select options in `src/button_view.py`
+  - Update `src/util.py` constants/builders and `resolve_selected_tools()`
+  - Update tool select options in `src/button_view.py` (`max_values` is derived automatically from `len(AVAILABLE_TOOLS)`)
   - Update README + this file
   - Add/adjust tests in `tests/test_xai_api.py`, `tests/test_button_view.py`, and `tests/test_util.py`
+- Run `pyright src/` to verify type safety before committing.

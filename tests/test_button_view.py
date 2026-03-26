@@ -175,3 +175,209 @@ class TestButtonView:
         cog.end_conversation.assert_awaited_once_with(111)
         call_args = interaction.response.send_message.call_args
         assert "Conversation ended" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_stop_button_rejects_non_owner(self, cog, conversation_starter):
+        """Stop button should reject non-owners."""
+        from src.button_view import ButtonView
+
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=111,
+        )
+
+        interaction = MagicMock()
+        interaction.user = MagicMock()  # Different user
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.stop_button.callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "not allowed" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_stop_button_no_conversation(self, cog, conversation_starter):
+        """Stop button with missing conversation should handle gracefully."""
+        from src.button_view import ButtonView
+
+        cog.conversations.clear()
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=999,  # Not in conversations
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.stop_button.callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "No active conversation" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_play_pause_toggles(self, cog, conversation_starter):
+        """Play/pause button should toggle the paused state."""
+        from src.button_view import ButtonView
+
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=111,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        conversation = cog.conversations[111]
+        conversation.params.paused = False
+
+        await view.play_pause_button.callback(interaction)
+        assert conversation.params.paused is True
+        assert "paused" in interaction.response.send_message.call_args.args[0]
+
+        interaction.response.send_message.reset_mock()
+        await view.play_pause_button.callback(interaction)
+        assert conversation.params.paused is False
+        assert "resumed" in interaction.response.send_message.call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_play_pause_rejects_non_owner(self, cog, conversation_starter):
+        """Play/pause button should reject non-owners."""
+        from src.button_view import ButtonView
+
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=111,
+        )
+
+        interaction = MagicMock()
+        interaction.user = MagicMock()
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.play_pause_button.callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "not allowed" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_play_pause_no_conversation(self, cog, conversation_starter):
+        """Play/pause with missing conversation should handle gracefully."""
+        from src.button_view import ButtonView
+
+        cog.conversations.clear()
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=999,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.play_pause_button.callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "No active conversation" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_regenerate_rejects_non_owner(self, cog, conversation_starter):
+        """Regenerate button should reject non-owners."""
+        from src.button_view import ButtonView
+
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=111,
+        )
+
+        interaction = MagicMock()
+        interaction.user = MagicMock()
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.regenerate_button.callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "not allowed" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_regenerate_no_conversation(self, cog, conversation_starter):
+        """Regenerate with missing conversation should handle gracefully."""
+        from src.button_view import ButtonView
+
+        cog.conversations.clear()
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=999,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.regenerate_button.callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "No active conversation" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_regenerate_no_history(self, cog, conversation_starter):
+        """Regenerate with empty history should say 'not enough history'."""
+        from src.button_view import ButtonView
+
+        cog.conversations[111].response_id_history = []
+
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=111,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.is_done = MagicMock(return_value=False)
+        interaction.response.defer = AsyncMock()
+        interaction.followup = MagicMock()
+        interaction.followup.send = AsyncMock()
+
+        await view.regenerate_button.callback(interaction)
+
+        call_args = interaction.followup.send.call_args
+        assert "Not enough history" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_tool_select_no_conversation(self, cog, conversation_starter):
+        """Tool select with missing conversation should handle gracefully."""
+        from src.button_view import ButtonView
+
+        cog.conversations.clear()
+        view = ButtonView(
+            cog=cog,
+            conversation_starter=conversation_starter,
+            conversation_id=999,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.data = {"values": ["web_search"]}
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        await view.tool_select_callback(interaction)
+
+        call_args = interaction.response.send_message.call_args
+        assert "No active conversation" in call_args.args[0]

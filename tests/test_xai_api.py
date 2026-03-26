@@ -478,13 +478,11 @@ class TestXAIAPICog:
         assert tools[0]["type"] == "web_search"
 
     @pytest.mark.asyncio
-    async def test_resolve_selected_tools_converts_datetime(self, cog):
-        """datetime objects in x_search kwargs should be converted to ISO strings."""
-        from datetime import datetime
-
+    async def test_resolve_selected_tools_passes_date_strings(self, cog):
+        """ISO date strings in x_search kwargs should be passed through."""
         x_search_kw = {
-            "from_date": datetime(2024, 1, 1),
-            "to_date": datetime(2024, 12, 31),
+            "from_date": "2024-01-01T00:00:00",
+            "to_date": "2024-12-31T00:00:00",
         }
         tools, error = cog.resolve_selected_tools(
             ["x_search"], x_search_kwargs=x_search_kw
@@ -1356,3 +1354,428 @@ class TestImageBatchGeneration:
         assert "not supported in Image Editing mode" in call_kwargs["embed"].description
         cog.client.image.sample.assert_not_awaited()
         cog.client.image.sample_batch.assert_not_awaited()
+
+
+class TestHandleNewMessageInConversation:
+    """Tests for the handle_new_message_in_conversation method."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        return _make_cog(mock_bot)
+
+    @pytest.fixture
+    def conversation(self):
+        from src.util import ChatCompletionParameters, Conversation
+
+        starter = MagicMock()
+        starter.id = 111222333
+        params = ChatCompletionParameters(
+            model="grok-3",
+            conversation_starter=starter,
+            channel_id=444555666,
+            conversation_id=777888999,
+        )
+        return Conversation(
+            params=params,
+            previous_response_id="resp_prev",
+            response_id_history=["resp_prev"],
+            prompt_cache_key="test-cache-key",
+        )
+
+    @pytest.fixture
+    def message(self, conversation):
+        msg = MagicMock()
+        msg.author = conversation.params.conversation_starter
+        msg.author.id = 111222333
+        msg.channel = MagicMock()
+        msg.channel.id = 444555666
+        msg.content = "Follow-up message"
+        msg.attachments = []
+        msg.reply = AsyncMock()
+        msg.channel.typing = MagicMock()
+        msg.channel.typing.return_value.__aenter__ = AsyncMock()
+        msg.channel.typing.return_value.__aexit__ = AsyncMock()
+        return msg
+
+    @pytest.mark.asyncio
+    async def test_follow_up_sends_response(self, cog, message, conversation):
+        """A follow-up message should call the API and reply with embeds."""
+        cog.conversations[777888999] = conversation
+        cog.views[message.author] = MagicMock()
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        cog._call_responses_api.assert_called_once()
+        message.reply.assert_called()
+        # Conversation state should be updated with new response ID
+        assert conversation.previous_response_id == "resp_01XFDUDYJgAACzvnptvVoYEL"
+        assert "resp_01XFDUDYJgAACzvnptvVoYEL" in conversation.response_id_history
+
+    @pytest.mark.asyncio
+    async def test_paused_conversation_ignored(self, cog, message, conversation):
+        """Messages in a paused conversation should be silently ignored."""
+        conversation.params.paused = True
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        cog._call_responses_api.assert_not_called()
+        message.reply.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_wrong_author_ignored(self, cog, message, conversation):
+        """Messages from a non-starter user should be silently ignored."""
+        message.author = MagicMock()  # Different user
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        cog._call_responses_api.assert_not_called()
+        message.reply.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_empty_content_returns_early(self, cog, message, conversation):
+        """A message with no text and no attachments should return early."""
+        message.content = ""
+        message.attachments = []
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        cog._call_responses_api.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_api_error_ends_conversation(self, cog, message, conversation):
+        """An API error should end the conversation and reply with an error embed."""
+        cog.conversations[777888999] = conversation
+        cog._call_responses_api.side_effect = Exception("API failure")
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        message.reply.assert_called_once()
+        embed = message.reply.call_args[1]["embed"]
+        assert embed.title == "Error"
+        assert 777888999 not in cog.conversations
+
+
+class TestOnMessageRouting:
+    """Tests for the on_message event listener routing."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        return _make_cog(mock_bot)
+
+    @pytest.mark.asyncio
+    async def test_routes_to_correct_conversation(self, cog, mock_discord_message):
+        """Message in the right channel from the right user should route to handler."""
+        from src.util import ChatCompletionParameters, Conversation
+
+        starter = mock_discord_message.author
+        params = ChatCompletionParameters(
+            model="grok-3",
+            conversation_starter=starter,
+            channel_id=mock_discord_message.channel.id,
+            conversation_id=111,
+        )
+        cog.conversations[111] = Conversation(params=params, prompt_cache_key="k")
+        cog.handle_new_message_in_conversation = AsyncMock()
+
+        await cog.on_message(mock_discord_message)
+
+        cog.handle_new_message_in_conversation.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_wrong_channel_skipped(self, cog, mock_discord_message):
+        """Message in a different channel should not route."""
+        from src.util import ChatCompletionParameters, Conversation
+
+        starter = mock_discord_message.author
+        params = ChatCompletionParameters(
+            model="grok-3",
+            conversation_starter=starter,
+            channel_id=999999,  # Different channel
+            conversation_id=111,
+        )
+        cog.conversations[111] = Conversation(params=params, prompt_cache_key="k")
+        cog.handle_new_message_in_conversation = AsyncMock()
+
+        await cog.on_message(mock_discord_message)
+
+        cog.handle_new_message_in_conversation.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_wrong_author_skipped(self, cog, mock_discord_message):
+        """Message from a different user should not route."""
+        from src.util import ChatCompletionParameters, Conversation
+
+        other_user = MagicMock()
+        other_user.id = 999
+        params = ChatCompletionParameters(
+            model="grok-3",
+            conversation_starter=other_user,
+            channel_id=mock_discord_message.channel.id,
+            conversation_id=111,
+        )
+        cog.conversations[111] = Conversation(params=params, prompt_cache_key="k")
+        cog.handle_new_message_in_conversation = AsyncMock()
+
+        await cog.on_message(mock_discord_message)
+
+        cog.handle_new_message_in_conversation.assert_not_awaited()
+
+
+class TestAppendSourcesEmbed:
+    """Tests for the append_sources_embed helper."""
+
+    def test_empty_citations_no_embed(self):
+        from src.xai_api import append_sources_embed
+
+        embeds = []
+        append_sources_embed(embeds, [])
+        assert len(embeds) == 0
+
+    def test_web_citations_grouped(self):
+        from src.xai_api import append_sources_embed
+
+        citations = [
+            {"url": "https://example.com/a", "source": "web"},
+            {"url": "https://example.com/b", "source": "web"},
+        ]
+        embeds = []
+        append_sources_embed(embeds, citations)
+        assert len(embeds) == 1
+        assert embeds[0].title == "Sources"
+        assert "example.com" in embeds[0].description
+
+    def test_mixed_sources_have_headings(self):
+        from src.xai_api import append_sources_embed
+
+        citations = [
+            {"url": "https://example.com/a", "source": "web"},
+            {"url": "https://x.com/i/status/123", "source": "x"},
+        ]
+        embeds = []
+        append_sources_embed(embeds, citations)
+        assert "**Web**" in embeds[0].description
+        assert "**X Posts**" in embeds[0].description
+
+    def test_single_source_type_no_heading(self):
+        from src.xai_api import append_sources_embed
+
+        citations = [
+            {"url": "https://x.com/i/status/1", "source": "x"},
+            {"url": "https://x.com/i/status/2", "source": "x"},
+        ]
+        embeds = []
+        append_sources_embed(embeds, citations)
+        assert "**X Posts**" not in embeds[0].description
+
+    def test_skips_when_at_embed_limit(self):
+        from src.xai_api import append_sources_embed
+
+        embeds = [MagicMock() for _ in range(10)]
+        citations = [{"url": "https://example.com", "source": "web"}]
+        append_sources_embed(embeds, citations)
+        assert len(embeds) == 10  # No embed added
+
+
+class TestChatMutualExclusionParams:
+    """Tests for mutual exclusion parameter validation."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        return _make_cog(mock_bot)
+
+    @pytest.mark.asyncio
+    async def test_rejects_both_x_search_handles(self, cog, mock_discord_context):
+        """Setting both allowed and excluded X handles should error."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="test",
+            x_search=True,
+            x_search_allowed_handles="a",
+            x_search_excluded_handles="b",
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "Cannot use both" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_rejects_both_web_search_domains(self, cog, mock_discord_context):
+        """Setting both allowed and excluded web domains should error."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="test",
+            web_search=True,
+            web_search_allowed_domains="a.com",
+            web_search_excluded_domains="b.com",
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "Cannot use both" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_rejects_too_many_x_handles(self, cog, mock_discord_context):
+        """More than 10 X handles should be rejected."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        handles = ",".join(f"user{i}" for i in range(11))
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="test",
+            x_search=True,
+            x_search_allowed_handles=handles,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "maximum of 10" in call_kwargs["embed"].description
+
+    @pytest.mark.asyncio
+    async def test_rejects_too_many_web_domains(self, cog, mock_discord_context):
+        """More than 5 web domains should be rejected."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        domains = ",".join(f"d{i}.com" for i in range(6))
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="test",
+            web_search=True,
+            web_search_allowed_domains=domains,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "maximum of 5" in call_kwargs["embed"].description
+
+
+class TestVideoCommand:
+    """Integration tests for the /grok video command."""
+
+    @pytest.fixture
+    def cog(self, mock_bot, mock_xai_client):
+        cog = _make_cog(mock_bot)
+        cog.client = mock_xai_client
+        return cog
+
+    @staticmethod
+    def _mock_http_session():
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read = AsyncMock(return_value=b"fake video bytes")
+
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_cm
+        return mock_session
+
+    @pytest.mark.asyncio
+    async def test_video_success(self, cog, mock_discord_context):
+        """Successful text-to-video should send a video file."""
+        with patch.object(
+            cog, "_get_http_session", new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.video.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A sunset",
+            )
+
+        cog.client.video.generate.assert_awaited_once()
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert call_kwargs["file"].filename == "video.mp4"
+
+    @pytest.mark.asyncio
+    async def test_video_with_attachment(self, cog, mock_discord_context, mock_attachment):
+        """Image-to-video should pass image_url to the SDK."""
+        with patch.object(
+            cog, "_get_http_session", new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.video.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="Animate this",
+                attachment=mock_attachment,
+            )
+
+        gen_kwargs = cog.client.video.generate.call_args[1]
+        assert gen_kwargs["image_url"] == str(mock_attachment.url)
+
+    @pytest.mark.asyncio
+    async def test_video_api_error(self, cog, mock_discord_context):
+        """API errors should display an error embed."""
+        cog.client.video.generate.side_effect = Exception("Video gen failed")
+
+        await cog.video.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="A sunset",
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert call_kwargs["embed"].title == "Error"
+
+    @pytest.mark.asyncio
+    async def test_video_no_url_returns_error(self, cog, mock_discord_context):
+        """No video URL from API should display an error."""
+        cog.client.video.generate.return_value.url = None
+
+        await cog.video.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="A sunset",
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert call_kwargs["embed"].title == "Error"
+
+
+class TestResolveSelectedToolsUtil:
+    """Tests for the resolve_selected_tools function in util.py."""
+
+    def test_basic_resolution(self):
+        from src.util import resolve_selected_tools
+
+        tools, error = resolve_selected_tools(
+            ["web_search", "x_search", "code_execution"],
+            collection_ids=[],
+        )
+        assert error is None
+        assert len(tools) == 3
+
+    def test_collections_requires_ids(self):
+        from src.util import resolve_selected_tools
+
+        tools, error = resolve_selected_tools(
+            ["collections_search"],
+            collection_ids=[],
+        )
+        assert tools == []
+        assert "XAI_COLLECTION_IDS" in error
+
+    def test_collections_with_ids(self):
+        from src.util import resolve_selected_tools
+
+        tools, error = resolve_selected_tools(
+            ["collections_search"],
+            collection_ids=["col_1"],
+        )
+        assert error is None
+        assert tools[0]["type"] == "file_search"
+        assert tools[0]["vector_store_ids"] == ["col_1"]
