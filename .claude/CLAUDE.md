@@ -47,7 +47,7 @@ These are non-obvious patterns worth knowing when modifying the codebase:
 - **File attachments**: Images go inline (`input_image`); non-image files are uploaded via `client.files.upload()` and sent as `input_file`. Files are cleaned up on conversation end AND on chat error (orphaned file cleanup in the exception handler).
 - **`SHOW_COST_EMBEDS`** is checked at each call site, not inside the embed helper functions.
 - **`TOOL_USAGE_DISPLAY_NAMES`** includes server-side tool types beyond the four user-selectable tools (e.g., `VIEW_X_VIDEO`, `VIEW_IMAGE`, `MCP`, `ATTACHMENT_SEARCH`).
-- **Session lifecycle**: `aiohttp.ClientSession` is lazily created via `_get_http_session()` and cleaned up via both `cog_unload()` (cog removal) and `on_close()` (bot shutdown).
+- **Session lifecycle**: `aiohttp.ClientSession` is lazily created via `_get_http_session()` and cleaned up via `cog_unload()`. Pycord does **not** dispatch an `on_close` event, so `cog_unload` is the only cleanup path.
 - **Logging**: `logging.basicConfig()` is called once in `bot.py`, not in the cog constructor.
 - **Env vars**: `BOT_TOKEN` and `XAI_API_KEY` use `os.environ[]` (fail-fast `KeyError` on missing). Optional vars use `os.getenv()` with defaults.
 - **Type checking**: The codebase passes `pyright` with 0 errors. `button_view.py` uses `from __future__ import annotations` + `TYPE_CHECKING` for the `xAIAPI` forward reference.

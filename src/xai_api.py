@@ -570,7 +570,10 @@ class xAIAPI(commands.Cog):
         """Close the shared HTTP session if open."""
         session = self._http_session
         if session and not session.closed:
-            await session.close()
+            try:
+                await session.close()
+            except Exception as e:
+                self.logger.warning("Error closing HTTP session: %s", e)
         self._http_session = None
 
     def cog_unload(self) -> None:
@@ -579,19 +582,14 @@ class xAIAPI(commands.Cog):
         session = self._http_session
         if session and not session.closed:
             if loop and loop.is_running():
-                loop.create_task(session.close())
+                loop.create_task(self._close_http_session())
             else:
                 new_loop = asyncio.new_event_loop()
                 try:
-                    new_loop.run_until_complete(session.close())
+                    new_loop.run_until_complete(self._close_http_session())
                 finally:
                     new_loop.close()
         self._http_session = None
-
-    @commands.Cog.listener()
-    async def on_close(self) -> None:
-        """Clean up HTTP session when the bot shuts down."""
-        await self._close_http_session()
 
     def resolve_selected_tools(
         self,
@@ -1421,8 +1419,8 @@ class xAIAPI(commands.Cog):
                 try:
                     await self.client.files.delete(fid)
                     self.logger.info("Cleaned up orphaned xAI file %s", fid)
-                except Exception:
-                    self.logger.warning("Failed to clean up orphaned xAI file %s", fid)
+                except Exception as cleanup_err:
+                    self.logger.warning("Failed to clean up orphaned xAI file %s: %s", fid, cleanup_err)
             # Clean up buttons and state if the conversation was partially created
             await self._strip_previous_view(ctx.author)
             self.views.pop(ctx.author, None)
