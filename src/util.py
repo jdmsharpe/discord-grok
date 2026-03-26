@@ -151,7 +151,7 @@ AVAILABLE_TOOLS = {
 TOOL_BUILDERS: dict[str, Callable[..., dict[str, Any]]] = {
     TOOL_WEB_SEARCH: lambda **kw: {"type": "web_search", **kw},
     TOOL_X_SEARCH: lambda **kw: {"type": "x_search", **kw},
-    TOOL_CODE_EXECUTION: lambda: {"type": "code_interpreter"},
+    TOOL_CODE_EXECUTION: lambda **kw: {"type": "code_interpreter"},  # noqa: ARG005
 }
 
 
