@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from discord import (
     ButtonStyle,
@@ -13,11 +15,14 @@ from discord.ui import Button, Select, View, button
 
 from util import AVAILABLE_TOOLS, resolve_tool_name
 
+if TYPE_CHECKING:
+    from xai_api import xAIAPI
+
 
 class ButtonView(View):
     def __init__(
         self,
-        cog: "xAIAPI",
+        cog: xAIAPI,
         conversation_starter: Member | User,
         conversation_id: int,
         initial_tools: list[Any] | None = None,
@@ -41,7 +46,7 @@ class ButtonView(View):
         tool_select = Select(
             placeholder="Toggle conversation tools",
             min_values=0,
-            max_values=4,
+            max_values=len(AVAILABLE_TOOLS),
             row=1,
             options=[
                 SelectOption(

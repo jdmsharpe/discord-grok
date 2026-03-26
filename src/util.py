@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -152,7 +151,7 @@ AVAILABLE_TOOLS = {
 TOOL_BUILDERS: dict[str, Callable[..., dict[str, Any]]] = {
     TOOL_WEB_SEARCH: lambda **kw: {"type": "web_search", **kw},
     TOOL_X_SEARCH: lambda **kw: {"type": "x_search", **kw},
-    TOOL_CODE_EXECUTION: lambda **kw: {"type": "code_interpreter"},
+    TOOL_CODE_EXECUTION: lambda: {"type": "code_interpreter"},
 }
 
 
@@ -183,7 +182,10 @@ def resolve_tool_name(tool_config: Any) -> str | None:
     """Resolve a Responses API tool dict to its canonical tool name."""
     if not isinstance(tool_config, dict):
         return None
-    canonical = _TOOL_TYPE_TO_CANONICAL.get(tool_config.get("type"))
+    tool_type = tool_config.get("type")
+    if not isinstance(tool_type, str):
+        return None
+    canonical = _TOOL_TYPE_TO_CANONICAL.get(tool_type)
     if canonical in AVAILABLE_TOOLS:
         return canonical
     return None
@@ -218,7 +220,7 @@ class Conversation:
     previous_response_id: str | None = None
     response_id_history: list[str] = field(default_factory=list)
     file_ids: list[str] = field(default_factory=list)
-    prompt_cache_key: str = field(default_factory=lambda: str(uuid.uuid4()))
+    prompt_cache_key: str = ""
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_TEXT_SIZE) -> list[str]:
@@ -272,3 +274,51 @@ def format_xai_error(error: Exception) -> str:
     if details:
         return f"{message}\n\n" + "\n".join(details)
     return message
+
+
+def resolve_selected_tools(
+    selected_tool_names: list[str],
+    collection_ids: list[str],
+    x_search_kwargs: dict[str, Any] | None = None,
+    web_search_kwargs: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Build Responses API tool dicts for the selected tool names.
+
+    Args:
+        selected_tool_names: Canonical tool names to resolve.
+        collection_ids: XAI_COLLECTION_IDS for file_search.
+        x_search_kwargs: Extra kwargs merged into the x_search tool dict.
+        web_search_kwargs: Extra kwargs merged into the web_search tool dict.
+
+    Returns:
+        A tuple of (tool dicts, error message or None).
+    """
+    tools: list[dict[str, Any]] = []
+
+    for tool_name in selected_tool_names:
+        if tool_name == TOOL_COLLECTIONS_SEARCH:
+            if not collection_ids:
+                return (
+                    [],
+                    "Collections search requires XAI_COLLECTION_IDS to be set in your .env.",
+                )
+            tools.append({
+                "type": "file_search",
+                "vector_store_ids": list(collection_ids),
+            })
+            continue
+
+        if tool_name == TOOL_X_SEARCH and x_search_kwargs:
+            tools.append({"type": "x_search", **x_search_kwargs})
+            continue
+
+        if tool_name == TOOL_WEB_SEARCH and web_search_kwargs:
+            tools.append({"type": "web_search", **web_search_kwargs})
+            continue
+
+        tool_builder = TOOL_BUILDERS.get(tool_name)
+        if tool_builder is None:
+            continue
+        tools.append(tool_builder())
+
+    return tools, None
