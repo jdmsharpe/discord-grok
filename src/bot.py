@@ -9,8 +9,8 @@ import logging
 
 from discord import Bot, Intents
 
-from xai_api import xAIAPI
 from config.auth import BOT_TOKEN
+from xai_api import xAIAPI
 
 if __name__ == "__main__":
     logging.basicConfig(

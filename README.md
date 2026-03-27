@@ -162,6 +162,20 @@ docker-compose up -d
 - python-dotenv ~1.2
 - xai-sdk ~1.10
 
+## Development
+
+A git pre-commit hook runs `ruff check` on staged Python files to enforce lint rules. It is installed locally in `.git/hooks/pre-commit` and skips gracefully if ruff is not installed.
+
+Lint configuration lives in `pyproject.toml` (rules: E, W, F, I, UP, B, SIM; 100-col line length; Python 3.12).
+
+```bash
+# Install ruff
+pip install ruff
+
+# Run lint manually
+ruff check src/ tests/
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
