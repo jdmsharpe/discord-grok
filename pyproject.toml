@@ -1,3 +1,14 @@
+[project]
+name = "discord-grok"
+version = "1.0.0"
+description = "Discord bot to enable xAI API interactions"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
