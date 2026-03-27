@@ -102,19 +102,13 @@ All commands are grouped under `/grok` for clean namespacing.
    pip install -r requirements.txt
    ```
 
-4. Enable the repo-synced git hooks:
-
-   ```bash
-   git config core.hooksPath .githooks
-   ```
-
-5. Copy the environment example file and fill in your values:
+4. Copy the environment example file and fill in your values:
 
    ```bash
    cp .env.example .env
    ```
 
-6. Edit `.env` with your credentials:
+5. Edit `.env` with your credentials:
 
    ```ini
    BOT_TOKEN=your_discord_bot_token
@@ -170,7 +164,7 @@ docker-compose up -d
 
 ## Development
 
-Linting (ruff) and type checking (pyright) are configured in `pyproject.toml`. A git pre-commit hook runs `ruff check` on staged Python files and blocks commits on lint failure (skips gracefully if ruff is not installed).
+Linting (ruff) and type checking (pyright) are configured in `pyproject.toml`.
 
 ```bash
 pip install ruff pyright
