@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir pytest pytest-asyncio
 COPY pyproject.toml .
 COPY src/ ./src/
 COPY tests/ ./tests/
-CMD ["pytest", "-v"]
+CMD ["python", "-m", "pytest", "-v"]
