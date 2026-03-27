@@ -130,12 +130,17 @@ If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a u
 .\.venv\Scripts\python -m pytest -q
 ```
 
-## Linting
+## Linting & Type Checking
 
-Ruff is configured in `pyproject.toml` (rules: E, W, F, I, UP, B, SIM; E501 ignored; 100-col line length; target Python 3.12). A git pre-commit hook in `.git/hooks/pre-commit` runs `ruff check` on staged files and blocks the commit on lint failure (skips gracefully if ruff is not installed).
+All tooling is configured in `pyproject.toml`:
+
+- **Ruff** lint (rules: E, W, F, I, UP, B, SIM; E501 ignored; 100-col line length; target Python 3.12) and format (double quotes).
+- **Pyright** type checking (`include: ["src"]`, `extraPaths: ["src"]`).
+- A git pre-commit hook in `.git/hooks/pre-commit` runs `ruff check` on staged files and blocks the commit on lint failure (skips gracefully if ruff is not installed).
 
 ```powershell
 python -m ruff check src/ tests/
+python -m pyright src/
 ```
 
 ## Notes for Future Changes

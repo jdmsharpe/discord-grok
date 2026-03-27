@@ -164,16 +164,13 @@ docker-compose up -d
 
 ## Development
 
-A git pre-commit hook runs `ruff check` on staged Python files to enforce lint rules. It is installed locally in `.git/hooks/pre-commit` and skips gracefully if ruff is not installed.
-
-Lint configuration lives in `pyproject.toml` (rules: E, W, F, I, UP, B, SIM; 100-col line length; Python 3.12).
+Linting (ruff) and type checking (pyright) are configured in `pyproject.toml`. A git pre-commit hook runs `ruff check` on staged Python files and blocks commits on lint failure (skips gracefully if ruff is not installed).
 
 ```bash
-# Install ruff
-pip install ruff
+pip install ruff pyright
 
-# Run lint manually
 ruff check src/ tests/
+pyright src/
 ```
 
 ## License
