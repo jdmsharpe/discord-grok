@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from discord import Colour, Embed
 
-# conftest.py is auto-loaded by pytest but we need to import its constant
+# conftest.py is auto-discovered by pytest for fixtures, but not importable
+# as a module without explicitly adding tests/ to sys.path.
 sys.path.insert(0, str(Path(__file__).parent))
 from conftest import MOCK_RESPONSES_API_RESPONSE
 
