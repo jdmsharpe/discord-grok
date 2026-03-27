@@ -17,6 +17,8 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+    if not BOT_TOKEN:
+        raise RuntimeError("BOT_TOKEN must be set before starting the Discord bot.")
     intents = Intents.default()
     intents.presences = False
     intents.members = True
