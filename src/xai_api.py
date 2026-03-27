@@ -9,6 +9,7 @@ from datetime import date, datetime
 from typing import Any, Literal, TypedDict, cast
 
 import aiohttp
+import xai_sdk
 from aiohttp import ClientTimeout
 from discord import (
     ApplicationContext,
@@ -24,7 +25,6 @@ from discord import (
 )
 from discord.commands import OptionChoice, SlashCommandGroup, option
 from discord.ext import commands
-from xai_sdk import AsyncClient
 from xai_sdk.image import ImageAspectRatio, ImageResolution
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
@@ -263,7 +263,7 @@ class xAIAPI(commands.Cog):
             bot: The bot instance.
         """
         self.bot = bot
-        self.client = AsyncClient(api_key=XAI_API_KEY)
+        self.client: Any | None = None
         self.logger = logging.getLogger(__name__)
 
         # Dictionary to store conversation state for each chat interaction
@@ -276,6 +276,11 @@ class xAIAPI(commands.Cog):
         self.daily_costs: dict[tuple[int, str], float] = {}
         self._http_session: aiohttp.ClientSession | None = None
         self._session_lock = asyncio.Lock()
+
+    def _get_client(self) -> Any:
+        if self.client is None:
+            self.client = xai_sdk.AsyncClient(api_key=XAI_API_KEY or None)
+        return self.client
 
     async def _get_http_session(self) -> aiohttp.ClientSession:
         if self._http_session and not self._http_session.closed:
@@ -527,8 +532,9 @@ class xAIAPI(commands.Cog):
         if file_bytes is None:
             return None
 
+        client = self._get_client()
         try:
-            uploaded = await self.client.files.upload(
+            uploaded = await client.files.upload(
                 file_bytes, filename=attachment.filename
             )
             self.logger.info(
@@ -543,9 +549,13 @@ class xAIAPI(commands.Cog):
 
     async def _cleanup_conversation_files(self, conversation: Conversation) -> None:
         """Delete all xAI files associated with a conversation."""
+        if not conversation.file_ids:
+            return
+
+        client = self._get_client()
         for file_id in conversation.file_ids:
             try:
-                await self.client.files.delete(file_id)
+                await client.files.delete(file_id)
                 self.logger.info("Deleted xAI file %s", file_id)
             except Exception as error:
                 self.logger.warning(
@@ -1412,12 +1422,14 @@ class xAIAPI(commands.Cog):
                 embed=Embed(title="Error", description=description, color=Colour.red())
             )
             # Clean up uploaded files that won't be tracked by a conversation
-            for fid in uploaded_file_ids:
-                try:
-                    await self.client.files.delete(fid)
-                    self.logger.info("Cleaned up orphaned xAI file %s", fid)
-                except Exception as cleanup_err:
-                    self.logger.warning("Failed to clean up orphaned xAI file %s: %s", fid, cleanup_err)
+            if uploaded_file_ids:
+                client = self._get_client()
+                for fid in uploaded_file_ids:
+                    try:
+                        await client.files.delete(fid)
+                        self.logger.info("Cleaned up orphaned xAI file %s", fid)
+                    except Exception as cleanup_err:
+                        self.logger.warning("Failed to clean up orphaned xAI file %s: %s", fid, cleanup_err)
             # Clean up buttons and state if the conversation was partially created
             await self._strip_previous_view(ctx.author)
             self.views.pop(ctx.author, None)
@@ -1529,11 +1541,12 @@ class xAIAPI(commands.Cog):
             if is_editing:
                 sample_kwargs["image_url"] = str(attachment.url)
 
+            client = self._get_client()
             if count == 1:
-                result = await self.client.image.sample(**sample_kwargs)
+                result = await client.image.sample(**sample_kwargs)
                 results = [result]
             else:
-                results = await self.client.image.sample_batch(n=count, **sample_kwargs)
+                results = await client.image.sample_batch(n=count, **sample_kwargs)
 
             image_cost = calculate_image_cost(model) * len(results)
             daily_cost = self._track_daily_cost(ctx.author.id, image_cost)
@@ -1664,7 +1677,8 @@ class xAIAPI(commands.Cog):
             if is_image_to_video:
                 generate_kwargs["image_url"] = str(attachment.url)
 
-            result = await self.client.video.generate(**generate_kwargs)
+            client = self._get_client()
+            result = await client.video.generate(**generate_kwargs)
 
             if not result.url:
                 raise Exception("No video URL returned from the API.")
