@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: lint staged Python files with ruff.
+# Soft-fails if ruff is not installed (warning only).
+
+set -euo pipefail
+
+# Collect staged Python files (Added, Copied, Modified only)
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(src|tests)/.*\.py$' || true)
+
+if [ -z "$STAGED_PY" ]; then
+    exit 0
+fi
+
+# Check for ruff
+if ! command -v ruff &>/dev/null; then
+    echo "⚠  ruff not found — skipping lint checks"
+    exit 0
+fi
+
+# Lint check (strict — blocks commit on failure)
+echo "$STAGED_PY" | xargs ruff check
