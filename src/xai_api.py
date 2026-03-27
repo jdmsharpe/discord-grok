@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import contextlib
 import io
 import logging
 import re
@@ -9,11 +10,6 @@ from typing import Any, Literal, TypedDict, cast
 
 import aiohttp
 from aiohttp import ClientTimeout
-
-from xai_sdk import AsyncClient
-from xai_sdk.image import ImageAspectRatio, ImageResolution
-from xai_sdk.video import VideoAspectRatio, VideoResolution
-
 from discord import (
     ApplicationContext,
     Attachment,
@@ -28,13 +24,14 @@ from discord import (
 )
 from discord.commands import OptionChoice, SlashCommandGroup, option
 from discord.ext import commands
+from xai_sdk import AsyncClient
+from xai_sdk.image import ImageAspectRatio, ImageResolution
+from xai_sdk.video import VideoAspectRatio, VideoResolution
 
 from button_view import ButtonView
 from config.auth import GUILD_IDS, SHOW_COST_EMBEDS, XAI_API_KEY, XAI_COLLECTION_IDS
 from util import (
     CHUNK_TEXT_SIZE,
-    ChatCompletionParameters,
-    Conversation,
     GROK_VIDEO_MODELS,
     MULTI_AGENT_MODELS,
     PENALTY_SUPPORTED_MODELS,
@@ -44,6 +41,8 @@ from util import (
     TOOL_USAGE_DISPLAY_NAMES,
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
+    ChatCompletionParameters,
+    Conversation,
     calculate_cost,
     calculate_image_cost,
     calculate_tool_cost,
@@ -327,10 +326,8 @@ class xAIAPI(commands.Cog):
         """Edit the last message that had buttons to remove its view."""
         prev = self.last_view_messages.pop(user, None)
         if prev is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await prev.edit(view=None)
-            except Exception:
-                pass  # Message may have been deleted or is no longer editable
 
     async def _generate_tts(
         self,

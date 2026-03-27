@@ -130,6 +130,14 @@ If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a u
 .\.venv\Scripts\python -m pytest -q
 ```
 
+## Linting
+
+Ruff is configured in `pyproject.toml` (rules: E, W, F, I, UP, B, SIM; E501 ignored; 100-col line length; target Python 3.12). A git pre-commit hook in `.git/hooks/pre-commit` runs `ruff check` on staged files and blocks the commit on lint failure (skips gracefully if ruff is not installed).
+
+```powershell
+python -m ruff check src/ tests/
+```
+
 ## Notes for Future Changes
 
 - Tool support targets exactly four built-in tools for `/grok chat`.

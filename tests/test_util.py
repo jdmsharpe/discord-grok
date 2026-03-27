@@ -4,16 +4,16 @@ from src.util import (
     CHUNK_TEXT_SIZE,
     IMAGE_PRICING,
     MODEL_PRICING,
+    TOOL_BUILDERS,
+    TOOL_CODE_EXECUTION,
+    TOOL_COLLECTIONS_SEARCH,
     TOOL_INVOCATION_PRICING,
+    TOOL_WEB_SEARCH,
+    TOOL_X_SEARCH,
     TTS_PRICING_PER_MILLION_CHARS,
     VIDEO_PRICING_PER_SECOND,
     ChatCompletionParameters,
     Conversation,
-    TOOL_BUILDERS,
-    TOOL_CODE_EXECUTION,
-    TOOL_COLLECTIONS_SEARCH,
-    TOOL_WEB_SEARCH,
-    TOOL_X_SEARCH,
     calculate_cost,
     calculate_image_cost,
     calculate_tool_cost,
@@ -111,7 +111,7 @@ class TestFormatXAIError:
     def test_exception_with_status_code(self):
         """Exception with status_code attribute should include it."""
         error = Exception("API error")
-        setattr(error, "status_code", 429)
+        error.status_code = 429
         result = format_xai_error(error)
         assert "API error" in result
         assert "Status: 429" in result
@@ -119,14 +119,14 @@ class TestFormatXAIError:
     def test_exception_with_message_attribute(self):
         """Exception with message attribute should use it."""
         error = Exception()
-        setattr(error, "message", "Custom message")
+        error.message = "Custom message"
         result = format_xai_error(error)
         assert "Custom message" in result
 
     def test_exception_with_code_attribute(self):
         """Exception with code attribute (gRPC style) should include it."""
         error = Exception("gRPC error")
-        setattr(error, "code", 14)
+        error.code = 14
         result = format_xai_error(error)
         assert "gRPC error" in result
         assert "Status: 14" in result
@@ -236,7 +236,7 @@ class TestReasoningConstants:
     def test_reasoning_effort_models(self):
         from src.util import REASONING_EFFORT_MODELS
 
-        assert REASONING_EFFORT_MODELS == {"grok-3-mini"}
+        assert {"grok-3-mini"} == REASONING_EFFORT_MODELS
 
     def test_multi_agent_models(self):
         from src.util import MULTI_AGENT_MODELS

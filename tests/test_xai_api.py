@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from discord import Colour, Embed
 
 # conftest.py is auto-loaded by pytest but we need to import its constant
