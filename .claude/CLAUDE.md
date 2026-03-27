@@ -136,7 +136,7 @@ All tooling is configured in `pyproject.toml`:
 
 - **Ruff** lint (rules: E, W, F, I, UP, B, SIM; E501 ignored; 100-col line length; target Python 3.12) and format (double quotes).
 - **Pyright** type checking (`include: ["src"]`, `extraPaths: ["src"]`).
-- A git pre-commit hook in `.git/hooks/pre-commit` runs `ruff check` on staged files and blocks the commit on lint failure (skips gracefully if ruff is not installed).
+- A git pre-commit hook in `.githooks/pre-commit` (repo-synced) runs `ruff check` on staged files and blocks the commit on lint failure (skips gracefully if ruff is not installed). Requires `git config core.hooksPath .githooks` after cloning.
 
 ```powershell
 python -m ruff check src/ tests/

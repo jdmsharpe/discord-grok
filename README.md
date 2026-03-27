@@ -102,13 +102,19 @@ All commands are grouped under `/grok` for clean namespacing.
    pip install -r requirements.txt
    ```
 
-4. Copy the environment example file and fill in your values:
+4. Enable the repo-synced git hooks:
+
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+5. Copy the environment example file and fill in your values:
 
    ```bash
    cp .env.example .env
    ```
 
-5. Edit `.env` with your credentials:
+6. Edit `.env` with your credentials:
 
    ```ini
    BOT_TOKEN=your_discord_bot_token
