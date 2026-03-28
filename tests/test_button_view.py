@@ -6,6 +6,27 @@ from discord.ui import Select
 from src.util import TOOL_BUILDERS
 
 
+def _make_view(
+    conversation_starter=None,
+    conversation_id=None,
+    initial_tools=None,
+    get_conversation=None,
+    on_tools_changed=None,
+    on_stop=None,
+):
+    from src.button_view import ButtonView
+
+    return ButtonView(
+        conversation_starter=conversation_starter or MagicMock(),
+        conversation_id=conversation_id or 111,
+        initial_tools=initial_tools,
+        get_conversation=get_conversation or MagicMock(return_value=None),
+        on_regenerate=AsyncMock(),
+        on_stop=on_stop or AsyncMock(),
+        on_tools_changed=on_tools_changed or MagicMock(return_value=(set(), None)),
+    )
+
+
 @pytest.mark.asyncio
 class TestButtonView:
     @pytest.fixture
@@ -14,46 +35,17 @@ class TestButtonView:
         user.id = 12345
         return user
 
-    @pytest.fixture
-    def cog(self, conversation_starter):
-        cog = MagicMock()
-        cog.conversations = {}
-        cog.resolve_selected_tools = MagicMock(return_value=([], None))
-
-        conversation = MagicMock()
-        conversation.params = MagicMock()
-        conversation.params.model = "grok-4.20"
-        conversation.params.tools = []
-        conversation.params.x_search_kwargs = {"enable_image_understanding": True}
-        conversation.params.web_search_kwargs = {"allowed_domains": ["example.com"]}
-        conversation.previous_response_id = "resp_001"
-        conversation.response_id_history = ["resp_001"]
-        cog.conversations[111] = conversation
-        return cog
-
-    async def test_init_adds_tool_select(self, cog, conversation_starter):
-        from src.button_view import ButtonView
-
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=111,
-        )
+    async def test_init_adds_tool_select(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         selects = [item for item in view.children if isinstance(item, Select)]
         assert len(selects) == 1
         assert selects[0].min_values == 0
         assert selects[0].max_values == 4
 
-    async def test_init_with_initial_tools_sets_defaults(
-        self, cog, conversation_starter
-    ):
-        from src.button_view import ButtonView
-
-        view = ButtonView(
-            cog=cog,
+    async def test_init_with_initial_tools_sets_defaults(self, conversation_starter):
+        view = _make_view(
             conversation_starter=conversation_starter,
-            conversation_id=111,
             initial_tools=[
                 TOOL_BUILDERS["web_search"](),
                 TOOL_BUILDERS["code_execution"](),
@@ -68,83 +60,87 @@ class TestButtonView:
         assert defaults["collections_search"] is False
 
     @pytest.mark.asyncio
-    async def test_tool_select_callback_updates_tools(self, cog, conversation_starter):
-        from src.button_view import ButtonView
+    async def test_tool_select_callback_updates_tools(self, conversation_starter):
+        conversation = MagicMock()
+        conversation.params = MagicMock()
+        conversation.params.tools = []
 
-        view = ButtonView(
-            cog=cog,
+        active = {"web_search", "code_execution"}
+        on_tools_changed = MagicMock(return_value=(active, None))
+
+        view = _make_view(
             conversation_starter=conversation_starter,
-            conversation_id=111,
+            get_conversation=MagicMock(return_value=conversation),
+            on_tools_changed=on_tools_changed,
         )
 
-        selected_tools = [
-            TOOL_BUILDERS["web_search"](),
-            TOOL_BUILDERS["code_execution"](),
-        ]
-        cog.resolve_selected_tools.return_value = (selected_tools, None)
+        # Get real select for verifying defaults; use mock for .values
+        real_select = next(item for item in view.children if isinstance(item, Select))
+        mock_select = MagicMock()
+        mock_select.values = ["web_search", "code_execution"]
 
         interaction = MagicMock()
         interaction.user = conversation_starter
-        interaction.data = {"values": ["web_search", "code_execution"]}
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
+        interaction.response.is_done = MagicMock(return_value=False)
 
-        await view.tool_select_callback(interaction)
+        await view.tool_select_callback(interaction, mock_select)
 
-        conversation = cog.conversations[111]
-        assert conversation.params.tools == selected_tools
-        cog.resolve_selected_tools.assert_called_once_with(
-            ["web_search", "code_execution"],
-            x_search_kwargs={"enable_image_understanding": True},
-            web_search_kwargs={"allowed_domains": ["example.com"]},
+        on_tools_changed.assert_called_once_with(
+            ["web_search", "code_execution"], conversation
         )
 
         call_args = interaction.response.send_message.call_args
         assert "Tools updated" in call_args.args[0]
         assert call_args.kwargs["ephemeral"] is True
 
-    @pytest.mark.asyncio
-    async def test_tool_select_callback_rejects_non_owner(self, cog, conversation_starter):
-        from src.button_view import ButtonView
+        # Verify Select defaults were updated on the real widget
+        defaults = {option.value: option.default for option in real_select.options}
+        assert defaults["web_search"] is True
+        assert defaults["code_execution"] is True
+        assert defaults["x_search"] is False
 
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=111,
-        )
+    @pytest.mark.asyncio
+    async def test_tool_select_callback_rejects_non_owner(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
+        mock_select = MagicMock()
+        mock_select.values = []
 
         interaction = MagicMock()
         interaction.user = MagicMock()
-        interaction.data = {"values": ["web_search"]}
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
 
-        await view.tool_select_callback(interaction)
+        await view.tool_select_callback(interaction, mock_select)
 
         interaction.response.send_message.assert_called_once()
         assert "not allowed" in interaction.response.send_message.call_args.args[0]
 
     @pytest.mark.asyncio
     async def test_tool_select_callback_shows_resolution_error(
-        self, cog, conversation_starter
+        self, conversation_starter
     ):
-        from src.button_view import ButtonView
-
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=111,
+        conversation = MagicMock()
+        on_tools_changed = MagicMock(
+            return_value=(set(), "Collections config missing")
         )
 
-        cog.resolve_selected_tools.return_value = ([], "Collections config missing")
+        view = _make_view(
+            conversation_starter=conversation_starter,
+            get_conversation=MagicMock(return_value=conversation),
+            on_tools_changed=on_tools_changed,
+        )
+
+        mock_select = MagicMock()
+        mock_select.values = ["collections_search"]
 
         interaction = MagicMock()
         interaction.user = conversation_starter
-        interaction.data = {"values": ["collections_search"]}
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
 
-        await view.tool_select_callback(interaction)
+        await view.tool_select_callback(interaction, mock_select)
 
         interaction.response.send_message.assert_called_once()
         assert (
@@ -153,42 +149,35 @@ class TestButtonView:
         )
 
     @pytest.mark.asyncio
-    async def test_stop_button_calls_end_conversation(self, cog, conversation_starter):
-        """Stop button should call end_conversation to clean up files."""
-        from src.button_view import ButtonView
+    async def test_stop_button_calls_on_stop(self, conversation_starter):
+        conversation = MagicMock()
+        on_stop = AsyncMock()
 
-        cog.end_conversation = AsyncMock()
-
-        view = ButtonView(
-            cog=cog,
+        view = _make_view(
             conversation_starter=conversation_starter,
             conversation_id=111,
+            get_conversation=MagicMock(return_value=conversation),
+            on_stop=on_stop,
         )
 
         interaction = MagicMock()
         interaction.user = conversation_starter
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
+        interaction.response.is_done = MagicMock(return_value=False)
 
         await view.stop_button.callback(interaction)
 
-        cog.end_conversation.assert_awaited_once_with(111)
+        on_stop.assert_awaited_once_with(111)
         call_args = interaction.response.send_message.call_args
         assert "Conversation ended" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_stop_button_rejects_non_owner(self, cog, conversation_starter):
-        """Stop button should reject non-owners."""
-        from src.button_view import ButtonView
-
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=111,
-        )
+    async def test_stop_button_rejects_non_owner(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         interaction = MagicMock()
-        interaction.user = MagicMock()  # Different user
+        interaction.user = MagicMock()
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
 
@@ -198,16 +187,8 @@ class TestButtonView:
         assert "not allowed" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_stop_button_no_conversation(self, cog, conversation_starter):
-        """Stop button with missing conversation should handle gracefully."""
-        from src.button_view import ButtonView
-
-        cog.conversations.clear()
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=999,  # Not in conversations
-        )
+    async def test_stop_button_no_conversation(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         interaction = MagicMock()
         interaction.user = conversation_starter
@@ -220,23 +201,21 @@ class TestButtonView:
         assert "No active conversation" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_play_pause_toggles(self, cog, conversation_starter):
-        """Play/pause button should toggle the paused state."""
-        from src.button_view import ButtonView
+    async def test_play_pause_toggles(self, conversation_starter):
+        conversation = MagicMock()
+        conversation.params = MagicMock()
+        conversation.params.paused = False
 
-        view = ButtonView(
-            cog=cog,
+        view = _make_view(
             conversation_starter=conversation_starter,
-            conversation_id=111,
+            get_conversation=MagicMock(return_value=conversation),
         )
 
         interaction = MagicMock()
         interaction.user = conversation_starter
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
-
-        conversation = cog.conversations[111]
-        conversation.params.paused = False
+        interaction.response.is_done = MagicMock(return_value=False)
 
         await view.play_pause_button.callback(interaction)
         assert conversation.params.paused is True
@@ -248,15 +227,8 @@ class TestButtonView:
         assert "resumed" in interaction.response.send_message.call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_play_pause_rejects_non_owner(self, cog, conversation_starter):
-        """Play/pause button should reject non-owners."""
-        from src.button_view import ButtonView
-
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=111,
-        )
+    async def test_play_pause_rejects_non_owner(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         interaction = MagicMock()
         interaction.user = MagicMock()
@@ -269,16 +241,8 @@ class TestButtonView:
         assert "not allowed" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_play_pause_no_conversation(self, cog, conversation_starter):
-        """Play/pause with missing conversation should handle gracefully."""
-        from src.button_view import ButtonView
-
-        cog.conversations.clear()
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=999,
-        )
+    async def test_play_pause_no_conversation(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         interaction = MagicMock()
         interaction.user = conversation_starter
@@ -291,15 +255,8 @@ class TestButtonView:
         assert "No active conversation" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_regenerate_rejects_non_owner(self, cog, conversation_starter):
-        """Regenerate button should reject non-owners."""
-        from src.button_view import ButtonView
-
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=111,
-        )
+    async def test_regenerate_rejects_non_owner(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         interaction = MagicMock()
         interaction.user = MagicMock()
@@ -312,16 +269,8 @@ class TestButtonView:
         assert "not allowed" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_regenerate_no_conversation(self, cog, conversation_starter):
-        """Regenerate with missing conversation should handle gracefully."""
-        from src.button_view import ButtonView
-
-        cog.conversations.clear()
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=999,
-        )
+    async def test_regenerate_no_conversation(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
 
         interaction = MagicMock()
         interaction.user = conversation_starter
@@ -334,16 +283,13 @@ class TestButtonView:
         assert "No active conversation" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_regenerate_no_history(self, cog, conversation_starter):
-        """Regenerate with empty history should say 'not enough history'."""
-        from src.button_view import ButtonView
+    async def test_regenerate_no_history(self, conversation_starter):
+        conversation = MagicMock()
+        conversation.response_id_history = []
 
-        cog.conversations[111].response_id_history = []
-
-        view = ButtonView(
-            cog=cog,
+        view = _make_view(
             conversation_starter=conversation_starter,
-            conversation_id=111,
+            get_conversation=MagicMock(return_value=conversation),
         )
 
         interaction = MagicMock()
@@ -360,24 +306,17 @@ class TestButtonView:
         assert "Not enough history" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_tool_select_no_conversation(self, cog, conversation_starter):
-        """Tool select with missing conversation should handle gracefully."""
-        from src.button_view import ButtonView
-
-        cog.conversations.clear()
-        view = ButtonView(
-            cog=cog,
-            conversation_starter=conversation_starter,
-            conversation_id=999,
-        )
+    async def test_tool_select_no_conversation(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
+        mock_select = MagicMock()
+        mock_select.values = []
 
         interaction = MagicMock()
         interaction.user = conversation_starter
-        interaction.data = {"values": ["web_search"]}
         interaction.response = MagicMock()
         interaction.response.send_message = AsyncMock()
 
-        await view.tool_select_callback(interaction)
+        await view.tool_select_callback(interaction, mock_select)
 
         call_args = interaction.response.send_message.call_args
         assert "No active conversation" in call_args.args[0]
