@@ -51,6 +51,7 @@ from util import (
     chunk_text,
     format_xai_error,
     resolve_selected_tools,
+    resolve_tool_name,
     truncate_text,
 )
 
@@ -562,6 +563,26 @@ class xAIAPI(commands.Cog):
                     "Failed to delete xAI file %s: %s", file_id, error
                 )
         conversation.file_ids.clear()
+
+    def _resolve_tools_for_view(
+        self, selected_values: list[str], conversation
+    ) -> tuple[set[str], str | None]:
+        """Resolve tool selection from ButtonView. Returns (active_names, error_msg)."""
+        tools, error_message = self.resolve_selected_tools(
+            selected_values,
+            x_search_kwargs=conversation.params.x_search_kwargs,
+            web_search_kwargs=conversation.params.web_search_kwargs,
+        )
+        if error_message:
+            return set(), error_message
+
+        conversation.params.tools = tools
+        active_names = {
+            tool_name
+            for tool in tools
+            if (tool_name := resolve_tool_name(tool)) is not None
+        }
+        return active_names, None
 
     async def end_conversation(self, conversation_id: int) -> None:
         """End a conversation and clean up associated resources."""
@@ -1375,10 +1396,13 @@ class xAIAPI(commands.Cog):
             await self._strip_previous_view(ctx.author)
 
             view = ButtonView(
-                cog=self,
                 conversation_starter=ctx.author,
                 conversation_id=main_conversation_id,
                 initial_tools=tools,
+                get_conversation=lambda cid: self.conversations.get(cid),
+                on_regenerate=self.handle_new_message_in_conversation,
+                on_stop=self.end_conversation,
+                on_tools_changed=self._resolve_tools_for_view,
             )
             self.views[ctx.author] = view
 
