@@ -76,7 +76,7 @@ All commands are grouped under `/grok` for clean namespacing.
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.13+
 - Discord Bot Token
 - xAI API Key (get one at [xAI Console](https://console.x.ai/))
 
