@@ -1,6 +1,6 @@
 import pytest
 
-from src.util import (
+from util import (
     CHUNK_TEXT_SIZE,
     IMAGE_PRICING,
     MODEL_PRICING,
@@ -196,7 +196,7 @@ class TestModelLists:
 
     def test_grok_models_contains_new_4_20_models(self):
         """GROK_MODELS should include all grok-4.20 GA models."""
-        from src.util import GROK_MODELS
+        from util import GROK_MODELS
 
         assert "grok-4.20-multi-agent" in GROK_MODELS
         assert "grok-4.20" in GROK_MODELS
@@ -204,14 +204,14 @@ class TestModelLists:
 
     def test_grok_models_no_deprecated(self):
         """GROK_MODELS should not contain deprecated grok-2 models."""
-        from src.util import GROK_MODELS
+        from util import GROK_MODELS
 
         for model in GROK_MODELS:
             assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
 
     def test_grok_image_models_no_deprecated(self):
         """GROK_IMAGE_MODELS should not contain deprecated grok-2 models."""
-        from src.util import GROK_IMAGE_MODELS
+        from util import GROK_IMAGE_MODELS
 
         for model in GROK_IMAGE_MODELS:
             assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
@@ -221,25 +221,25 @@ class TestReasoningConstants:
     """Tests for reasoning model constants."""
 
     def test_penalty_supported_models_are_non_reasoning(self):
-        from src.util import PENALTY_SUPPORTED_MODELS
+        from util import PENALTY_SUPPORTED_MODELS
 
         for model in PENALTY_SUPPORTED_MODELS:
             assert "non-reasoning" in model
 
     def test_reasoning_models_excluded_from_penalty_support(self):
-        from src.util import PENALTY_SUPPORTED_MODELS
+        from util import PENALTY_SUPPORTED_MODELS
 
         assert "grok-3-mini" not in PENALTY_SUPPORTED_MODELS
         assert "grok-3" not in PENALTY_SUPPORTED_MODELS
         assert "grok-4-0709" not in PENALTY_SUPPORTED_MODELS
 
     def test_reasoning_effort_models(self):
-        from src.util import REASONING_EFFORT_MODELS
+        from util import REASONING_EFFORT_MODELS
 
         assert {"grok-3-mini"} == REASONING_EFFORT_MODELS
 
     def test_multi_agent_models(self):
-        from src.util import MULTI_AGENT_MODELS
+        from util import MULTI_AGENT_MODELS
 
         assert "grok-4.20-multi-agent" in MULTI_AGENT_MODELS
         for model in MULTI_AGENT_MODELS:
@@ -250,12 +250,12 @@ class TestTTSConstants:
     """Tests for TTS-related constants."""
 
     def test_tts_voices_contains_all_voices(self):
-        from src.util import TTS_VOICES
+        from util import TTS_VOICES
 
         assert TTS_VOICES == ["eve", "ara", "rex", "sal", "leo"]
 
     def test_tts_voices_has_five_entries(self):
-        from src.util import TTS_VOICES
+        from util import TTS_VOICES
 
         assert len(TTS_VOICES) == 5
 
@@ -285,14 +285,14 @@ class TestPricing:
 
     def test_model_pricing_covers_all_grok_models(self):
         """Every model in GROK_MODELS should have a pricing entry."""
-        from src.util import GROK_MODELS
+        from util import GROK_MODELS
 
         for model in GROK_MODELS:
             assert model in MODEL_PRICING, f"Missing pricing for {model}"
 
     def test_image_pricing_covers_all_image_models(self):
         """Every model in GROK_IMAGE_MODELS should have a pricing entry."""
-        from src.util import GROK_IMAGE_MODELS
+        from util import GROK_IMAGE_MODELS
 
         for model in GROK_IMAGE_MODELS:
             assert model in IMAGE_PRICING, f"Missing pricing for {model}"

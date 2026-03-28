@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from discord.ui import Select
 
-from src.util import TOOL_BUILDERS
+from util import TOOL_BUILDERS
 
 
 def _make_view(
@@ -14,7 +14,7 @@ def _make_view(
     on_tools_changed=None,
     on_stop=None,
 ):
-    from src.button_view import ButtonView
+    from button_view import ButtonView
 
     return ButtonView(
         conversation_starter=conversation_starter or MagicMock(),
@@ -27,7 +27,6 @@ def _make_view(
     )
 
 
-@pytest.mark.asyncio
 class TestButtonView:
     @pytest.fixture
     def conversation_starter(self):
@@ -59,7 +58,6 @@ class TestButtonView:
         assert defaults["x_search"] is False
         assert defaults["collections_search"] is False
 
-    @pytest.mark.asyncio
     async def test_tool_select_callback_updates_tools(self, conversation_starter):
         conversation = MagicMock()
         conversation.params = MagicMock()
@@ -101,7 +99,6 @@ class TestButtonView:
         assert defaults["code_execution"] is True
         assert defaults["x_search"] is False
 
-    @pytest.mark.asyncio
     async def test_tool_select_callback_rejects_non_owner(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
         mock_select = MagicMock()
@@ -117,7 +114,6 @@ class TestButtonView:
         interaction.response.send_message.assert_called_once()
         assert "not allowed" in interaction.response.send_message.call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_tool_select_callback_shows_resolution_error(
         self, conversation_starter
     ):
@@ -148,7 +144,6 @@ class TestButtonView:
             in interaction.response.send_message.call_args.args[0]
         )
 
-    @pytest.mark.asyncio
     async def test_stop_button_calls_on_stop(self, conversation_starter):
         conversation = MagicMock()
         on_stop = AsyncMock()
@@ -172,7 +167,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "Conversation ended" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_stop_button_rejects_non_owner(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
 
@@ -186,7 +180,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "not allowed" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_stop_button_no_conversation(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
 
@@ -200,7 +193,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "No active conversation" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_play_pause_toggles(self, conversation_starter):
         conversation = MagicMock()
         conversation.params = MagicMock()
@@ -226,7 +218,6 @@ class TestButtonView:
         assert conversation.params.paused is False
         assert "resumed" in interaction.response.send_message.call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_play_pause_rejects_non_owner(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
 
@@ -240,7 +231,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "not allowed" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_play_pause_no_conversation(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
 
@@ -254,7 +244,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "No active conversation" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_regenerate_rejects_non_owner(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
 
@@ -268,7 +257,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "not allowed" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_regenerate_no_conversation(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
 
@@ -282,7 +270,6 @@ class TestButtonView:
         call_args = interaction.response.send_message.call_args
         assert "No active conversation" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_regenerate_no_history(self, conversation_starter):
         conversation = MagicMock()
         conversation.response_id_history = []
@@ -305,7 +292,6 @@ class TestButtonView:
         call_args = interaction.followup.send.call_args
         assert "Not enough history" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_tool_select_no_conversation(self, conversation_starter):
         view = _make_view(conversation_starter=conversation_starter)
         mock_select = MagicMock()

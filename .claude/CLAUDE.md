@@ -124,7 +124,12 @@ Current parameter count: 6
 
 If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a user-facing error.
 
-## Test Commands
+## Testing
+
+- `pytest` from project root — pytest-native with `asyncio_mode = "auto"` (no `@pytest.mark.asyncio` needed)
+- `pythonpath = ["src", "tests"]` configured in `pyproject.toml` — use direct imports (`from util import ...`), no `sys.path` hacks
+- Mocked Discord/xAI clients, no real API calls
+- `conftest.py` provides shared fixtures (mock_bot, mock_xai_client, mock_discord_context, etc.)
 
 ```powershell
 .\.venv\Scripts\python -m pytest -q
