@@ -76,7 +76,7 @@ All commands are grouped under `/grok` for clean namespacing.
 
 ### Prerequisites
 
-- Python 3.13+
+- Python 3.10+
 - Discord Bot Token
 - xAI API Key (get one at [xAI Console](https://console.x.ai/))
 
@@ -160,7 +160,7 @@ docker-compose up -d
 - aiohttp ~3.13
 - py-cord ~2.7
 - python-dotenv ~1.2
-- xai-sdk ~1.10
+- xai-sdk ~1.11
 
 ## Development
 
@@ -168,13 +168,14 @@ docker-compose up -d
 
 Tests use pytest with pytest-asyncio (`asyncio_mode = "auto"`). All tests are mocked — no real API calls.
 
+GitHub Actions runs the test suite against Python 3.10, 3.11, 3.12, and 3.13.
+
 ```bash
 # Run tests
-.venv/Scripts/python.exe -m pytest -q    # Windows
-.venv/bin/python -m pytest -q            # Unix
+python -m pytest -q
 
 # Run tests in Docker
-docker build -f Dockerfile.test -t discord-grok-test . && docker run --rm discord-grok-test
+docker build --build-arg PYTHON_VERSION=3.13 -f Dockerfile.test -t discord-grok-test . && docker run --rm discord-grok-test
 ```
 
 ### Linting & Type Checking

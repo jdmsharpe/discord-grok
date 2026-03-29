@@ -17,7 +17,7 @@ Four optional tools in `/grok chat`:
 
 ```text
 discord-grok/
-├── .github/workflows/main.yml   # CI workflow (pytest)
+├── .github/workflows/main.yml   # CI workflow (pytest matrix, Docker smoke test, release image)
 ├── src/
 │   ├── bot.py                   # Main bot entry point
 │   ├── xai_api.py               # xAI Discord cog (`/grok` commands)
@@ -126,20 +126,24 @@ If `collections_search=true` and `XAI_COLLECTION_IDS` is empty, chat returns a u
 
 ## Testing
 
+- Supported Python versions: 3.10, 3.11, 3.12, 3.13
+- GitHub Actions runs `pytest` across a Python version matrix (3.10-3.13)
+- `Dockerfile` and `Dockerfile.test` accept `PYTHON_VERSION` build args (default `3.13`)
 - `pytest` from project root — pytest-native with `asyncio_mode = "auto"` (no `@pytest.mark.asyncio` needed)
 - `pythonpath = ["src", "tests"]` configured in `pyproject.toml` — use direct imports (`from util import ...`), no `sys.path` hacks
 - Mocked Discord/xAI clients, no real API calls
 - `conftest.py` provides shared fixtures (mock_bot, mock_xai_client, mock_discord_context, etc.)
 
-```powershell
-.\.venv\Scripts\python -m pytest -q
+```bash
+python -m pytest -q
+docker build --build-arg PYTHON_VERSION=3.13 -f Dockerfile.test -t discord-grok-test . && docker run --rm discord-grok-test
 ```
 
 ## Linting & Type Checking
 
 All tooling is configured in `pyproject.toml`:
 
-- **Ruff** lint (rules: E, W, F, I, UP, B, SIM; E501 ignored; 100-col line length; target Python 3.13) and format (double quotes).
+- **Ruff** lint (rules: E, W, F, I, UP, B, SIM; E501 ignored; 100-col line length; target Python 3.10) and format (double quotes).
 - **Pyright** type checking (`include: ["src"]`, `extraPaths: ["src"]`).
 - A git pre-commit hook in `.githooks/pre-commit` (repo-synced) runs `ruff check` on staged files and blocks the commit on lint failure (skips gracefully if ruff is not installed). Requires `git config core.hooksPath .githooks` after cloning.
 
