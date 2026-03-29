@@ -1,4 +1,4 @@
-name: Docker CI
+name: CI
 
 on:
   push:
@@ -7,7 +7,62 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  test:
+    name: Pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest -q
+
+  docker-smoke-test:
+    name: Docker smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build test image
+        uses: docker/build-push-action@v7
+        with:
+          push: false
+          load: true
+          context: .
+          file: ./Dockerfile.test
+          tags: discord-grok-test:latest
+          build-args: |
+            PYTHON_VERSION=3.13
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Docker container to execute tests
+        run: docker run --rm discord-grok-test:latest
+
+  release-image:
+    name: Build and push release image
+    if: github.event_name == 'push'
+    needs: [test, docker-smoke-test]
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -22,45 +77,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Cache Docker layers
-        uses: actions/cache@v5
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Build and push release image
-        if: github.event_name == 'push'
         uses: docker/build-push-action@v7
         with:
           push: true
           context: .
           file: ./Dockerfile
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/discord-grok:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-        env:
-          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-
-      - name: Build test image
-        uses: docker/build-push-action@v7
-        with:
-          push: false
-          load: true
-          context: .
-          file: ./Dockerfile.test
-          tags: discord-grok-test:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-      - name: Run Docker container to execute tests
-        run: docker run discord-grok-test:latest
-        env:
-          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-
-      # Avoid unbounded cache growth
-      - name: Rotate cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          build-args: |
+            PYTHON_VERSION=3.13
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
