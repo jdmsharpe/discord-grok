@@ -2,6 +2,7 @@
 
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fjdmsharpe%2Fdiscord-grok%2F&label=discord-grok&icon=github&color=%23198754&message=&style=flat&tz=UTC)
 [![CI](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml/badge.svg)](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 
 A Discord bot built on [Pycord 2.0](https://github.com/Pycord-Development/pycord) that integrates xAI's Grok APIs. Chat uses the [xAI Responses API](https://docs.x.ai/docs/guides/responses-api) directly via aiohttp for stateful multi-turn conversations with automatic billing optimization. Image, video, and file operations use the official [xAI SDK](https://github.com/xai-org/sdk-python). It provides conversational AI, image generation, video generation, and text-to-speech accessible through Discord slash commands.
 
