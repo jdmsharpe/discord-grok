@@ -5,15 +5,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
-from conftest import MOCK_RESPONSES_API_RESPONSE
 from discord import Colour, Embed
+
+from tests.fixtures import MOCK_RESPONSES_API_RESPONSE
 
 
 class TestAppendPricingEmbed:
     """Tests for the append_pricing_embed helper."""
 
     def test_append_pricing_embed(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50)
@@ -25,7 +26,7 @@ class TestAppendPricingEmbed:
         assert embeds[0].colour == Colour(0)
 
     def test_append_pricing_embed_with_reasoning_tokens(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=200)
@@ -33,28 +34,28 @@ class TestAppendPricingEmbed:
         assert "200 reasoning" in embeds[0].description
 
     def test_append_pricing_embed_hides_zero_reasoning_tokens(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=0)
         assert "reasoning" not in embeds[0].description
 
     def test_append_pricing_embed_with_cached_tokens(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=300)
         assert "300 cached" in embeds[0].description
 
     def test_append_pricing_embed_with_image_tokens(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, image_tokens=200)
         assert "200 image" in embeds[0].description
 
     def test_append_pricing_embed_hides_zero_cached_and_image_tokens(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=0, image_tokens=0)
@@ -62,7 +63,7 @@ class TestAppendPricingEmbed:
         assert "image" not in embeds[0].description
 
     def test_append_pricing_embed_with_tool_usage(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         tool_usage = {"SERVER_SIDE_TOOL_WEB_SEARCH": 3, "SERVER_SIDE_TOOL_X_SEARCH": 2}
@@ -75,14 +76,14 @@ class TestAppendPricingEmbed:
         assert "tool cost" in desc
 
     def test_append_pricing_embed_no_tool_usage_line(self):
-        from xai_api import append_pricing_embed
+        from discord_grok.cogs.grok.cog import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage={})
         assert "\n" not in embeds[0].description
 
     def test_append_generation_pricing_embed(self):
-        from xai_api import append_generation_pricing_embed
+        from discord_grok.cogs.grok.cog import append_generation_pricing_embed
 
         embeds: list[Embed] = []
         append_generation_pricing_embed(embeds, 0.07, 2.50)
@@ -97,7 +98,7 @@ class TestTrackDailyCost:
     @pytest.fixture
     def cog(self, mock_bot):
         with patch("xai_sdk.AsyncClient"):
-            from xai_api import xAIAPI
+            from discord_grok.cogs.grok.cog import xAIAPI
 
             cog = xAIAPI(bot=mock_bot)
             return cog
@@ -119,7 +120,7 @@ class TestExtractToolInfo:
 
     def test_annotations_deduplicates_and_classifies_citations(self):
         """URL citations in annotations should be deduplicated and classified."""
-        from xai_api import extract_tool_info
+        from discord_grok.cogs.grok.cog import extract_tool_info
 
         response_json = {
             "output": [
@@ -133,7 +134,10 @@ class TestExtractToolInfo:
                                 {"type": "url_citation", "url": "https://x.ai/news"},
                                 {"type": "url_citation", "url": "https://x.ai/news"},
                                 {"type": "url_citation", "url": "https://x.com/i/status/123"},
-                                {"type": "url_citation", "url": "collections://collection_1/files/file_1"},
+                                {
+                                    "type": "url_citation",
+                                    "url": "collections://collection_1/files/file_1",
+                                },
                             ],
                         }
                     ],
@@ -151,7 +155,7 @@ class TestExtractToolInfo:
 
     def test_annotations_web_and_x(self):
         """Mixed web and X citations should be classified correctly."""
-        from xai_api import extract_tool_info
+        from discord_grok.cogs.grok.cog import extract_tool_info
 
         response_json = {
             "output": [
@@ -180,14 +184,14 @@ class TestExtractToolInfo:
 
     def test_empty_output(self):
         """Empty output should return no citations."""
-        from xai_api import extract_tool_info
+        from discord_grok.cogs.grok.cog import extract_tool_info
 
         result = extract_tool_info({"output": []})
         assert result["citations"] == []
 
     def test_no_annotations(self):
         """Output without annotations should return no citations."""
-        from xai_api import extract_tool_info
+        from discord_grok.cogs.grok.cog import extract_tool_info
 
         response_json = {
             "output": [
@@ -206,7 +210,7 @@ class TestAppendReasoningEmbeds:
 
     def test_no_reasoning(self):
         """Empty reasoning text should not add an embed."""
-        from xai_api import append_reasoning_embeds
+        from discord_grok.cogs.grok.cog import append_reasoning_embeds
 
         embeds = []
         append_reasoning_embeds(embeds, "")
@@ -214,7 +218,7 @@ class TestAppendReasoningEmbeds:
 
     def test_with_reasoning(self):
         """Reasoning text should be wrapped in spoiler tags."""
-        from xai_api import append_reasoning_embeds
+        from discord_grok.cogs.grok.cog import append_reasoning_embeds
 
         embeds = []
         append_reasoning_embeds(embeds, "Some reasoning here")
@@ -224,7 +228,7 @@ class TestAppendReasoningEmbeds:
 
     def test_long_reasoning_truncated(self):
         """Long reasoning text should be truncated."""
-        from xai_api import append_reasoning_embeds
+        from discord_grok.cogs.grok.cog import append_reasoning_embeds
 
         embeds = []
         long_text = "a" * 4000
@@ -239,7 +243,7 @@ class TestAppendResponseEmbeds:
 
     def test_short_response(self):
         """Short response should create a single embed."""
-        from xai_api import append_response_embeds
+        from discord_grok.cogs.grok.cog import append_response_embeds
 
         embeds = []
         append_response_embeds(embeds, "Hello!")
@@ -249,7 +253,7 @@ class TestAppendResponseEmbeds:
 
     def test_long_response_chunked(self):
         """Long response should be split into multiple embeds."""
-        from xai_api import append_response_embeds
+        from discord_grok.cogs.grok.cog import append_response_embeds
 
         embeds = []
         long_text = "a" * 7500
@@ -260,7 +264,7 @@ class TestAppendResponseEmbeds:
 
     def test_very_long_response_truncated(self):
         """Very long response should be truncated before chunking."""
-        from xai_api import append_response_embeds
+        from discord_grok.cogs.grok.cog import append_response_embeds
 
         embeds = []
         very_long_text = "a" * 25000
@@ -272,7 +276,7 @@ class TestAppendResponseEmbeds:
 def _make_cog(mock_bot, mock_api_response=None):
     """Helper to create a cog with _call_responses_api mocked."""
     with patch("xai_sdk.AsyncClient"):
-        from xai_api import xAIAPI
+        from discord_grok.cogs.grok.cog import xAIAPI
 
         cog = xAIAPI(bot=mock_bot)
 
@@ -290,12 +294,8 @@ def _make_http_response(
     response = MagicMock()
     response.status = status
     response.headers = headers or {}
-    response.read = AsyncMock(
-        return_value=body if isinstance(body, bytes) else body.encode()
-    )
-    response.text = AsyncMock(
-        return_value=body.decode() if isinstance(body, bytes) else body
-    )
+    response.read = AsyncMock(return_value=body if isinstance(body, bytes) else body.encode())
+    response.text = AsyncMock(return_value=body.decode() if isinstance(body, bytes) else body)
     return response
 
 
@@ -363,10 +363,7 @@ class TestXAIAPICog:
         assert cog._call_responses_api.call_args.kwargs["grok_conv_id"] == conversation.grok_conv_id
         assert conversation.grok_conv_id is not None
         assert str(UUID(conversation.grok_conv_id)) == conversation.grok_conv_id
-        assert any(
-            msg.get("role") == "user"
-            for msg in payload["input"]
-        )
+        assert any(msg.get("role") == "user" for msg in payload["input"])
 
     async def test_chat_stores_response_id(self, cog, mock_discord_context):
         """Chat should store the response ID for multi-turn."""
@@ -391,7 +388,7 @@ class TestXAIAPICog:
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
 
-        with patch("xai_api.XAI_COLLECTION_IDS", ["collection_123"]):
+        with patch("discord_grok.cogs.grok.cog.XAI_COLLECTION_IDS", ["collection_123"]):
             await cog.chat.callback(
                 cog,
                 ctx=mock_discord_context,
@@ -416,11 +413,9 @@ class TestXAIAPICog:
         # Tools should trigger encrypted content include
         assert "reasoning.encrypted_content" in payload.get("include", [])
 
-    async def test_chat_prevents_duplicate_conversations(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_prevents_duplicate_conversations(self, cog, mock_discord_context):
         """Test that users can't start multiple conversations in the same channel."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         existing_params = ChatCompletionParameters(
             model="grok-3",
@@ -441,14 +436,14 @@ class TestXAIAPICog:
         assert "already have an active conversation" in call_kwargs["embed"].description
 
     async def test_resolve_selected_tools_collections_requires_ids(self, cog):
-        with patch("xai_api.XAI_COLLECTION_IDS", []):
+        with patch("discord_grok.cogs.grok.cog.XAI_COLLECTION_IDS", []):
             tools, error = cog.resolve_selected_tools(["collections_search"])
 
         assert tools == []
         assert "XAI_COLLECTION_IDS" in error
 
     async def test_resolve_selected_tools_success(self, cog):
-        with patch("xai_api.XAI_COLLECTION_IDS", ["collection_abc"]):
+        with patch("discord_grok.cogs.grok.cog.XAI_COLLECTION_IDS", ["collection_abc"]):
             tools, error = cog.resolve_selected_tools(
                 ["web_search", "x_search", "code_execution", "collections_search"]
             )
@@ -469,9 +464,7 @@ class TestXAIAPICog:
             "enable_image_understanding": True,
             "allowed_x_handles": ["elonmusk"],
         }
-        tools, error = cog.resolve_selected_tools(
-            ["x_search"], x_search_kwargs=x_search_kw
-        )
+        tools, error = cog.resolve_selected_tools(["x_search"], x_search_kwargs=x_search_kw)
 
         assert error is None
         assert len(tools) == 1
@@ -493,9 +486,7 @@ class TestXAIAPICog:
             "enable_image_understanding": True,
             "allowed_domains": ["example.com"],
         }
-        tools, error = cog.resolve_selected_tools(
-            ["web_search"], web_search_kwargs=web_search_kw
-        )
+        tools, error = cog.resolve_selected_tools(["web_search"], web_search_kwargs=web_search_kw)
 
         assert error is None
         assert len(tools) == 1
@@ -517,9 +508,7 @@ class TestXAIAPICog:
             "from_date": "2024-01-01T00:00:00",
             "to_date": "2024-12-31T00:00:00",
         }
-        tools, error = cog.resolve_selected_tools(
-            ["x_search"], x_search_kwargs=x_search_kw
-        )
+        tools, error = cog.resolve_selected_tools(["x_search"], x_search_kwargs=x_search_kw)
 
         assert error is None
         assert tools[0]["from_date"] == "2024-01-01T00:00:00"
@@ -560,9 +549,7 @@ class TestXAIAPICog:
         assert "frequency_penalty" in call_kwargs["embed"].description
         assert "not supported" in call_kwargs["embed"].description
 
-    async def test_chat_rejects_both_penalties_on_reasoning_model(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_rejects_both_penalties_on_reasoning_model(self, cog, mock_discord_context):
         """Both penalties set on a reasoning model should be rejected."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -581,9 +568,7 @@ class TestXAIAPICog:
         assert "frequency_penalty" in call_kwargs["embed"].description
         assert "presence_penalty" in call_kwargs["embed"].description
 
-    async def test_chat_allows_penalty_on_non_reasoning_model(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_allows_penalty_on_non_reasoning_model(self, cog, mock_discord_context):
         """Penalty params should be allowed for non-reasoning models."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -638,9 +623,7 @@ class TestXAIAPICog:
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["reasoning_effort"] == "high"
 
-    async def test_chat_rejects_max_tokens_on_multi_agent(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_rejects_max_tokens_on_multi_agent(self, cog, mock_discord_context):
         """max_tokens should be rejected for multi-agent models."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -658,9 +641,7 @@ class TestXAIAPICog:
         assert "max_tokens" in call_kwargs["embed"].description
         assert "not supported" in call_kwargs["embed"].description
 
-    async def test_chat_rejects_agent_count_on_non_multi_agent(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_rejects_agent_count_on_non_multi_agent(self, cog, mock_discord_context):
         """agent_count should be rejected for non-multi-agent models."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -678,9 +659,7 @@ class TestXAIAPICog:
         assert "agent_count" in call_kwargs["embed"].description
         assert "multi-agent" in call_kwargs["embed"].description
 
-    async def test_chat_passes_agent_count_for_multi_agent(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_passes_agent_count_for_multi_agent(self, cog, mock_discord_context):
         """agent_count should be passed to the API for multi-agent models."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -698,9 +677,7 @@ class TestXAIAPICog:
         assert payload["agent_count"] == 16
         assert "reasoning.encrypted_content" in payload["include"]
 
-    async def test_chat_multi_agent_sets_encrypted_content(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_multi_agent_sets_encrypted_content(self, cog, mock_discord_context):
         """Multi-agent model should always set include with encrypted content."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -717,9 +694,7 @@ class TestXAIAPICog:
         assert "reasoning.encrypted_content" in payload["include"]
         assert "agent_count" not in payload
 
-    async def test_chat_tools_set_encrypted_content(
-        self, cog, mock_discord_context
-    ):
+    async def test_chat_tools_set_encrypted_content(self, cog, mock_discord_context):
         """Tool-using conversations should include encrypted content."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -738,30 +713,22 @@ class TestXAIAPICog:
 
     def test_chat_model_choices_match_grok_models(self, cog):
         """Chat command model choices should match GROK_MODELS."""
-        from util import GROK_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_MODELS
 
         # Extract choice values from the chat command's model option
-        chat_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "chat"
-        )
+        chat_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "chat")
 
-        model_option = next(
-            opt for opt in chat_cmd.options if opt.name == "model"
-        )
+        model_option = next(opt for opt in chat_cmd.options if opt.name == "model")
         choice_values = sorted(c.value for c in model_option.choices)
         assert choice_values == sorted(GROK_MODELS)
 
     def test_image_model_choices_match_grok_image_models(self, cog):
         """Image command model choices should match GROK_IMAGE_MODELS."""
-        from util import GROK_IMAGE_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_IMAGE_MODELS
 
-        image_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
-        )
+        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
 
-        model_option = next(
-            opt for opt in image_cmd.options if opt.name == "model"
-        )
+        model_option = next(opt for opt in image_cmd.options if opt.name == "model")
         choice_values = sorted(c.value for c in model_option.choices)
         assert choice_values == sorted(GROK_IMAGE_MODELS)
 
@@ -769,12 +736,8 @@ class TestXAIAPICog:
         """Image command aspect ratios should match xai-sdk ImageAspectRatio."""
         from xai_sdk.image import ImageAspectRatio
 
-        image_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
-        )
-        ar_option = next(
-            opt for opt in image_cmd.options if opt.name == "aspect_ratio"
-        )
+        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        ar_option = next(opt for opt in image_cmd.options if opt.name == "aspect_ratio")
         choice_values = sorted(c.value for c in ar_option.choices)
         assert choice_values == sorted(ImageAspectRatio.__args__)
 
@@ -782,23 +745,15 @@ class TestXAIAPICog:
         """Image command resolution choices should match xai-sdk ImageResolution."""
         from xai_sdk.image import ImageResolution
 
-        image_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
-        )
-        res_option = next(
-            opt for opt in image_cmd.options if opt.name == "resolution"
-        )
+        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        res_option = next(opt for opt in image_cmd.options if opt.name == "resolution")
         choice_values = sorted(c.value for c in res_option.choices)
         assert choice_values == sorted(ImageResolution.__args__)
 
     def test_image_has_attachment_option(self, cog):
         """Image command should have an optional attachment parameter."""
-        image_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
-        )
-        att_option = next(
-            (opt for opt in image_cmd.options if opt.name == "attachment"), None
-        )
+        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        att_option = next((opt for opt in image_cmd.options if opt.name == "attachment"), None)
         assert att_option is not None
         assert att_option.required is False
 
@@ -806,23 +761,15 @@ class TestXAIAPICog:
         """Video command aspect ratios should match xai-sdk VideoAspectRatio."""
         from xai_sdk.video import VideoAspectRatio
 
-        video_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "video"
-        )
-        ar_option = next(
-            opt for opt in video_cmd.options if opt.name == "aspect_ratio"
-        )
+        video_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "video")
+        ar_option = next(opt for opt in video_cmd.options if opt.name == "aspect_ratio")
         choice_values = sorted(c.value for c in ar_option.choices)
         assert choice_values == sorted(VideoAspectRatio.__args__)
 
     def test_video_has_attachment_option(self, cog):
         """Video command should have an optional attachment parameter."""
-        video_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "video"
-        )
-        att_option = next(
-            (opt for opt in video_cmd.options if opt.name == "attachment"), None
-        )
+        video_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "video")
+        att_option = next((opt for opt in video_cmd.options if opt.name == "attachment"), None)
         assert att_option is not None
         assert att_option.required is False
 
@@ -957,10 +904,16 @@ class TestResponseParsing:
         assert msg == {"role": "user", "content": "Hello!"}
 
     def test_build_user_message_multimodal(self, cog):
-        msg = cog._build_user_message([
-            "Describe this",
-            {"type": "input_image", "image_url": "https://example.com/img.png", "detail": "high"},
-        ])
+        msg = cog._build_user_message(
+            [
+                "Describe this",
+                {
+                    "type": "input_image",
+                    "image_url": "https://example.com/img.png",
+                    "detail": "high",
+                },
+            ]
+        )
         assert msg["role"] == "user"
         assert isinstance(msg["content"], list)
         assert len(msg["content"]) == 2
@@ -974,7 +927,7 @@ class TestTTSCommand:
     @pytest.fixture
     def cog(self, mock_bot):
         with patch("xai_sdk.AsyncClient"):
-            from xai_api import xAIAPI
+            from discord_grok.cogs.grok.cog import xAIAPI
 
             cog = xAIAPI(bot=mock_bot)
             return cog
@@ -1062,7 +1015,7 @@ class TestTTSCommand:
 
     def test_tts_voice_choices_match_tts_voices(self, cog):
         """TTS command voice choices should match TTS_VOICES."""
-        from util import TTS_VOICES
+        from discord_grok.cogs.grok.tooling import TTS_VOICES
 
         tts_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "tts")
         voice_option = next(opt for opt in tts_cmd.options if opt.name == "voice")
@@ -1088,9 +1041,7 @@ class TestFileUploadAndCleanup:
             file_id = await cog._upload_file_attachment(mock_file_attachment)
 
         assert file_id == "file-abc123"
-        cog.client.files.upload.assert_awaited_once_with(
-            b"file content", filename="document.pdf"
-        )
+        cog.client.files.upload.assert_awaited_once_with(b"file content", filename="document.pdf")
 
     async def test_upload_file_attachment_too_large(self, cog, mock_file_attachment):
         """Files exceeding 48 MB should be rejected."""
@@ -1123,7 +1074,7 @@ class TestFileUploadAndCleanup:
 
     async def test_cleanup_conversation_files(self, cog):
         """Should delete all tracked file IDs from xAI."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         conversation = Conversation(
             params=ChatCompletionParameters(model="grok-3"),
@@ -1140,7 +1091,7 @@ class TestFileUploadAndCleanup:
 
     async def test_cleanup_continues_on_failure(self, cog):
         """Should continue deleting remaining files even if one fails."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         conversation = Conversation(
             params=ChatCompletionParameters(model="grok-3"),
@@ -1155,7 +1106,7 @@ class TestFileUploadAndCleanup:
 
     async def test_end_conversation_cleans_up_files(self, cog):
         """end_conversation should remove the conversation and delete files."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         conversation = Conversation(
             params=ChatCompletionParameters(model="grok-3"),
@@ -1173,9 +1124,7 @@ class TestFileUploadAndCleanup:
         await cog.end_conversation(999)
         cog.client.files.delete.assert_not_awaited()
 
-    async def test_chat_with_file_attachment(
-        self, cog, mock_discord_context, mock_file_attachment
-    ):
+    async def test_chat_with_file_attachment(self, cog, mock_discord_context, mock_file_attachment):
         """Chat command with a non-image attachment should upload to xAI Files API."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
@@ -1251,13 +1200,11 @@ class TestXAIHTTPRetries:
     @pytest.fixture
     def cog(self, mock_bot):
         with patch("xai_sdk.AsyncClient"):
-            from xai_api import xAIAPI
+            from discord_grok.cogs.grok.cog import xAIAPI
 
             return xAIAPI(bot=mock_bot)
 
-    async def test_call_responses_api_retries_429_with_retry_after(
-        self, cog
-    ):
+    async def test_call_responses_api_retries_429_with_retry_after(self, cog):
         session = _MockHTTPSession(
             [
                 _make_http_response(
@@ -1278,7 +1225,7 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
         ):
             response = await cog._call_responses_api(
                 {"model": "grok-3"},
@@ -1308,8 +1255,8 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-            patch("xai_api.random.uniform", return_value=0.0),
+            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("discord_grok.cogs.grok.cog.random.uniform", return_value=0.0),
         ):
             response = await cog._call_responses_api({"model": "grok-3"})
 
@@ -1326,7 +1273,7 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
             pytest.raises(Exception, match="bad input"),
         ):
             await cog._call_responses_api({"model": "grok-3"})
@@ -1350,8 +1297,8 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-            patch("xai_api.random.uniform", return_value=0.0),
+            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("discord_grok.cogs.grok.cog.random.uniform", return_value=0.0),
         ):
             audio = await cog._call_tts_api({"text": "Hello"})
 
@@ -1374,12 +1321,8 @@ class TestImageBatchGeneration:
 
     def test_image_has_count_option(self, cog):
         """Image command should have a count parameter with min=1, max=10."""
-        image_cmd = next(
-            cmd for cmd in cog.grok.walk_commands() if cmd.name == "image"
-        )
-        count_option = next(
-            (opt for opt in image_cmd.options if opt.name == "count"), None
-        )
+        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        count_option = next((opt for opt in image_cmd.options if opt.name == "count"), None)
         assert count_option is not None
         assert count_option.required is False
         assert count_option.min_value == 1
@@ -1403,7 +1346,9 @@ class TestImageBatchGeneration:
     async def test_image_single_calls_sample(self, cog, mock_discord_context):
         """count=1 should call client.image.sample (not sample_batch)."""
         with patch.object(
-            cog, "_get_http_session", new_callable=AsyncMock,
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
             return_value=self._mock_http_session(),
         ):
             await cog.image.callback(
@@ -1420,7 +1365,9 @@ class TestImageBatchGeneration:
     async def test_image_batch_calls_sample_batch(self, cog, mock_discord_context):
         """count>1 should call client.image.sample_batch with n=count."""
         with patch.object(
-            cog, "_get_http_session", new_callable=AsyncMock,
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
             return_value=self._mock_http_session(),
         ):
             await cog.image.callback(
@@ -1439,7 +1386,9 @@ class TestImageBatchGeneration:
     async def test_image_batch_sends_multiple_files(self, cog, mock_discord_context):
         """Batch generation should send multiple File objects."""
         with patch.object(
-            cog, "_get_http_session", new_callable=AsyncMock,
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
             return_value=self._mock_http_session(),
         ):
             await cog.image.callback(
@@ -1458,10 +1407,12 @@ class TestImageBatchGeneration:
 
     async def test_image_batch_cost_multiplied(self, cog, mock_discord_context):
         """Batch generation cost should be per-image cost × count."""
-        from util import calculate_image_cost
+        from discord_grok.cogs.grok.tooling import calculate_image_cost
 
         with patch.object(
-            cog, "_get_http_session", new_callable=AsyncMock,
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
             return_value=self._mock_http_session(),
         ):
             await cog.image.callback(
@@ -1475,6 +1426,7 @@ class TestImageBatchGeneration:
         expected_cost = calculate_image_cost("grok-imagine-image") * 2
         # The daily cost tracker should reflect the multiplied cost
         from datetime import date
+
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(cog.daily_costs[key] - expected_cost) < 1e-9
 
@@ -1506,7 +1458,7 @@ class TestHandleNewMessageInConversation:
 
     @pytest.fixture
     def conversation(self):
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         starter = MagicMock()
         starter.id = 111222333
@@ -1592,9 +1544,7 @@ class TestHandleNewMessageInConversation:
         assert embed.title == "Error"
         assert 777888999 not in cog.conversations
 
-    async def test_unsupported_image_attachment_returns_error(
-        self, cog, message, conversation
-    ):
+    async def test_unsupported_image_attachment_returns_error(self, cog, message, conversation):
         """Unsupported image MIME types should return an error before calling xAI."""
         attachment = MagicMock()
         attachment.content_type = "image/webp"
@@ -1622,7 +1572,7 @@ class TestOnMessageRouting:
 
     async def test_routes_to_correct_conversation(self, cog, mock_discord_message):
         """Message in the right channel from the right user should route to handler."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         starter = mock_discord_message.author
         params = ChatCompletionParameters(
@@ -1640,7 +1590,7 @@ class TestOnMessageRouting:
 
     async def test_wrong_channel_skipped(self, cog, mock_discord_message):
         """Message in a different channel should not route."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         starter = mock_discord_message.author
         params = ChatCompletionParameters(
@@ -1658,7 +1608,7 @@ class TestOnMessageRouting:
 
     async def test_wrong_author_skipped(self, cog, mock_discord_message):
         """Message from a different user should not route."""
-        from util import ChatCompletionParameters, Conversation
+        from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         other_user = MagicMock()
         other_user.id = 999
@@ -1680,14 +1630,14 @@ class TestAppendSourcesEmbed:
     """Tests for the append_sources_embed helper."""
 
     def test_empty_citations_no_embed(self):
-        from xai_api import append_sources_embed
+        from discord_grok.cogs.grok.cog import append_sources_embed
 
         embeds = []
         append_sources_embed(embeds, [])
         assert len(embeds) == 0
 
     def test_web_citations_grouped(self):
-        from xai_api import append_sources_embed
+        from discord_grok.cogs.grok.cog import append_sources_embed
 
         citations = [
             {"url": "https://example.com/a", "source": "web"},
@@ -1700,7 +1650,7 @@ class TestAppendSourcesEmbed:
         assert "example.com" in embeds[0].description
 
     def test_mixed_sources_have_headings(self):
-        from xai_api import append_sources_embed
+        from discord_grok.cogs.grok.cog import append_sources_embed
 
         citations = [
             {"url": "https://example.com/a", "source": "web"},
@@ -1712,7 +1662,7 @@ class TestAppendSourcesEmbed:
         assert "**X Posts**" in embeds[0].description
 
     def test_single_source_type_no_heading(self):
-        from xai_api import append_sources_embed
+        from discord_grok.cogs.grok.cog import append_sources_embed
 
         citations = [
             {"url": "https://x.com/i/status/1", "source": "x"},
@@ -1723,7 +1673,7 @@ class TestAppendSourcesEmbed:
         assert "**X Posts**" not in embeds[0].description
 
     def test_skips_when_at_embed_limit(self):
-        from xai_api import append_sources_embed
+        from discord_grok.cogs.grok.cog import append_sources_embed
 
         embeds = [MagicMock() for _ in range(10)]
         citations = [{"url": "https://example.com", "source": "web"}]
@@ -1837,7 +1787,9 @@ class TestVideoCommand:
     async def test_video_success(self, cog, mock_discord_context):
         """Successful text-to-video should send a video file."""
         with patch.object(
-            cog, "_get_http_session", new_callable=AsyncMock,
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
             return_value=self._mock_http_session(),
         ):
             await cog.video.callback(
@@ -1853,7 +1805,9 @@ class TestVideoCommand:
     async def test_video_with_attachment(self, cog, mock_discord_context, mock_attachment):
         """Image-to-video should pass image_url to the SDK."""
         with patch.object(
-            cog, "_get_http_session", new_callable=AsyncMock,
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
             return_value=self._mock_http_session(),
         ):
             await cog.video.callback(
@@ -1897,7 +1851,7 @@ class TestResolveSelectedToolsUtil:
     """Tests for the resolve_selected_tools function in util.py."""
 
     def test_basic_resolution(self):
-        from util import resolve_selected_tools
+        from discord_grok.cogs.grok.tooling import resolve_selected_tools
 
         tools, error = resolve_selected_tools(
             ["web_search", "x_search", "code_execution"],
@@ -1907,7 +1861,7 @@ class TestResolveSelectedToolsUtil:
         assert len(tools) == 3
 
     def test_collections_requires_ids(self):
-        from util import resolve_selected_tools
+        from discord_grok.cogs.grok.tooling import resolve_selected_tools
 
         tools, error = resolve_selected_tools(
             ["collections_search"],
@@ -1917,7 +1871,7 @@ class TestResolveSelectedToolsUtil:
         assert "XAI_COLLECTION_IDS" in error
 
     def test_collections_with_ids(self):
-        from util import resolve_selected_tools
+        from discord_grok.cogs.grok.tooling import resolve_selected_tools
 
         tools, error = resolve_selected_tools(
             ["collections_search"],

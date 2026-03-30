@@ -1,6 +1,6 @@
 import pytest
 
-from util import (
+from discord_grok.cogs.grok.tooling import (
     CHUNK_TEXT_SIZE,
     IMAGE_PRICING,
     MODEL_PRICING,
@@ -196,7 +196,7 @@ class TestModelLists:
 
     def test_grok_models_contains_new_4_20_models(self):
         """GROK_MODELS should include all grok-4.20 GA models."""
-        from util import GROK_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_MODELS
 
         assert "grok-4.20-multi-agent" in GROK_MODELS
         assert "grok-4.20" in GROK_MODELS
@@ -204,14 +204,14 @@ class TestModelLists:
 
     def test_grok_models_no_deprecated(self):
         """GROK_MODELS should not contain deprecated grok-2 models."""
-        from util import GROK_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_MODELS
 
         for model in GROK_MODELS:
             assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
 
     def test_grok_image_models_no_deprecated(self):
         """GROK_IMAGE_MODELS should not contain deprecated grok-2 models."""
-        from util import GROK_IMAGE_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_IMAGE_MODELS
 
         for model in GROK_IMAGE_MODELS:
             assert not model.startswith("grok-2"), f"Deprecated model found: {model}"
@@ -221,25 +221,25 @@ class TestReasoningConstants:
     """Tests for reasoning model constants."""
 
     def test_penalty_supported_models_are_non_reasoning(self):
-        from util import PENALTY_SUPPORTED_MODELS
+        from discord_grok.cogs.grok.tooling import PENALTY_SUPPORTED_MODELS
 
         for model in PENALTY_SUPPORTED_MODELS:
             assert "non-reasoning" in model
 
     def test_reasoning_models_excluded_from_penalty_support(self):
-        from util import PENALTY_SUPPORTED_MODELS
+        from discord_grok.cogs.grok.tooling import PENALTY_SUPPORTED_MODELS
 
         assert "grok-3-mini" not in PENALTY_SUPPORTED_MODELS
         assert "grok-3" not in PENALTY_SUPPORTED_MODELS
         assert "grok-4-0709" not in PENALTY_SUPPORTED_MODELS
 
     def test_reasoning_effort_models(self):
-        from util import REASONING_EFFORT_MODELS
+        from discord_grok.cogs.grok.tooling import REASONING_EFFORT_MODELS
 
         assert {"grok-3-mini"} == REASONING_EFFORT_MODELS
 
     def test_multi_agent_models(self):
-        from util import MULTI_AGENT_MODELS
+        from discord_grok.cogs.grok.tooling import MULTI_AGENT_MODELS
 
         assert "grok-4.20-multi-agent" in MULTI_AGENT_MODELS
         for model in MULTI_AGENT_MODELS:
@@ -250,12 +250,12 @@ class TestTTSConstants:
     """Tests for TTS-related constants."""
 
     def test_tts_voices_contains_all_voices(self):
-        from util import TTS_VOICES
+        from discord_grok.cogs.grok.tooling import TTS_VOICES
 
         assert TTS_VOICES == ["eve", "ara", "rex", "sal", "leo"]
 
     def test_tts_voices_has_five_entries(self):
-        from util import TTS_VOICES
+        from discord_grok.cogs.grok.tooling import TTS_VOICES
 
         assert len(TTS_VOICES) == 5
 
@@ -266,10 +266,7 @@ class TestToolHelpers:
     def test_resolve_tool_name_for_builtin_tools(self):
         assert resolve_tool_name(TOOL_BUILDERS[TOOL_WEB_SEARCH]()) == TOOL_WEB_SEARCH
         assert resolve_tool_name(TOOL_BUILDERS[TOOL_X_SEARCH]()) == TOOL_X_SEARCH
-        assert (
-            resolve_tool_name(TOOL_BUILDERS[TOOL_CODE_EXECUTION]())
-            == TOOL_CODE_EXECUTION
-        )
+        assert resolve_tool_name(TOOL_BUILDERS[TOOL_CODE_EXECUTION]()) == TOOL_CODE_EXECUTION
 
     def test_resolve_tool_name_for_collections_search(self):
         tool = {"type": "file_search", "vector_store_ids": ["collection_123"]}
@@ -285,14 +282,14 @@ class TestPricing:
 
     def test_model_pricing_covers_all_grok_models(self):
         """Every model in GROK_MODELS should have a pricing entry."""
-        from util import GROK_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_MODELS
 
         for model in GROK_MODELS:
             assert model in MODEL_PRICING, f"Missing pricing for {model}"
 
     def test_image_pricing_covers_all_image_models(self):
         """Every model in GROK_IMAGE_MODELS should have a pricing entry."""
-        from util import GROK_IMAGE_MODELS
+        from discord_grok.cogs.grok.tooling import GROK_IMAGE_MODELS
 
         for model in GROK_IMAGE_MODELS:
             assert model in IMAGE_PRICING, f"Missing pricing for {model}"
@@ -357,10 +354,12 @@ class TestPricing:
 
     def test_calculate_tool_cost_multiple_tools(self):
         """Multiple tool types should sum their costs."""
-        cost = calculate_tool_cost({
-            "SERVER_SIDE_TOOL_WEB_SEARCH": 1000,
-            "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": 1000,
-        })
+        cost = calculate_tool_cost(
+            {
+                "SERVER_SIDE_TOOL_WEB_SEARCH": 1000,
+                "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": 1000,
+            }
+        )
         assert cost == pytest.approx(5.00 + 2.50)
 
     def test_calculate_tool_cost_unknown_tool(self):
