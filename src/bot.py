@@ -1,29 +1,4 @@
-"""
-Notes
----------------
-May need to use this command to install pycord
-python -m pip install --upgrade --no-deps --force-reinstall git+https://github.com/Pycord-Development/pycord
-"""
-
-import logging
-
-from discord import Bot, Intents
-
-from config.auth import BOT_TOKEN
-from xai_api import xAIAPI
+from discord_grok.bot import main
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-    if not BOT_TOKEN:
-        raise RuntimeError("BOT_TOKEN must be set before starting the Discord bot.")
-    intents = Intents.default()
-    intents.presences = False
-    intents.members = True
-    intents.message_content = True
-    intents.guilds = True
-    bot = Bot(intents=intents)
-    bot.add_cog(xAIAPI(bot=bot))
-    bot.run(BOT_TOKEN)
+    main()

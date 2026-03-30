@@ -1,15 +1,11 @@
-import os
+"""Legacy auth shim pointing into discord_grok.config."""
 
-from dotenv import load_dotenv
+import warnings
 
-load_dotenv()
+from discord_grok.config.auth import *  # noqa: F401,F403
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-GUILD_IDS = [int(id) for id in os.getenv("GUILD_IDS", "").split(",") if id]
-XAI_API_KEY = os.getenv("XAI_API_KEY", "")
-XAI_COLLECTION_IDS = [
-    collection_id
-    for collection_id in os.getenv("XAI_COLLECTION_IDS", "").split(",")
-    if collection_id
-]
-SHOW_COST_EMBEDS = os.getenv("SHOW_COST_EMBEDS", "true").lower() in ("true", "1", "yes")
+warnings.warn(
+    "Importing config.auth via src/config is deprecated; use discord_grok.config.auth instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
