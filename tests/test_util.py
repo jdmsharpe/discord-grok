@@ -413,6 +413,7 @@ class TestConversation:
         assert conv.previous_response_id is None
         assert conv.response_id_history == []
         assert conv.file_ids == []
+        assert conv.grok_conv_id is None
 
     def test_conversation_with_response_id(self):
         """Conversation should store response ID and history."""
@@ -422,10 +423,12 @@ class TestConversation:
             previous_response_id="resp_123",
             response_id_history=["resp_123"],
             file_ids=["file-1", "file-2"],
+            grok_conv_id="conv_123",
         )
         assert conv.previous_response_id == "resp_123"
         assert conv.response_id_history == ["resp_123"]
         assert conv.file_ids == ["file-1", "file-2"]
+        assert conv.grok_conv_id == "conv_123"
 
     def test_default_file_ids_isolated(self):
         """Default file_ids list should not be shared across instances."""

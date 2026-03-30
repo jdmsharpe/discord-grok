@@ -22,7 +22,7 @@ All commands are grouped under `/grok` for clean namespacing.
   - Grok 4 (0709)
   - Grok 3, Grok 3 Mini
 - Persistent conversation history with interactive button controls (regenerate, pause/resume, stop)
-- Multimodal support (text + images: JPEG, PNG, GIF, WEBP)
+- Multimodal support (text + images: JPEG, PNG)
 - File attachment support via xAI Files API (PDF, TXT, CSV, code files, etc., up to 48 MB)
 - Reasoning content displayed in spoilered embeds for reasoning-capable models
 - Customizable system prompts
