@@ -2,10 +2,13 @@ import asyncio
 import base64
 import contextlib
 import io
+import json
 import logging
+import random
 import re
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Literal, TypedDict, cast
 
 import aiohttp
@@ -71,6 +74,10 @@ REASONING_TRUNCATION_SUFFIX = "\n\n... [reasoning truncated]"
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MiB xAI image understanding limit
 MAX_FILE_SIZE = 48 * 1024 * 1024  # 48 MB xAI Files API limit
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+MAX_API_ATTEMPTS = 5
+INITIAL_RETRY_DELAY_SECONDS = 0.5
+RETRY_JITTER_RATIO = 0.25
 
 _CITATION_MARKER_RE = re.compile(r"\[\[\d+\]\]\([^)]+\)")
 
@@ -293,6 +300,114 @@ class xAIAPI(commands.Cog):
                 )
             return self._http_session
 
+    @staticmethod
+    def _build_xai_headers(*, grok_conv_id: str | None = None) -> dict[str, str]:
+        """Build standard xAI headers, adding a stable conversation cache header when present."""
+        headers = {
+            "Authorization": f"Bearer {XAI_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        if grok_conv_id:
+            headers["x-grok-conv-id"] = grok_conv_id
+        return headers
+
+    @staticmethod
+    def _describe_api_request(url: str) -> str:
+        """Return a readable name for the xAI endpoint."""
+        if url == RESPONSES_API_URL:
+            return "Responses API"
+        if url == TTS_API_URL:
+            return "TTS API"
+        return "xAI API"
+
+    @staticmethod
+    def _parse_retry_after(retry_after: str | None) -> float | None:
+        """Parse a Retry-After header as either seconds or an HTTP date."""
+        if not retry_after:
+            return None
+
+        retry_after = retry_after.strip()
+        with contextlib.suppress(ValueError):
+            return max(0.0, float(retry_after))
+
+        with contextlib.suppress(TypeError, ValueError, OverflowError):
+            retry_at = parsedate_to_datetime(retry_after)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=timezone.utc)
+            return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+
+        return None
+
+    def _compute_retry_delay(self, attempt: int, *, retry_after: str | None = None) -> float:
+        """Return Retry-After or exponential backoff with small positive jitter."""
+        parsed_retry_after = self._parse_retry_after(retry_after)
+        if parsed_retry_after is not None:
+            return parsed_retry_after
+
+        base_delay = INITIAL_RETRY_DELAY_SECONDS * (2 ** (attempt - 1))
+        return base_delay + random.uniform(0.0, base_delay * RETRY_JITTER_RATIO)
+
+    async def _post_with_retries(
+        self,
+        url: str,
+        headers: dict[str, str],
+        json_payload: dict[str, Any],
+    ) -> bytes:
+        """POST JSON to xAI with bounded retries for transient HTTP and network failures."""
+        session = await self._get_http_session()
+        request_name = self._describe_api_request(url)
+
+        for attempt in range(1, MAX_API_ATTEMPTS + 1):
+            try:
+                async with session.post(url, headers=headers, json=json_payload) as resp:
+                    if resp.status == 200:
+                        return await resp.read()
+
+                    error_body = await resp.text()
+                    should_retry = (
+                        resp.status in RETRYABLE_STATUS_CODES
+                        and attempt < MAX_API_ATTEMPTS
+                    )
+                    if should_retry:
+                        delay = self._compute_retry_delay(
+                            attempt,
+                            retry_after=(
+                                resp.headers.get("Retry-After")
+                                if resp.status == 429
+                                else None
+                            ),
+                        )
+                        self.logger.warning(
+                            "%s request returned HTTP %s on attempt %d/%d; retrying in %.2fs",
+                            request_name,
+                            resp.status,
+                            attempt,
+                            MAX_API_ATTEMPTS,
+                            delay,
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+
+                    raise Exception(f"{request_name} error (HTTP {resp.status}): {error_body}")
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                if attempt >= MAX_API_ATTEMPTS:
+                    raise Exception(
+                        f"{request_name} request failed after {MAX_API_ATTEMPTS} attempts: {error}"
+                    ) from error
+
+                delay = self._compute_retry_delay(attempt)
+                self.logger.warning(
+                    "%s request failed on attempt %d/%d (%s); retrying in %.2fs",
+                    request_name,
+                    attempt,
+                    MAX_API_ATTEMPTS,
+                    error,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        raise RuntimeError(f"{request_name} retry loop exited unexpectedly.")
+
     def _track_daily_cost(self, user_id: int, cost: float) -> float:
         """Add a cost to the user's daily total and return the new daily total."""
         key = (user_id, date.today().isoformat())
@@ -345,7 +460,6 @@ class xAIAPI(commands.Cog):
         bit_rate: int | None = None,
     ) -> bytes:
         """Call the xAI TTS REST endpoint and return raw audio bytes."""
-        session = await self._get_http_session()
         output_format: dict[str, Any] = {"codec": codec}
         if sample_rate is not None:
             output_format["sample_rate"] = sample_rate
@@ -357,38 +471,29 @@ class xAIAPI(commands.Cog):
             "language": language,
             "output_format": output_format,
         }
-        async with session.post(
-            TTS_API_URL,
-            headers={
-                "Authorization": f"Bearer {XAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        ) as resp:
-            if resp.status != 200:
-                error_body = await resp.text()
-                raise Exception(
-                    f"TTS API error (HTTP {resp.status}): {error_body}"
-                )
-            return await resp.read()
+        return await self._call_tts_api(payload)
 
-    async def _call_responses_api(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _call_tts_api(self, payload: dict[str, Any]) -> bytes:
+        """Call the xAI TTS REST endpoint and return raw audio bytes."""
+        return await self._post_with_retries(
+            TTS_API_URL,
+            headers=self._build_xai_headers(),
+            json_payload=payload,
+        )
+
+    async def _call_responses_api(
+        self,
+        payload: dict[str, Any],
+        *,
+        grok_conv_id: str | None = None,
+    ) -> dict[str, Any]:
         """Call the xAI Responses API and return the parsed JSON response."""
-        session = await self._get_http_session()
-        async with session.post(
+        response_body = await self._post_with_retries(
             RESPONSES_API_URL,
-            headers={
-                "Authorization": f"Bearer {XAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        ) as resp:
-            if resp.status != 200:
-                error_body = await resp.text()
-                raise Exception(
-                    f"Responses API error (HTTP {resp.status}): {error_body}"
-                )
-            return await resp.json()
+            headers=self._build_xai_headers(grok_conv_id=grok_conv_id),
+            json_payload=payload,
+        )
+        return cast(dict[str, Any], json.loads(response_body))
 
     def _build_responses_payload(
         self,
@@ -515,6 +620,20 @@ class xAIAPI(commands.Cog):
                 "Error fetching attachment %s: %s", attachment.url, error
             )
         return None
+
+    @staticmethod
+    def _unsupported_image_type_error(attachment: Attachment) -> str | None:
+        """Return a user-facing error for unsupported image MIME types."""
+        content_type = (attachment.content_type or "").lower()
+        if not content_type.startswith("image/") or content_type in SUPPORTED_IMAGE_TYPES:
+            return None
+
+        display_type = attachment.content_type or "unknown"
+        return (
+            f"Unsupported image type `{display_type}` for `{attachment.filename}`. "
+            "xAI image input currently supports only JPEG and PNG. Convert the image "
+            "to PNG or JPEG and try again."
+        )
 
     async def _upload_file_attachment(self, attachment: Attachment) -> str | None:
         """Download a Discord attachment and upload it to the xAI Files API.
@@ -661,8 +780,34 @@ class xAIAPI(commands.Cog):
             if message.content:
                 content_parts.append(message.content)
             if message.attachments:
+                unsupported_image_error = next(
+                    (
+                        error
+                        for attachment in message.attachments
+                        if (
+                            error := self._unsupported_image_type_error(
+                                cast(Attachment, attachment)
+                            )
+                        )
+                    ),
+                    None,
+                )
+                if unsupported_image_error:
+                    if typing_task:
+                        typing_task.cancel()
+                        typing_task = None
+                    await message.reply(
+                        embed=Embed(
+                            title="Error",
+                            description=unsupported_image_error,
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+
                 for attachment in message.attachments:
-                    if attachment.content_type and attachment.content_type in SUPPORTED_IMAGE_TYPES:
+                    content_type = (attachment.content_type or "").lower()
+                    if content_type in SUPPORTED_IMAGE_TYPES:
                         if attachment.size > MAX_IMAGE_SIZE:
                             self.logger.warning(
                                 "Image %s exceeds 20 MiB limit (%s bytes), skipping",
@@ -695,7 +840,10 @@ class xAIAPI(commands.Cog):
                 reasoning_effort=params.reasoning_effort,
                 agent_count=params.agent_count,
             )
-            response_json = await self._call_responses_api(payload)
+            response_json = await self._call_responses_api(
+                payload,
+                grok_conv_id=conversation.grok_conv_id,
+            )
             response_text, reasoning_text = self._extract_response_text(response_json)
             tool_info = extract_tool_info(response_json)
 
@@ -1287,10 +1435,28 @@ class xAIAPI(commands.Cog):
             # Build user message content parts
             content_parts: list[Any] = [prompt]
             if attachment:
-                if attachment.content_type in SUPPORTED_IMAGE_TYPES:
+                unsupported_image_error = self._unsupported_image_type_error(attachment)
+                if unsupported_image_error:
+                    await ctx.send_followup(
+                        embed=Embed(
+                            title="Error",
+                            description=unsupported_image_error,
+                            color=Colour.red(),
+                        )
+                    )
+                    return
+
+                content_type = (attachment.content_type or "").lower()
+                if content_type in SUPPORTED_IMAGE_TYPES:
                     if attachment.size > MAX_IMAGE_SIZE:
-                        await ctx.followup.send(
-                            f"Image `{attachment.filename}` exceeds the 20 MiB limit.",
+                        await ctx.send_followup(
+                            embed=Embed(
+                                title="Error",
+                                description=(
+                                    f"Image `{attachment.filename}` exceeds the 20 MiB limit."
+                                ),
+                                color=Colour.red(),
+                            ),
                             ephemeral=True,
                         )
                         return
@@ -1303,6 +1469,7 @@ class xAIAPI(commands.Cog):
             initial_messages.append(self._build_user_message(content_parts))
 
             prompt_cache_key = str(uuid.uuid4())
+            grok_conv_id = str(uuid.uuid4())
             payload = self._build_responses_payload(
                 model=model,
                 input_messages=initial_messages,
@@ -1316,7 +1483,10 @@ class xAIAPI(commands.Cog):
                 reasoning_effort=reasoning_effort,
                 agent_count=agent_count if is_multi_agent else None,
             )
-            response_json = await self._call_responses_api(payload)
+            response_json = await self._call_responses_api(
+                payload,
+                grok_conv_id=grok_conv_id,
+            )
             response_text, reasoning_text = self._extract_response_text(response_json)
             tool_info = extract_tool_info(response_json)
 
@@ -1433,6 +1603,7 @@ class xAIAPI(commands.Cog):
                 response_id_history=[response_id] if response_id else [],
                 file_ids=uploaded_file_ids,
                 prompt_cache_key=prompt_cache_key,
+                grok_conv_id=grok_conv_id,
             )
             self.conversations[main_conversation_id] = conversation
 

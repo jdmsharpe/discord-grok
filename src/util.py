@@ -222,6 +222,7 @@ class Conversation:
     response_id_history: list[str] = field(default_factory=list)
     file_ids: list[str] = field(default_factory=list)
     prompt_cache_key: str = ""
+    grok_conv_id: str | None = None
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_TEXT_SIZE) -> list[str]:

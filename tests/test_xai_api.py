@@ -1,5 +1,8 @@
+import asyncio
 import copy
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 from conftest import MOCK_RESPONSES_API_RESPONSE
@@ -279,6 +282,50 @@ def _make_cog(mock_bot, mock_api_response=None):
     return cog
 
 
+def _make_http_response(
+    status: int,
+    body: str | bytes,
+    headers: dict[str, str] | None = None,
+):
+    response = MagicMock()
+    response.status = status
+    response.headers = headers or {}
+    response.read = AsyncMock(
+        return_value=body if isinstance(body, bytes) else body.encode()
+    )
+    response.text = AsyncMock(
+        return_value=body.decode() if isinstance(body, bytes) else body
+    )
+    return response
+
+
+class _MockPostContextManager:
+    def __init__(self, *, response=None, exc: Exception | None = None):
+        self.response = response
+        self.exc = exc
+
+    async def __aenter__(self):
+        if self.exc is not None:
+            raise self.exc
+        return self.response
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _MockHTTPSession:
+    def __init__(self, post_results: list[object]):
+        self.post_results = list(post_results)
+        self.post_calls: list[dict[str, object]] = []
+
+    def post(self, *args, **kwargs):
+        self.post_calls.append({"args": args, "kwargs": kwargs})
+        result = self.post_results.pop(0)
+        if isinstance(result, Exception):
+            return _MockPostContextManager(exc=result)
+        return _MockPostContextManager(response=result)
+
+
 class TestXAIAPICog:
     """Tests for the xAIAPI Discord cog."""
 
@@ -307,11 +354,15 @@ class TestXAIAPICog:
 
         cog._call_responses_api.assert_called_once()
         assert len(cog.conversations) == 1
+        conversation = list(cog.conversations.values())[0]
 
         # Verify payload structure
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["model"] == "grok-3"
         assert payload["store"] is True
+        assert cog._call_responses_api.call_args.kwargs["grok_conv_id"] == conversation.grok_conv_id
+        assert conversation.grok_conv_id is not None
+        assert str(UUID(conversation.grok_conv_id)) == conversation.grok_conv_id
         assert any(
             msg.get("role") == "user"
             for msg in payload["input"]
@@ -1146,6 +1197,31 @@ class TestFileUploadAndCleanup:
         conversation = list(cog.conversations.values())[0]
         assert "file-xyz789" in conversation.file_ids
 
+    async def test_chat_rejects_unsupported_image_attachment(
+        self, cog, mock_discord_context, mock_attachment
+    ):
+        """Unsupported image MIME types should fail fast with a clear error."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+        mock_attachment.content_type = "image/gif"
+        mock_attachment.filename = "loop.gif"
+
+        with patch.object(cog, "_upload_file_attachment", new_callable=AsyncMock) as mock_upload:
+            await cog.chat.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="Describe this image",
+                model="grok-3",
+                attachment=mock_attachment,
+            )
+
+        cog._call_responses_api.assert_not_called()
+        mock_upload.assert_not_awaited()
+        assert len(cog.conversations) == 0
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "supports only JPEG and PNG" in call_kwargs["embed"].description
+
 
 class TestSessionManagement:
     """Tests for shared aiohttp session and timeout configuration."""
@@ -1167,6 +1243,123 @@ class TestSessionManagement:
         session2 = await cog._get_http_session()
         assert session1 is session2
         await session1.close()
+
+
+class TestXAIHTTPRetries:
+    """Tests for shared retry behavior across xAI HTTP endpoints."""
+
+    @pytest.fixture
+    def cog(self, mock_bot):
+        with patch("xai_sdk.AsyncClient"):
+            from xai_api import xAIAPI
+
+            return xAIAPI(bot=mock_bot)
+
+    async def test_call_responses_api_retries_429_with_retry_after(
+        self, cog
+    ):
+        session = _MockHTTPSession(
+            [
+                _make_http_response(
+                    429,
+                    "rate limited",
+                    headers={"Retry-After": "3"},
+                ),
+                _make_http_response(
+                    200,
+                    json.dumps({"id": "resp_retry", "output": []}),
+                ),
+            ]
+        )
+
+        with (
+            patch.object(
+                cog,
+                "_get_http_session",
+                new=AsyncMock(return_value=session),
+            ),
+            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            response = await cog._call_responses_api(
+                {"model": "grok-3"},
+                grok_conv_id="conv-cache-123",
+            )
+
+        assert response["id"] == "resp_retry"
+        mock_sleep.assert_awaited_once_with(3.0)
+        assert len(session.post_calls) == 2
+        headers = session.post_calls[0]["kwargs"]["headers"]
+        assert headers["x-grok-conv-id"] == "conv-cache-123"
+
+    async def test_call_responses_api_retries_503_with_backoff(self, cog):
+        session = _MockHTTPSession(
+            [
+                _make_http_response(503, "try again later"),
+                _make_http_response(
+                    200,
+                    json.dumps({"id": "resp_ok", "output": []}),
+                ),
+            ]
+        )
+
+        with (
+            patch.object(
+                cog,
+                "_get_http_session",
+                new=AsyncMock(return_value=session),
+            ),
+            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("xai_api.random.uniform", return_value=0.0),
+        ):
+            response = await cog._call_responses_api({"model": "grok-3"})
+
+        assert response["id"] == "resp_ok"
+        mock_sleep.assert_awaited_once_with(0.5)
+        assert len(session.post_calls) == 2
+
+    async def test_call_responses_api_fails_fast_for_422(self, cog):
+        session = _MockHTTPSession([_make_http_response(422, "bad input")])
+
+        with (
+            patch.object(
+                cog,
+                "_get_http_session",
+                new=AsyncMock(return_value=session),
+            ),
+            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            pytest.raises(Exception, match="bad input"),
+        ):
+            await cog._call_responses_api({"model": "grok-3"})
+
+        mock_sleep.assert_not_awaited()
+        assert len(session.post_calls) == 1
+        headers = session.post_calls[0]["kwargs"]["headers"]
+        assert "x-grok-conv-id" not in headers
+
+    async def test_call_tts_api_retries_timeouts(self, cog):
+        session = _MockHTTPSession(
+            [
+                asyncio.TimeoutError("timed out"),
+                _make_http_response(200, b"audio-bytes"),
+            ]
+        )
+
+        with (
+            patch.object(
+                cog,
+                "_get_http_session",
+                new=AsyncMock(return_value=session),
+            ),
+            patch("xai_api.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("xai_api.random.uniform", return_value=0.0),
+        ):
+            audio = await cog._call_tts_api({"text": "Hello"})
+
+        assert audio == b"audio-bytes"
+        mock_sleep.assert_awaited_once_with(0.5)
+        assert len(session.post_calls) == 2
+        headers = session.post_calls[0]["kwargs"]["headers"]
+        assert "x-grok-conv-id" not in headers
 
 
 class TestImageBatchGeneration:
@@ -1328,6 +1521,7 @@ class TestHandleNewMessageInConversation:
             previous_response_id="resp_prev",
             response_id_history=["resp_prev"],
             prompt_cache_key="test-cache-key",
+            grok_conv_id="conv-cache-123",
         )
 
     @pytest.fixture
@@ -1353,6 +1547,7 @@ class TestHandleNewMessageInConversation:
         await cog.handle_new_message_in_conversation(message, conversation)
 
         cog._call_responses_api.assert_called_once()
+        assert cog._call_responses_api.call_args.kwargs["grok_conv_id"] == "conv-cache-123"
         message.reply.assert_called()
         # Conversation state should be updated with new response ID
         assert conversation.previous_response_id == "resp_01XFDUDYJgAACzvnptvVoYEL"
@@ -1396,6 +1591,26 @@ class TestHandleNewMessageInConversation:
         embed = message.reply.call_args[1]["embed"]
         assert embed.title == "Error"
         assert 777888999 not in cog.conversations
+
+    async def test_unsupported_image_attachment_returns_error(
+        self, cog, message, conversation
+    ):
+        """Unsupported image MIME types should return an error before calling xAI."""
+        attachment = MagicMock()
+        attachment.content_type = "image/webp"
+        attachment.filename = "scene.webp"
+        attachment.size = 1024
+        attachment.url = "https://example.com/scene.webp"
+        message.attachments = [attachment]
+
+        with patch.object(cog, "_upload_file_attachment", new_callable=AsyncMock) as mock_upload:
+            await cog.handle_new_message_in_conversation(message, conversation)
+
+        cog._call_responses_api.assert_not_called()
+        mock_upload.assert_not_awaited()
+        message.reply.assert_called_once()
+        embed = message.reply.call_args[1]["embed"]
+        assert "supports only JPEG and PNG" in embed.description
 
 
 class TestOnMessageRouting:

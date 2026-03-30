@@ -43,8 +43,9 @@ These are non-obvious patterns worth knowing when modifying the codebase:
 - **`resolve_selected_tools()`** is a standalone function in `util.py` (not a cog method). The cog has a thin wrapper that passes `XAI_COLLECTION_IDS`. This breaks the circular coupling with `button_view.py`.
 - **Agentic state**: `include: ["reasoning.encrypted_content"]` + `store: true` is set for all tool-using conversations AND multi-agent models. This enables server-side state via `previous_response_id`.
 - **`prompt_cache_key`**: `Conversation.prompt_cache_key` defaults to `""`. Callers always pass a `uuid.uuid4()` string explicitly — there is no default factory.
+- **`x-grok-conv-id`**: `Conversation.grok_conv_id` is a stable UUID4 generated once per `/grok chat` conversation and sent only on Responses API calls for that conversation to improve cache hit rates.
 - **Multi-agent constraints**: `agent_count` is only valid for `MULTI_AGENT_MODELS`. Multi-agent models reject `max_tokens`.
-- **File attachments**: Images go inline (`input_image`); non-image files are uploaded via `client.files.upload()` and sent as `input_file`. Files are cleaned up on conversation end AND on chat error (orphaned file cleanup in the exception handler).
+- **File attachments**: JPEG/PNG images go inline (`input_image`); unsupported image types (for example GIF/WEBP) return a user-facing error; non-image files are uploaded via `client.files.upload()` and sent as `input_file`. Files are cleaned up on conversation end AND on chat error (orphaned file cleanup in the exception handler).
 - **`SHOW_COST_EMBEDS`** is checked at each call site, not inside the embed helper functions.
 - **`TOOL_USAGE_DISPLAY_NAMES`** includes server-side tool types beyond the four user-selectable tools (e.g., `VIEW_X_VIDEO`, `VIEW_IMAGE`, `MCP`, `ATTACHMENT_SEARCH`).
 - **Session lifecycle**: `aiohttp.ClientSession` is lazily created via `_get_http_session()` and cleaned up via `cog_unload()`. Pycord does **not** dispatch an `on_close` event, so `cog_unload` is the only cleanup path.
