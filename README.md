@@ -127,6 +127,21 @@ All commands are grouped under `/grok` for clean namespacing.
 python src/bot.py
 ```
 
+`src/bot.py` remains a thin repo-local launcher that delegates to `discord_grok.bot.main`.
+
+### Using as a Cog
+
+To compose this repo into a larger bot, import the namespaced package:
+
+```python
+from discord_grok import xAIAPI
+
+bot.add_cog(xAIAPI(bot=bot))
+```
+
+The legacy top-level `xai_api` module remains as a temporary compatibility shim and emits a `DeprecationWarning`.
+Top-level `bot.py`, `button_view.py`, `util.py`, and `config` stay repo-local and are not the installed public API surface.
+
 **With Docker:**
 
 ```bash

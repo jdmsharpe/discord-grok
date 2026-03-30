@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from discord.ui import Select
 
-from util import TOOL_BUILDERS
+from discord_grok.cogs.grok.tooling import TOOL_BUILDERS
 
 
 def _make_view(
@@ -14,7 +14,7 @@ def _make_view(
     on_tools_changed=None,
     on_stop=None,
 ):
-    from button_view import ButtonView
+    from discord_grok.cogs.grok.views import ButtonView
 
     return ButtonView(
         conversation_starter=conversation_starter or MagicMock(),
@@ -85,9 +85,7 @@ class TestButtonView:
 
         await view.tool_select_callback(interaction, mock_select)
 
-        on_tools_changed.assert_called_once_with(
-            ["web_search", "code_execution"], conversation
-        )
+        on_tools_changed.assert_called_once_with(["web_search", "code_execution"], conversation)
 
         call_args = interaction.response.send_message.call_args
         assert "Tools updated" in call_args.args[0]
@@ -114,13 +112,9 @@ class TestButtonView:
         interaction.response.send_message.assert_called_once()
         assert "not allowed" in interaction.response.send_message.call_args.args[0]
 
-    async def test_tool_select_callback_shows_resolution_error(
-        self, conversation_starter
-    ):
+    async def test_tool_select_callback_shows_resolution_error(self, conversation_starter):
         conversation = MagicMock()
-        on_tools_changed = MagicMock(
-            return_value=(set(), "Collections config missing")
-        )
+        on_tools_changed = MagicMock(return_value=(set(), "Collections config missing"))
 
         view = _make_view(
             conversation_starter=conversation_starter,
@@ -139,10 +133,7 @@ class TestButtonView:
         await view.tool_select_callback(interaction, mock_select)
 
         interaction.response.send_message.assert_called_once()
-        assert (
-            "Collections config missing"
-            in interaction.response.send_message.call_args.args[0]
-        )
+        assert "Collections config missing" in interaction.response.send_message.call_args.args[0]
 
     async def test_stop_button_calls_on_stop(self, conversation_starter):
         conversation = MagicMock()
