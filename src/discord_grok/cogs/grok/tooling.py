@@ -1,8 +1,8 @@
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from typing import Any
 
-from discord import Member, User
+from ...config.auth import XAI_COLLECTION_IDS
+from .models import ChatCompletionParameters, Conversation
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
@@ -190,39 +190,6 @@ def resolve_tool_name(tool_config: Any) -> str | None:
     return None
 
 
-@dataclass
-class ChatCompletionParameters:
-    """A dataclass to store the parameters for a chat completion."""
-
-    model: str
-    temperature: float | None = None
-    top_p: float | None = None
-    max_tokens: int | None = None
-    frequency_penalty: float | None = None
-    presence_penalty: float | None = None
-    reasoning_effort: str | None = None
-    agent_count: int | None = None
-    tools: list[Any] = field(default_factory=list)
-    x_search_kwargs: dict[str, Any] = field(default_factory=dict)
-    web_search_kwargs: dict[str, Any] = field(default_factory=dict)
-    conversation_starter: Member | User | None = None
-    conversation_id: int | None = None
-    channel_id: int | None = None
-    paused: bool = False
-
-
-@dataclass
-class Conversation:
-    """A dataclass to store conversation state."""
-
-    params: ChatCompletionParameters
-    previous_response_id: str | None = None
-    response_id_history: list[str] = field(default_factory=list)
-    file_ids: list[str] = field(default_factory=list)
-    prompt_cache_key: str = ""
-    grok_conv_id: str | None = None
-
-
 def chunk_text(text: str, chunk_size: int = CHUNK_TEXT_SIZE) -> list[str]:
     """
     Splits a string into chunks of a specified size.
@@ -278,7 +245,7 @@ def format_xai_error(error: Exception) -> str:
 
 def resolve_selected_tools(
     selected_tool_names: list[str],
-    collection_ids: list[str],
+    collection_ids: list[str] | None = None,
     x_search_kwargs: dict[str, Any] | None = None,
     web_search_kwargs: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]:
@@ -286,7 +253,6 @@ def resolve_selected_tools(
 
     Args:
         selected_tool_names: Canonical tool names to resolve.
-        collection_ids: XAI_COLLECTION_IDS for file_search.
         x_search_kwargs: Extra kwargs merged into the x_search tool dict.
         web_search_kwargs: Extra kwargs merged into the web_search tool dict.
 
@@ -294,10 +260,11 @@ def resolve_selected_tools(
         A tuple of (tool dicts, error message or None).
     """
     tools: list[dict[str, Any]] = []
+    active_collection_ids = XAI_COLLECTION_IDS if collection_ids is None else collection_ids
 
     for tool_name in selected_tool_names:
         if tool_name == TOOL_COLLECTIONS_SEARCH:
-            if not collection_ids:
+            if not active_collection_ids:
                 return (
                     [],
                     "Collections search requires XAI_COLLECTION_IDS to be set in your .env.",
@@ -305,7 +272,7 @@ def resolve_selected_tools(
             tools.append(
                 {
                     "type": "file_search",
-                    "vector_store_ids": list(collection_ids),
+                    "vector_store_ids": list(active_collection_ids),
                 }
             )
             continue
@@ -324,3 +291,35 @@ def resolve_selected_tools(
         tools.append(tool_builder())
 
     return tools, None
+
+
+__all__ = [
+    "AVAILABLE_TOOLS",
+    "CHUNK_TEXT_SIZE",
+    "ChatCompletionParameters",
+    "Conversation",
+    "GROK_IMAGE_MODELS",
+    "GROK_MODELS",
+    "GROK_VIDEO_MODELS",
+    "MODEL_PRICING",
+    "MULTI_AGENT_MODELS",
+    "PENALTY_SUPPORTED_MODELS",
+    "REASONING_EFFORT_MODELS",
+    "TOOL_COLLECTIONS_SEARCH",
+    "TOOL_CODE_EXECUTION",
+    "TOOL_USAGE_DISPLAY_NAMES",
+    "TOOL_WEB_SEARCH",
+    "TOOL_X_SEARCH",
+    "TTS_VOICES",
+    "XAI_COLLECTION_IDS",
+    "calculate_cost",
+    "calculate_image_cost",
+    "calculate_tool_cost",
+    "calculate_tts_cost",
+    "calculate_video_cost",
+    "chunk_text",
+    "format_xai_error",
+    "resolve_selected_tools",
+    "resolve_tool_name",
+    "truncate_text",
+]
