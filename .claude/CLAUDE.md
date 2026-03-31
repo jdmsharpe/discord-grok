@@ -16,7 +16,6 @@
 ```text
 src/
 ├── bot.py                           # Thin repo-local launcher
-├── config/                          # Repo-local compatibility shim
 └── discord_grok/
     ├── __init__.py
     ├── bot.py
@@ -45,7 +44,7 @@ tests/
 └── ...
 ```
 
-Top-level `button_view.py`, `util.py`, and `config/` remain repo-local compatibility layers and are not the installed public API.
+Only `src/bot.py` remains at the repo root; code imports should target `discord_grok...`.
 
 ## Testing And Patch Targets
 
