@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from tests.grok_test_support import MockHTTPSession, make_cog, make_http_response, make_raw_cog
+from tests.support import MockHTTPSession, make_cog, make_http_response, make_raw_cog
 
 
 class TestFileUploadAndCleanup:

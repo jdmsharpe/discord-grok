@@ -3,7 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from tests.grok_test_support import make_cog
+from tests.support import make_cog
 
 
 class TestGrokChat:

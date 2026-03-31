@@ -41,6 +41,7 @@ src/
 tests/
 ├── conftest.py
 ├── fixtures.py
+├── support.py
 └── ...
 ```
 
@@ -51,6 +52,7 @@ Top-level `button_view.py`, `util.py`, and `config/` remain repo-local compatibi
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
 - The test suite is organized into module-aligned files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, and `tests/test_grok_tooling.py`.
+- `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
 - Examples:
   - `discord_grok.cogs.grok.client.RESPONSES_API_URL`

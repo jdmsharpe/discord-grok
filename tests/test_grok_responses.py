@@ -1,7 +1,7 @@
 import pytest
 
 from tests.fixtures import MOCK_RESPONSES_API_RESPONSE
-from tests.grok_test_support import make_cog
+from tests.support import make_cog
 
 
 class TestExtractToolInfo:

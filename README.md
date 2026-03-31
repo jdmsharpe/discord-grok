@@ -183,6 +183,7 @@ docker-compose up -d
 
 Tests use pytest with pytest-asyncio (`asyncio_mode = "auto"`). All tests are mocked — no real API calls.
 The suite is organized around the refactored package layout, with focused files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, and `tests/test_grok_tooling.py`.
+`tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 Import from `discord_grok` directly; legacy top-level shim modules are no longer part of the supported workflow.
 
 GitHub Actions runs the test suite against Python 3.10, 3.11, 3.12, and 3.13.
