@@ -115,11 +115,22 @@ All commands are grouped under `/grok` for clean namespacing.
 5. Edit `.env` with your credentials:
 
    ```ini
+   # Required: Discord bot token for your application
    BOT_TOKEN=your_discord_bot_token
+
+   # Required: Comma-separated Discord guild IDs where slash commands should be registered
    GUILD_IDS=your_guild_id_1,your_guild_id_2
+
+   # Required: xAI API key used for Grok requests
    XAI_API_KEY=your_xai_api_key
-   XAI_COLLECTION_IDS=optional_collection_id_1,optional_collection_id_2
-   SHOW_COST_EMBEDS=true
+
+   # Optional: Comma-separated collection IDs used by /grok chat collections_search
+   # Set this to enable the built-in collections search tool for chat requests
+   # XAI_COLLECTION_IDS=collection_id_1,collection_id_2
+
+   # Optional: Show cost and token usage embeds on Grok responses (default: true)
+   # Set this to false to hide pricing and usage details in Discord
+   # SHOW_COST_EMBEDS=true
    ```
 
 ### Running the Bot
