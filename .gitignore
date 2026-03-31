@@ -4,14 +4,17 @@
 # Ignore VS Code settings
 .vscode/
 
-# Ignore system files
-.DS_Store
-Thumbs.db
+# Ignore virtual environments
+.venv/
+.venv-wsl/
+venv/
 
 # Ignore Python cache files
 __pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
 
-# Ignore virtual environment
-.venv/
-venv/
-.venv-wsl/
+# Ignore system files
+.DS_Store
+Thumbs.db

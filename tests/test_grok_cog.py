@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.grok_test_support import make_cog
+from tests.support import make_cog
 
 
 class TestGrokCog:
