@@ -11,14 +11,11 @@
   bot.add_cog(GrokCog(bot=bot))
   ```
 
-- Legacy shim: `src/xai_api.py` exists only for import compatibility and emits a `DeprecationWarning`.
-
 ## Package Layout
 
 ```text
 src/
 ├── bot.py                           # Thin repo-local launcher
-├── xai_api.py                       # Temporary compatibility shim
 ├── config/                          # Repo-local compatibility shim
 └── discord_grok/
     ├── __init__.py
@@ -53,12 +50,14 @@ Top-level `button_view.py`, `util.py`, and `config/` remain repo-local compatibi
 
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
-- New tests and patches should target real owners under `discord_grok...`, not `xai_api`.
+- The test suite is organized into module-aligned files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, and `tests/test_grok_tooling.py`.
+- New tests and patches should target real owners under `discord_grok...`.
 - Examples:
   - `discord_grok.cogs.grok.client.RESPONSES_API_URL`
   - `discord_grok.cogs.grok.client.RETRYABLE_STATUS_CODES`
   - `discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS`
   - `discord_grok.cogs.grok.views.ButtonView`
+- Import `GrokCog` from `discord_grok`; do not reintroduce legacy `xai_api` shim paths.
 
 ## Validation Commands
 
