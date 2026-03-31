@@ -6,9 +6,9 @@
 - Cog composition contract:
 
   ```python
-  from discord_grok import xAIAPI
+  from discord_grok import GrokCog
 
-  bot.add_cog(xAIAPI(bot=bot))
+  bot.add_cog(GrokCog(bot=bot))
   ```
 
 - Legacy shim: `src/xai_api.py` exists only for import compatibility and emits a `DeprecationWarning`.
@@ -28,11 +28,18 @@ src/
     │   └── auth.py
     └── cogs/grok/
         ├── __init__.py
+        ├── attachments.py
+        ├── chat.py
         ├── client.py
         ├── cog.py
         ├── embeds.py
+        ├── image.py
         ├── models.py
+        ├── responses.py
+        ├── speech.py
+        ├── state.py
         ├── tooling.py
+        ├── video.py
         └── views.py
 tests/
 ├── conftest.py
@@ -48,9 +55,9 @@ Top-level `button_view.py`, `util.py`, and `config/` remain repo-local compatibi
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
 - New tests and patches should target real owners under `discord_grok...`, not `xai_api`.
 - Examples:
-  - `discord_grok.cogs.grok.cog.RESPONSES_API_URL`
+  - `discord_grok.cogs.grok.client.RESPONSES_API_URL`
   - `discord_grok.cogs.grok.client.RETRYABLE_STATUS_CODES`
-  - `discord_grok.cogs.grok.tooling.resolve_tool_name`
+  - `discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS`
   - `discord_grok.cogs.grok.views.ButtonView`
 
 ## Validation Commands
@@ -66,4 +73,5 @@ pytest -q
 
 - Conversation state still preserves `previous_response_id`, `response_id_history`, `prompt_cache_key`, and `grok_conv_id`.
 - `collections_search` requires `XAI_COLLECTION_IDS`.
-- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle live under `discord_grok.cogs.grok`.
+- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`.
+- Chat, image, video, and TTS command bodies are delegated from `discord_grok.cogs.grok.cog` into feature modules.

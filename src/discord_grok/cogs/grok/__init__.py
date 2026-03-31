@@ -1,5 +1,5 @@
 """Grok cog package exports."""
 
-from .cog import xAIAPI
+from .cog import GrokCog
 
-__all__ = ["xAIAPI"]
+__all__ = ["GrokCog"]
