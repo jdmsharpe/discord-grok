@@ -2,7 +2,15 @@
 name = "discord-grok"
 version = "1.0.0"
 description = "Discord bot to enable xAI API interactions"
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "John Magnus-Sharpe" },
+]
+
+[project.urls]
+Repository = "https://github.com/jdmsharpe/discord-grok"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
