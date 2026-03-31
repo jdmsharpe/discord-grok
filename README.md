@@ -139,7 +139,7 @@ from discord_grok import GrokCog
 bot.add_cog(GrokCog(bot=bot))
 ```
 
-Top-level `bot.py`, `button_view.py`, `util.py`, and `config` stay repo-local and are not the installed public API surface.
+Only `src/bot.py` remains at the repository root as a thin launcher; package code should be imported from `discord_grok`.
 
 **With Docker:**
 
