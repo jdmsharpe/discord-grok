@@ -14,7 +14,7 @@ from discord import (
 )
 from discord.ui import Button, Select, View, button
 
-from .tooling import SELECTABLE_TOOLS, resolve_tool_name
+from .tooling import SELECTABLE_TOOLS, TOOL_REGISTRY, resolve_tool_name
 
 
 async def _send_interaction_error(interaction: Interaction, context: str, error: Exception) -> None:
@@ -65,29 +65,13 @@ class ButtonView(View):
             row=1,
             options=[
                 SelectOption(
-                    label="Web Search",
-                    value="web_search",
-                    description="Search the web in real time.",
-                    default="web_search" in selected_tools,
-                ),
-                SelectOption(
-                    label="X Search",
-                    value="x_search",
-                    description="Search X posts and threads.",
-                    default="x_search" in selected_tools,
-                ),
-                SelectOption(
-                    label="Code Execution",
-                    value="code_execution",
-                    description="Run Python code in a sandbox.",
-                    default="code_execution" in selected_tools,
-                ),
-                SelectOption(
-                    label="Collections Search",
-                    value="collections_search",
-                    description="Search configured collections.",
-                    default="collections_search" in selected_tools,
-                ),
+                    label=entry.display_label,
+                    value=tool_name,
+                    description=entry.description,
+                    default=tool_name in selected_tools,
+                )
+                for tool_name, entry in TOOL_REGISTRY.items()
+                if entry.ui_selectable
             ],
         )
 
