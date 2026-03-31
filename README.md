@@ -134,9 +134,9 @@ python src/bot.py
 To compose this repo into a larger bot, import the namespaced package:
 
 ```python
-from discord_grok import xAIAPI
+from discord_grok import GrokCog
 
-bot.add_cog(xAIAPI(bot=bot))
+bot.add_cog(GrokCog(bot=bot))
 ```
 
 The legacy top-level `xai_api` module remains as a temporary compatibility shim and emits a `DeprecationWarning`.

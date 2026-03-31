@@ -2,7 +2,7 @@ import logging
 
 from discord import Bot, Intents
 
-from .cogs.grok.cog import xAIAPI
+from . import GrokCog
 from .config.auth import BOT_TOKEN
 
 logging.basicConfig(
@@ -18,7 +18,7 @@ def main() -> None:
     intents.message_content = True
     intents.guilds = True
     bot = Bot(intents=intents)
-    bot.add_cog(xAIAPI(bot=bot))
+    bot.add_cog(GrokCog(bot=bot))
     bot.run(BOT_TOKEN)
 
 

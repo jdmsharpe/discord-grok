@@ -2,12 +2,12 @@
 
 import warnings
 
-from discord_grok import xAIAPI
+from discord_grok import GrokCog
 
 warnings.warn(
-    "Importing xAIAPI via xai_api is deprecated; use discord_grok.xAIAPI instead.",
+    "Importing GrokCog via xai_api is deprecated; use discord_grok.GrokCog instead.",
     DeprecationWarning,
     stacklevel=2,
 )
 
-__all__ = ["xAIAPI"]
+__all__ = ["GrokCog"]

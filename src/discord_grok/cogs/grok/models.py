@@ -1,5 +1,54 @@
-"""Model helpers re-exporting from the grok cog."""
+from dataclasses import dataclass, field
+from typing import Any, Literal, TypedDict
 
-from .cog import CitationInfo, ToolInfo
+from discord import Member, User
 
-__all__ = ["CitationInfo", "ToolInfo"]
+
+class CitationInfo(TypedDict):
+    url: str
+    source: Literal["web", "x", "collections"]
+
+
+class ToolInfo(TypedDict):
+    citations: list[CitationInfo]
+
+
+@dataclass
+class ChatCompletionParameters:
+    """A dataclass to store the parameters for a chat completion."""
+
+    model: str
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
+    frequency_penalty: float | None = None
+    presence_penalty: float | None = None
+    reasoning_effort: str | None = None
+    agent_count: int | None = None
+    tools: list[Any] = field(default_factory=list)
+    x_search_kwargs: dict[str, Any] = field(default_factory=dict)
+    web_search_kwargs: dict[str, Any] = field(default_factory=dict)
+    conversation_starter: Member | User | None = None
+    conversation_id: int | None = None
+    channel_id: int | None = None
+    paused: bool = False
+
+
+@dataclass
+class Conversation:
+    """A dataclass to store conversation state."""
+
+    params: ChatCompletionParameters
+    previous_response_id: str | None = None
+    response_id_history: list[str] = field(default_factory=list)
+    file_ids: list[str] = field(default_factory=list)
+    prompt_cache_key: str = ""
+    grok_conv_id: str | None = None
+
+
+__all__ = [
+    "ChatCompletionParameters",
+    "CitationInfo",
+    "Conversation",
+    "ToolInfo",
+]

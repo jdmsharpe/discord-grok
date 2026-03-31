@@ -14,7 +14,7 @@ class TestAppendPricingEmbed:
     """Tests for the append_pricing_embed helper."""
 
     def test_append_pricing_embed(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50)
@@ -26,7 +26,7 @@ class TestAppendPricingEmbed:
         assert embeds[0].colour == Colour(0)
 
     def test_append_pricing_embed_with_reasoning_tokens(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=200)
@@ -34,28 +34,28 @@ class TestAppendPricingEmbed:
         assert "200 reasoning" in embeds[0].description
 
     def test_append_pricing_embed_hides_zero_reasoning_tokens(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=0)
         assert "reasoning" not in embeds[0].description
 
     def test_append_pricing_embed_with_cached_tokens(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=300)
         assert "300 cached" in embeds[0].description
 
     def test_append_pricing_embed_with_image_tokens(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, image_tokens=200)
         assert "200 image" in embeds[0].description
 
     def test_append_pricing_embed_hides_zero_cached_and_image_tokens(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=0, image_tokens=0)
@@ -63,7 +63,7 @@ class TestAppendPricingEmbed:
         assert "image" not in embeds[0].description
 
     def test_append_pricing_embed_with_tool_usage(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         tool_usage = {"SERVER_SIDE_TOOL_WEB_SEARCH": 3, "SERVER_SIDE_TOOL_X_SEARCH": 2}
@@ -76,14 +76,14 @@ class TestAppendPricingEmbed:
         assert "tool cost" in desc
 
     def test_append_pricing_embed_no_tool_usage_line(self):
-        from discord_grok.cogs.grok.cog import append_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage={})
         assert "\n" not in embeds[0].description
 
     def test_append_generation_pricing_embed(self):
-        from discord_grok.cogs.grok.cog import append_generation_pricing_embed
+        from discord_grok.cogs.grok.embeds import append_generation_pricing_embed
 
         embeds: list[Embed] = []
         append_generation_pricing_embed(embeds, 0.07, 2.50)
@@ -98,9 +98,9 @@ class TestTrackDailyCost:
     @pytest.fixture
     def cog(self, mock_bot):
         with patch("xai_sdk.AsyncClient"):
-            from discord_grok.cogs.grok.cog import xAIAPI
+            from discord_grok import GrokCog
 
-            cog = xAIAPI(bot=mock_bot)
+            cog = GrokCog(bot=mock_bot)
             return cog
 
     def test_track_daily_cost_accumulates(self, cog):
@@ -120,7 +120,7 @@ class TestExtractToolInfo:
 
     def test_annotations_deduplicates_and_classifies_citations(self):
         """URL citations in annotations should be deduplicated and classified."""
-        from discord_grok.cogs.grok.cog import extract_tool_info
+        from discord_grok.cogs.grok.responses import extract_tool_info
 
         response_json = {
             "output": [
@@ -155,7 +155,7 @@ class TestExtractToolInfo:
 
     def test_annotations_web_and_x(self):
         """Mixed web and X citations should be classified correctly."""
-        from discord_grok.cogs.grok.cog import extract_tool_info
+        from discord_grok.cogs.grok.responses import extract_tool_info
 
         response_json = {
             "output": [
@@ -184,14 +184,14 @@ class TestExtractToolInfo:
 
     def test_empty_output(self):
         """Empty output should return no citations."""
-        from discord_grok.cogs.grok.cog import extract_tool_info
+        from discord_grok.cogs.grok.responses import extract_tool_info
 
         result = extract_tool_info({"output": []})
         assert result["citations"] == []
 
     def test_no_annotations(self):
         """Output without annotations should return no citations."""
-        from discord_grok.cogs.grok.cog import extract_tool_info
+        from discord_grok.cogs.grok.responses import extract_tool_info
 
         response_json = {
             "output": [
@@ -210,7 +210,7 @@ class TestAppendReasoningEmbeds:
 
     def test_no_reasoning(self):
         """Empty reasoning text should not add an embed."""
-        from discord_grok.cogs.grok.cog import append_reasoning_embeds
+        from discord_grok.cogs.grok.embeds import append_reasoning_embeds
 
         embeds = []
         append_reasoning_embeds(embeds, "")
@@ -218,7 +218,7 @@ class TestAppendReasoningEmbeds:
 
     def test_with_reasoning(self):
         """Reasoning text should be wrapped in spoiler tags."""
-        from discord_grok.cogs.grok.cog import append_reasoning_embeds
+        from discord_grok.cogs.grok.embeds import append_reasoning_embeds
 
         embeds = []
         append_reasoning_embeds(embeds, "Some reasoning here")
@@ -228,7 +228,7 @@ class TestAppendReasoningEmbeds:
 
     def test_long_reasoning_truncated(self):
         """Long reasoning text should be truncated."""
-        from discord_grok.cogs.grok.cog import append_reasoning_embeds
+        from discord_grok.cogs.grok.embeds import append_reasoning_embeds
 
         embeds = []
         long_text = "a" * 4000
@@ -243,7 +243,7 @@ class TestAppendResponseEmbeds:
 
     def test_short_response(self):
         """Short response should create a single embed."""
-        from discord_grok.cogs.grok.cog import append_response_embeds
+        from discord_grok.cogs.grok.embeds import append_response_embeds
 
         embeds = []
         append_response_embeds(embeds, "Hello!")
@@ -253,7 +253,7 @@ class TestAppendResponseEmbeds:
 
     def test_long_response_chunked(self):
         """Long response should be split into multiple embeds."""
-        from discord_grok.cogs.grok.cog import append_response_embeds
+        from discord_grok.cogs.grok.embeds import append_response_embeds
 
         embeds = []
         long_text = "a" * 7500
@@ -264,7 +264,7 @@ class TestAppendResponseEmbeds:
 
     def test_very_long_response_truncated(self):
         """Very long response should be truncated before chunking."""
-        from discord_grok.cogs.grok.cog import append_response_embeds
+        from discord_grok.cogs.grok.embeds import append_response_embeds
 
         embeds = []
         very_long_text = "a" * 25000
@@ -276,9 +276,9 @@ class TestAppendResponseEmbeds:
 def _make_cog(mock_bot, mock_api_response=None):
     """Helper to create a cog with _call_responses_api mocked."""
     with patch("xai_sdk.AsyncClient"):
-        from discord_grok.cogs.grok.cog import xAIAPI
+        from discord_grok import GrokCog
 
-        cog = xAIAPI(bot=mock_bot)
+        cog = GrokCog(bot=mock_bot)
 
     if mock_api_response is None:
         mock_api_response = copy.deepcopy(MOCK_RESPONSES_API_RESPONSE)
@@ -327,7 +327,7 @@ class _MockHTTPSession:
 
 
 class TestXAIAPICog:
-    """Tests for the xAIAPI Discord cog."""
+    """Tests for the GrokCog Discord cog."""
 
     @pytest.fixture
     def cog(self, mock_bot):
@@ -388,7 +388,7 @@ class TestXAIAPICog:
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
 
-        with patch("discord_grok.cogs.grok.cog.XAI_COLLECTION_IDS", ["collection_123"]):
+        with patch("discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS", ["collection_123"]):
             await cog.chat.callback(
                 cog,
                 ctx=mock_discord_context,
@@ -436,14 +436,14 @@ class TestXAIAPICog:
         assert "already have an active conversation" in call_kwargs["embed"].description
 
     async def test_resolve_selected_tools_collections_requires_ids(self, cog):
-        with patch("discord_grok.cogs.grok.cog.XAI_COLLECTION_IDS", []):
+        with patch("discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS", []):
             tools, error = cog.resolve_selected_tools(["collections_search"])
 
         assert tools == []
         assert "XAI_COLLECTION_IDS" in error
 
     async def test_resolve_selected_tools_success(self, cog):
-        with patch("discord_grok.cogs.grok.cog.XAI_COLLECTION_IDS", ["collection_abc"]):
+        with patch("discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS", ["collection_abc"]):
             tools, error = cog.resolve_selected_tools(
                 ["web_search", "x_search", "code_execution", "collections_search"]
             )
@@ -927,9 +927,9 @@ class TestTTSCommand:
     @pytest.fixture
     def cog(self, mock_bot):
         with patch("xai_sdk.AsyncClient"):
-            from discord_grok.cogs.grok.cog import xAIAPI
+            from discord_grok import GrokCog
 
-            cog = xAIAPI(bot=mock_bot)
+            cog = GrokCog(bot=mock_bot)
             return cog
 
     async def test_tts_text_too_long(self, cog, mock_discord_context):
@@ -1200,9 +1200,9 @@ class TestXAIHTTPRetries:
     @pytest.fixture
     def cog(self, mock_bot):
         with patch("xai_sdk.AsyncClient"):
-            from discord_grok.cogs.grok.cog import xAIAPI
+            from discord_grok import GrokCog
 
-            return xAIAPI(bot=mock_bot)
+            return GrokCog(bot=mock_bot)
 
     async def test_call_responses_api_retries_429_with_retry_after(self, cog):
         session = _MockHTTPSession(
@@ -1225,7 +1225,9 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch(
+                "discord_grok.cogs.grok.client.asyncio.sleep", new_callable=AsyncMock
+            ) as mock_sleep,
         ):
             response = await cog._call_responses_api(
                 {"model": "grok-3"},
@@ -1255,8 +1257,10 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-            patch("discord_grok.cogs.grok.cog.random.uniform", return_value=0.0),
+            patch(
+                "discord_grok.cogs.grok.client.asyncio.sleep", new_callable=AsyncMock
+            ) as mock_sleep,
+            patch("discord_grok.cogs.grok.client.random.uniform", return_value=0.0),
         ):
             response = await cog._call_responses_api({"model": "grok-3"})
 
@@ -1273,7 +1277,9 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch(
+                "discord_grok.cogs.grok.client.asyncio.sleep", new_callable=AsyncMock
+            ) as mock_sleep,
             pytest.raises(Exception, match="bad input"),
         ):
             await cog._call_responses_api({"model": "grok-3"})
@@ -1297,8 +1303,10 @@ class TestXAIHTTPRetries:
                 "_get_http_session",
                 new=AsyncMock(return_value=session),
             ),
-            patch("discord_grok.cogs.grok.cog.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-            patch("discord_grok.cogs.grok.cog.random.uniform", return_value=0.0),
+            patch(
+                "discord_grok.cogs.grok.client.asyncio.sleep", new_callable=AsyncMock
+            ) as mock_sleep,
+            patch("discord_grok.cogs.grok.client.random.uniform", return_value=0.0),
         ):
             audio = await cog._call_tts_api({"text": "Hello"})
 
@@ -1630,14 +1638,14 @@ class TestAppendSourcesEmbed:
     """Tests for the append_sources_embed helper."""
 
     def test_empty_citations_no_embed(self):
-        from discord_grok.cogs.grok.cog import append_sources_embed
+        from discord_grok.cogs.grok.embeds import append_sources_embed
 
         embeds = []
         append_sources_embed(embeds, [])
         assert len(embeds) == 0
 
     def test_web_citations_grouped(self):
-        from discord_grok.cogs.grok.cog import append_sources_embed
+        from discord_grok.cogs.grok.embeds import append_sources_embed
 
         citations = [
             {"url": "https://example.com/a", "source": "web"},
@@ -1650,7 +1658,7 @@ class TestAppendSourcesEmbed:
         assert "example.com" in embeds[0].description
 
     def test_mixed_sources_have_headings(self):
-        from discord_grok.cogs.grok.cog import append_sources_embed
+        from discord_grok.cogs.grok.embeds import append_sources_embed
 
         citations = [
             {"url": "https://example.com/a", "source": "web"},
@@ -1662,7 +1670,7 @@ class TestAppendSourcesEmbed:
         assert "**X Posts**" in embeds[0].description
 
     def test_single_source_type_no_heading(self):
-        from discord_grok.cogs.grok.cog import append_sources_embed
+        from discord_grok.cogs.grok.embeds import append_sources_embed
 
         citations = [
             {"url": "https://x.com/i/status/1", "source": "x"},
@@ -1673,7 +1681,7 @@ class TestAppendSourcesEmbed:
         assert "**X Posts**" not in embeds[0].description
 
     def test_skips_when_at_embed_limit(self):
-        from discord_grok.cogs.grok.cog import append_sources_embed
+        from discord_grok.cogs.grok.embeds import append_sources_embed
 
         embeds = [MagicMock() for _ in range(10)]
         citations = [{"url": "https://example.com", "source": "web"}]
