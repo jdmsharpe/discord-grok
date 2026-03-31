@@ -14,6 +14,15 @@ class ToolInfo(TypedDict):
 
 
 @dataclass
+class McpServerConfig:
+    """Validated MCP server configuration persisted with a conversation."""
+
+    server_url: str
+    server_label: str
+    allowed_tool_names: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ChatCompletionParameters:
     """A dataclass to store the parameters for a chat completion."""
 
@@ -26,6 +35,7 @@ class ChatCompletionParameters:
     reasoning_effort: str | None = None
     agent_count: int | None = None
     tools: list[Any] = field(default_factory=list)
+    mcp_servers: list[McpServerConfig] = field(default_factory=list)
     x_search_kwargs: dict[str, Any] = field(default_factory=dict)
     web_search_kwargs: dict[str, Any] = field(default_factory=dict)
     conversation_starter: Member | User | None = None
@@ -50,5 +60,6 @@ __all__ = [
     "ChatCompletionParameters",
     "CitationInfo",
     "Conversation",
+    "McpServerConfig",
     "ToolInfo",
 ]

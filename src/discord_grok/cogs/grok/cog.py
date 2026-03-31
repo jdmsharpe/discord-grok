@@ -296,11 +296,13 @@ class GrokCog(commands.Cog):
         selected_tool_names: list[str],
         x_search_kwargs: dict[str, Any] | None = None,
         web_search_kwargs: dict[str, Any] | None = None,
+        mcp_servers: list[Any] | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         return resolve_selected_tools(
             selected_tool_names,
             x_search_kwargs=x_search_kwargs,
             web_search_kwargs=web_search_kwargs,
+            mcp_servers=mcp_servers,
         )
 
     async def handle_new_message_in_conversation(
@@ -454,6 +456,18 @@ class GrokCog(commands.Cog):
         type=bool,
     )
     @option(
+        "mcp",
+        description="HTTPS URL of a trusted remote MCP server to enable for this conversation.",
+        required=False,
+        type=str,
+    )
+    @option(
+        "mcp_allowed_tools",
+        description="Optional comma-separated MCP tool allow-list, max 20 names.",
+        required=False,
+        type=str,
+    )
+    @option(
         "x_search_images",
         description="Allow X search to analyze images in posts. (default: false)",
         required=False,
@@ -519,6 +533,8 @@ class GrokCog(commands.Cog):
         x_search: bool = False,
         code_execution: bool = False,
         collections_search: bool = False,
+        mcp: str | None = None,
+        mcp_allowed_tools: str | None = None,
         x_search_images: bool = False,
         x_search_videos: bool = False,
         x_search_date_range: str | None = None,
@@ -546,6 +562,8 @@ class GrokCog(commands.Cog):
             x_search=x_search,
             code_execution=code_execution,
             collections_search=collections_search,
+            mcp=mcp,
+            mcp_allowed_tools=mcp_allowed_tools,
             x_search_images=x_search_images,
             x_search_videos=x_search_videos,
             x_search_date_range=x_search_date_range,

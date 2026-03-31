@@ -58,6 +58,8 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
   - `discord_grok.cogs.grok.client.RETRYABLE_STATUS_CODES`
   - `discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS`
   - `discord_grok.cogs.grok.views.ButtonView`
+  - `discord_grok.cogs.grok.tooling.validate_mcp_server_input`
+  - `discord_grok.cogs.grok.models.McpServerConfig`
 - Import `GrokCog` from `discord_grok`; do not reintroduce legacy `xai_api` shim paths.
 
 ## Validation Commands
@@ -75,3 +77,6 @@ pytest -q
 - `collections_search` requires `XAI_COLLECTION_IDS`.
 - Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`.
 - Chat, image, video, and TTS command bodies are delegated from `discord_grok.cogs.grok.cog` into feature modules.
+- Remote MCP is configured per `/grok chat` invocation with raw `mcp` and `mcp_allowed_tools` inputs, then persisted as `mcp_servers` on `ChatCompletionParameters`.
+- `resolve_selected_tools()` skips the canonical `mcp` marker and only emits MCP tool payloads from validated `mcp_servers`, preventing duplicate MCP entries.
+- MCP is intentionally excluded from the built-in tool dropdown so dropdown changes only affect built-in tools.

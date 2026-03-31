@@ -85,6 +85,48 @@ class TestGrokChat:
         ]
         assert "reasoning.encrypted_content" in payload.get("include", [])
 
+    async def test_chat_with_mcp_tool(self, cog, mock_discord_context):
+        """Chat should pass MCP tools through the Responses payload and persist config."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Use MCP",
+            model="grok-4.20",
+            mcp="https://mcp.example.com/sse",
+            mcp_allowed_tools="search,run,search",
+        )
+
+        payload = cog._call_responses_api.call_args[0][0]
+        assert [tool["type"] for tool in payload["tools"]] == ["mcp"]
+        assert payload["tools"][0]["server_url"] == "https://mcp.example.com/sse"
+        assert payload["tools"][0]["server_label"] == "mcp.example.com"
+        assert payload["tools"][0]["allowed_tool_names"] == ["search", "run"]
+
+        conversation = list(cog.conversations.values())[0]
+        assert conversation.params.mcp_servers[0].server_url == "https://mcp.example.com/sse"
+        assert conversation.params.mcp_servers[0].allowed_tool_names == ["search", "run"]
+
+    async def test_chat_rejects_non_https_mcp(self, cog, mock_discord_context):
+        """MCP URLs must be HTTPS."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Use MCP",
+            mcp="http://mcp.example.com/sse",
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "HTTPS" in call_kwargs["embed"].description
+        cog._call_responses_api.assert_not_called()
+
     async def test_chat_prevents_duplicate_conversations(self, cog, mock_discord_context):
         """Test that users can't start multiple conversations in the same channel."""
         from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation

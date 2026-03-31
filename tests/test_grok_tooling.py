@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -91,6 +91,25 @@ class TestGrokCogTooling:
         assert tools[0]["from_date"] == "2024-01-01T00:00:00"
         assert tools[0]["to_date"] == "2024-12-31T00:00:00"
 
+    async def test_resolve_selected_tools_includes_mcp(self, cog):
+        from discord_grok.cogs.grok.tooling import McpServerConfig
+
+        tools, error = cog.resolve_selected_tools(
+            ["web_search", "mcp"],
+            mcp_servers=[
+                McpServerConfig(
+                    server_url="https://mcp.example.com/sse",
+                    server_label="mcp.example.com",
+                    allowed_tool_names=["search"],
+                )
+            ],
+        )
+
+        assert error is None
+        assert [tool["type"] for tool in tools] == ["web_search", "mcp"]
+        assert tools[1]["server_url"] == "https://mcp.example.com/sse"
+        assert tools[1]["allowed_tool_names"] == ["search"]
+
 
 class TestResolveSelectedToolsUtil:
     """Tests for the resolve_selected_tools function in tooling.py."""
@@ -125,3 +144,49 @@ class TestResolveSelectedToolsUtil:
         assert error is None
         assert tools[0]["type"] == "file_search"
         assert tools[0]["vector_store_ids"] == ["col_1"]
+
+    def test_mcp_with_builtins(self):
+        from discord_grok.cogs.grok.tooling import McpServerConfig, resolve_selected_tools
+
+        tools, error = resolve_selected_tools(
+            ["code_execution"],
+            collection_ids=[],
+            mcp_servers=[
+                McpServerConfig(
+                    server_url="https://mcp.example.com/sse",
+                    server_label="mcp.example.com",
+                    allowed_tool_names=["search"],
+                )
+            ],
+        )
+
+        assert error is None
+        assert [tool["type"] for tool in tools] == ["code_interpreter", "mcp"]
+
+    def test_resolve_tools_for_view_preserves_mcp_servers(self):
+        from discord_grok.cogs.grok.models import (
+            ChatCompletionParameters,
+            Conversation,
+            McpServerConfig,
+        )
+        from discord_grok.cogs.grok.state import resolve_tools_for_view
+
+        conversation = Conversation(
+            params=ChatCompletionParameters(
+                model="grok-4.20",
+                mcp_servers=[
+                    McpServerConfig(
+                        server_url="https://mcp.example.com/sse",
+                        server_label="mcp.example.com",
+                        allowed_tool_names=["search"],
+                    )
+                ],
+            )
+        )
+        cog = make_cog(MagicMock())
+
+        active_names, error = resolve_tools_for_view(cog, ["web_search"], conversation)
+
+        assert error is None
+        assert active_names == {"web_search"}
+        assert [tool["type"] for tool in conversation.params.tools] == ["web_search", "mcp"]

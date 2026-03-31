@@ -6,7 +6,7 @@ from datetime import date
 from discord import Member, User
 
 from .client import cleanup_conversation_files
-from .tooling import resolve_selected_tools, resolve_tool_name
+from .tooling import SELECTABLE_TOOLS, resolve_selected_tools, resolve_tool_name
 from .views import ButtonView
 
 
@@ -77,13 +77,16 @@ def resolve_tools_for_view(
         selected_values,
         x_search_kwargs=conversation.params.x_search_kwargs,
         web_search_kwargs=conversation.params.web_search_kwargs,
+        mcp_servers=conversation.params.mcp_servers,
     )
     if error_message:
         return set(), error_message
 
     conversation.params.tools = tools
     active_names = {
-        tool_name for tool in tools if (tool_name := resolve_tool_name(tool)) is not None
+        tool_name
+        for tool in tools
+        if (tool_name := resolve_tool_name(tool)) in SELECTABLE_TOOLS
     }
     return active_names, None
 
