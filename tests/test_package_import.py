@@ -1,5 +1,3 @@
-import warnings
-
 from discord import Bot, Intents
 
 from discord_grok import GrokCog
@@ -14,13 +12,3 @@ def test_namespaced_import_registers_cog():
     bot = Bot(intents=intents)
     bot.add_cog(GrokCog(bot=bot))
     assert bot.get_cog("GrokCog") is not None
-
-
-def test_shim_import_warns():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        import xai_api
-
-        assert xai_api.GrokCog is GrokCog
-        assert not hasattr(xai_api, "xAIAPI")
-    assert any(item.category is DeprecationWarning for item in caught)

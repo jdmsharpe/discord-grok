@@ -38,8 +38,5 @@ venv = ".venv"
 where = ["src"]
 include = ["discord_grok", "discord_grok.*"]
 
-[tool.setuptools]
-py-modules = ["xai_api"]
-
 [tool.setuptools.package-dir]
 "" = "src"

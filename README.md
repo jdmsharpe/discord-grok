@@ -139,7 +139,6 @@ from discord_grok import GrokCog
 bot.add_cog(GrokCog(bot=bot))
 ```
 
-The legacy top-level `xai_api` module remains as a temporary compatibility shim and emits a `DeprecationWarning`.
 Top-level `bot.py`, `button_view.py`, `util.py`, and `config` stay repo-local and are not the installed public API surface.
 
 **With Docker:**
@@ -183,6 +182,8 @@ docker-compose up -d
 ### Testing
 
 Tests use pytest with pytest-asyncio (`asyncio_mode = "auto"`). All tests are mocked — no real API calls.
+The suite is organized around the refactored package layout, with focused files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, and `tests/test_grok_tooling.py`.
+Import from `discord_grok` directly; legacy top-level shim modules are no longer part of the supported workflow.
 
 GitHub Actions runs the test suite against Python 3.10, 3.11, 3.12, and 3.13.
 
