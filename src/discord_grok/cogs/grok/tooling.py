@@ -1,8 +1,9 @@
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
 from ...config.auth import XAI_COLLECTION_IDS
-from .models import ChatCompletionParameters, Conversation
+from .models import ChatCompletionParameters, Conversation, McpServerConfig
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
@@ -137,13 +138,28 @@ TOOL_WEB_SEARCH = "web_search"
 TOOL_X_SEARCH = "x_search"
 TOOL_CODE_EXECUTION = "code_execution"
 TOOL_COLLECTIONS_SEARCH = "collections_search"
+TOOL_REMOTE_MCP = "mcp"
 
-# Tool names available to the Discord UI.
+MAX_MCP_URL_LENGTH = 2048
+MAX_MCP_ALLOWED_TOOLS = 20
+MAX_MCP_LABEL_LENGTH = 50
+MAX_MCP_TOOL_NAME_LENGTH = 100
+
+# Tool names available to the Discord layer.
 AVAILABLE_TOOLS = {
     TOOL_WEB_SEARCH: "Web Search",
     TOOL_X_SEARCH: "X Search",
     TOOL_CODE_EXECUTION: "Code Execution",
     TOOL_COLLECTIONS_SEARCH: "Collections Search",
+    TOOL_REMOTE_MCP: "Remote MCP",
+}
+
+# Tool names managed by the conversation tool dropdown.
+SELECTABLE_TOOLS = {
+    TOOL_WEB_SEARCH: AVAILABLE_TOOLS[TOOL_WEB_SEARCH],
+    TOOL_X_SEARCH: AVAILABLE_TOOLS[TOOL_X_SEARCH],
+    TOOL_CODE_EXECUTION: AVAILABLE_TOOLS[TOOL_CODE_EXECUTION],
+    TOOL_COLLECTIONS_SEARCH: AVAILABLE_TOOLS[TOOL_COLLECTIONS_SEARCH],
 }
 
 # Tool builders that produce Responses API JSON tool dicts.
@@ -151,6 +167,7 @@ TOOL_BUILDERS: dict[str, Callable[..., dict[str, Any]]] = {
     TOOL_WEB_SEARCH: lambda **kw: {"type": "web_search", **kw},
     TOOL_X_SEARCH: lambda **kw: {"type": "x_search", **kw},
     TOOL_CODE_EXECUTION: lambda **kw: {"type": "code_interpreter"},  # noqa: ARG005
+    TOOL_REMOTE_MCP: lambda **kw: {"type": "mcp", **kw},
 }
 
 
@@ -174,6 +191,7 @@ _TOOL_TYPE_TO_CANONICAL: dict[str, str] = {
     "x_search": TOOL_X_SEARCH,
     "code_interpreter": TOOL_CODE_EXECUTION,
     "file_search": TOOL_COLLECTIONS_SEARCH,
+    "mcp": TOOL_REMOTE_MCP,
 }
 
 
@@ -188,6 +206,78 @@ def resolve_tool_name(tool_config: Any) -> str | None:
     if canonical in AVAILABLE_TOOLS:
         return canonical
     return None
+
+
+def _normalize_mcp_label(hostname: str) -> str:
+    label = hostname.strip().lower().rstrip(".")
+    if label.startswith("www."):
+        label = label[4:]
+    if len(label) > MAX_MCP_LABEL_LENGTH:
+        label = label[:MAX_MCP_LABEL_LENGTH]
+    return label or "mcp"
+
+
+def validate_mcp_server_input(
+    server_url: str | None,
+    allowed_tools_csv: str | None = None,
+) -> tuple[McpServerConfig | None, str | None]:
+    """Validate raw /grok MCP inputs and normalize them into a config object."""
+    if server_url is None or not server_url.strip():
+        return None, None
+
+    normalized_url = server_url.strip()
+    if len(normalized_url) > MAX_MCP_URL_LENGTH:
+        return None, f"`mcp` must be {MAX_MCP_URL_LENGTH} characters or fewer."
+
+    parsed = urlparse(normalized_url)
+    if parsed.scheme != "https":
+        return None, "`mcp` must be an HTTPS URL."
+    if not parsed.netloc or not parsed.hostname:
+        return None, "`mcp` must be a valid URL with a hostname."
+
+    allowed_tool_names: list[str] = []
+    seen_names: set[str] = set()
+    if allowed_tools_csv:
+        for raw_name in allowed_tools_csv.split(","):
+            tool_name = raw_name.strip()
+            if not tool_name:
+                continue
+            if len(tool_name) > MAX_MCP_TOOL_NAME_LENGTH:
+                return (
+                    None,
+                    "`mcp_allowed_tools` entries must be "
+                    f"{MAX_MCP_TOOL_NAME_LENGTH} characters or fewer.",
+                )
+            if tool_name in seen_names:
+                continue
+            seen_names.add(tool_name)
+            allowed_tool_names.append(tool_name)
+            if len(allowed_tool_names) > MAX_MCP_ALLOWED_TOOLS:
+                return (
+                    None,
+                    "`mcp_allowed_tools` supports a maximum of "
+                    f"{MAX_MCP_ALLOWED_TOOLS} tool names.",
+                )
+
+    return (
+        McpServerConfig(
+            server_url=normalized_url,
+            server_label=_normalize_mcp_label(parsed.hostname),
+            allowed_tool_names=allowed_tool_names,
+        ),
+        None,
+    )
+
+
+def build_mcp_tool(server: McpServerConfig) -> dict[str, Any]:
+    """Build the xAI Responses API MCP tool dict for a validated server config."""
+    tool = TOOL_BUILDERS[TOOL_REMOTE_MCP](
+        server_url=server.server_url,
+        server_label=server.server_label,
+    )
+    if server.allowed_tool_names:
+        tool["allowed_tool_names"] = list(server.allowed_tool_names)
+    return tool
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_TEXT_SIZE) -> list[str]:
@@ -248,6 +338,7 @@ def resolve_selected_tools(
     collection_ids: list[str] | None = None,
     x_search_kwargs: dict[str, Any] | None = None,
     web_search_kwargs: dict[str, Any] | None = None,
+    mcp_servers: list[McpServerConfig] | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Build Responses API tool dicts for the selected tool names.
 
@@ -263,6 +354,8 @@ def resolve_selected_tools(
     active_collection_ids = XAI_COLLECTION_IDS if collection_ids is None else collection_ids
 
     for tool_name in selected_tool_names:
+        if tool_name == TOOL_REMOTE_MCP:
+            continue
         if tool_name == TOOL_COLLECTIONS_SEARCH:
             if not active_collection_ids:
                 return (
@@ -290,6 +383,9 @@ def resolve_selected_tools(
             continue
         tools.append(tool_builder())
 
+    for mcp_server in mcp_servers or []:
+        tools.append(build_mcp_tool(mcp_server))
+
     return tools, None
 
 
@@ -307,11 +403,19 @@ __all__ = [
     "REASONING_EFFORT_MODELS",
     "TOOL_COLLECTIONS_SEARCH",
     "TOOL_CODE_EXECUTION",
+    "TOOL_REMOTE_MCP",
     "TOOL_USAGE_DISPLAY_NAMES",
     "TOOL_WEB_SEARCH",
     "TOOL_X_SEARCH",
+    "MAX_MCP_ALLOWED_TOOLS",
+    "MAX_MCP_LABEL_LENGTH",
+    "MAX_MCP_TOOL_NAME_LENGTH",
+    "MAX_MCP_URL_LENGTH",
+    "McpServerConfig",
+    "SELECTABLE_TOOLS",
     "TTS_VOICES",
     "XAI_COLLECTION_IDS",
+    "build_mcp_tool",
     "calculate_cost",
     "calculate_image_cost",
     "calculate_tool_cost",
@@ -319,6 +423,7 @@ __all__ = [
     "calculate_video_cost",
     "chunk_text",
     "format_xai_error",
+    "validate_mcp_server_input",
     "resolve_selected_tools",
     "resolve_tool_name",
     "truncate_text",

@@ -8,12 +8,14 @@ from discord_grok.cogs.grok.tooling import (
     TOOL_CODE_EXECUTION,
     TOOL_COLLECTIONS_SEARCH,
     TOOL_INVOCATION_PRICING,
+    TOOL_REMOTE_MCP,
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
     TTS_PRICING_PER_MILLION_CHARS,
     VIDEO_PRICING_PER_SECOND,
     ChatCompletionParameters,
     Conversation,
+    McpServerConfig,
     calculate_cost,
     calculate_image_cost,
     calculate_tool_cost,
@@ -23,6 +25,7 @@ from discord_grok.cogs.grok.tooling import (
     format_xai_error,
     resolve_tool_name,
     truncate_text,
+    validate_mcp_server_input,
 )
 
 
@@ -147,6 +150,7 @@ class TestChatCompletionParameters:
         assert params.reasoning_effort is None
         assert params.agent_count is None
         assert params.tools == []
+        assert params.mcp_servers == []
         assert params.x_search_kwargs == {}
         assert params.web_search_kwargs == {}
         assert params.paused is False
@@ -168,6 +172,13 @@ class TestChatCompletionParameters:
                 TOOL_BUILDERS[TOOL_X_SEARCH](),
                 TOOL_BUILDERS[TOOL_CODE_EXECUTION](),
             ],
+            mcp_servers=[
+                McpServerConfig(
+                    server_url="https://mcp.example.com/sse",
+                    server_label="mcp.example.com",
+                    allowed_tool_names=["search"],
+                )
+            ],
         )
         assert params.model == "grok-4.20"
         assert params.temperature == 0.7
@@ -177,6 +188,7 @@ class TestChatCompletionParameters:
         assert params.presence_penalty == 0.3
         assert params.reasoning_effort == "high"
         assert len(params.tools) == 3
+        assert params.mcp_servers[0].server_url == "https://mcp.example.com/sse"
         assert resolve_tool_name(params.tools[0]) == TOOL_WEB_SEARCH
         assert resolve_tool_name(params.tools[1]) == TOOL_X_SEARCH
         assert resolve_tool_name(params.tools[2]) == TOOL_CODE_EXECUTION
@@ -189,6 +201,19 @@ class TestChatCompletionParameters:
         params_two = ChatCompletionParameters(model="grok-3")
         assert params_two.tools == []
         assert params_one.tools is not params_two.tools
+
+    def test_default_mcp_servers_isolated(self):
+        params_one = ChatCompletionParameters(model="grok-3")
+        params_one.mcp_servers.append(
+            McpServerConfig(
+                server_url="https://mcp.example.com/sse",
+                server_label="mcp.example.com",
+            )
+        )
+
+        params_two = ChatCompletionParameters(model="grok-3")
+        assert params_two.mcp_servers == []
+        assert params_one.mcp_servers is not params_two.mcp_servers
 
 
 class TestModelLists:
@@ -272,9 +297,43 @@ class TestToolHelpers:
         tool = {"type": "file_search", "vector_store_ids": ["collection_123"]}
         assert resolve_tool_name(tool) == TOOL_COLLECTIONS_SEARCH
 
+    def test_resolve_tool_name_for_mcp(self):
+        tool = {
+            "type": "mcp",
+            "server_url": "https://mcp.example.com/sse",
+            "server_label": "mcp.example.com",
+        }
+        assert resolve_tool_name(tool) == TOOL_REMOTE_MCP
+
     def test_resolve_tool_name_unknown(self):
         assert resolve_tool_name(object()) is None
         assert resolve_tool_name({"type": "unknown_tool"}) is None
+
+    def test_validate_mcp_server_input_success(self):
+        config, error = validate_mcp_server_input(
+            "https://www.example.com/mcp",
+            "search, run, search",
+        )
+
+        assert error is None
+        assert config is not None
+        assert config.server_url == "https://www.example.com/mcp"
+        assert config.server_label == "example.com"
+        assert config.allowed_tool_names == ["search", "run"]
+
+    def test_validate_mcp_server_input_requires_https(self):
+        config, error = validate_mcp_server_input("http://example.com/mcp")
+
+        assert config is None
+        assert "HTTPS" in error
+
+    def test_validate_mcp_server_input_rejects_too_many_tool_names(self):
+        allowed = ",".join(f"tool_{index}" for index in range(21))
+
+        config, error = validate_mcp_server_input("https://example.com/mcp", allowed)
+
+        assert config is None
+        assert "maximum of 20" in error
 
 
 class TestPricing:

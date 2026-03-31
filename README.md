@@ -33,10 +33,13 @@ All commands are grouped under `/grok` for clean namespacing.
   - `x_search`
   - `code_execution`
   - `collections_search` (requires `XAI_COLLECTION_IDS`)
+- Optional remote MCP support on `/grok chat` through `mcp` and `mcp_allowed_tools`
 - Conversation tool toggle dropdown to enable/disable tools mid-conversation
+- MCP configuration persists across follow-up turns and is intentionally kept separate from the built-in tool dropdown
 - Tool configuration options:
   - X search: date range filter, allowed/excluded handles, image and video understanding
   - Web search: allowed/excluded domains, image understanding
+- Remote MCP validation: HTTPS required, hostname-derived label, deduplicated allow-list, and a max of 20 allowed tool names
 - Source citations shown in a dedicated "Sources" embed when available
 - Per-request cost and token usage tracking with daily cumulative cost per user (includes reasoning, cached, and image token breakdowns, cached token discounts, tool invocation costs, and TTS character-based costs)
 - Server-side tool usage counts and invocation costs shown in cost embed when tools are used
@@ -169,6 +172,19 @@ docker-compose up -d
    - :arrows_counterclockwise: Regenerate the last response
    - :play_or_pause_button: Pause/resume the conversation
    - :stop_button: End the conversation
+4. Optional MCP settings on `/grok chat`:
+   - `mcp`: a single trusted HTTPS remote MCP server URL
+   - `mcp_allowed_tools`: optional comma-separated allow-list for that server
+5. Built-in tool dropdown changes do not remove an active MCP server; MCP stays attached until the conversation ends
+
+## Remote MCP Safety
+
+`/grok chat` accepts raw remote MCP URLs, so treat them as highly trusted:
+
+- Use only HTTPS servers you control or trust.
+- Prefer a narrow `mcp_allowed_tools` allow-list instead of exposing every tool on a server.
+- xAI MCP support in this bot does not have a Discord approval loop in this implementation.
+- Sensitive conversation context may be sent to the configured MCP server if the model chooses to call it.
 
 ## Requirements
 

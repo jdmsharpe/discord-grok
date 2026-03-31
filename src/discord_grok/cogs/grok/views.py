@@ -14,7 +14,7 @@ from discord import (
 )
 from discord.ui import Button, Select, View, button
 
-from .tooling import AVAILABLE_TOOLS, resolve_tool_name
+from .tooling import SELECTABLE_TOOLS, resolve_tool_name
 
 
 async def _send_interaction_error(interaction: Interaction, context: str, error: Exception) -> None:
@@ -61,7 +61,7 @@ class ButtonView(View):
         tool_select = Select(
             placeholder="Toggle conversation tools",
             min_values=0,
-            max_values=len(AVAILABLE_TOOLS),
+            max_values=len(SELECTABLE_TOOLS),
             row=1,
             options=[
                 SelectOption(
@@ -114,7 +114,7 @@ class ButtonView(View):
                 )
                 return
 
-            selected_values = [value for value in tool_select.values if value in AVAILABLE_TOOLS]
+            selected_values = [value for value in tool_select.values if value in SELECTABLE_TOOLS]
 
             active_names, error_message = self._on_tools_changed(selected_values, conversation)
             if error_message and not active_names:

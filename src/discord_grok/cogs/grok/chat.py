@@ -22,12 +22,14 @@ from .tooling import (
     REASONING_EFFORT_MODELS,
     TOOL_CODE_EXECUTION,
     TOOL_COLLECTIONS_SEARCH,
+    TOOL_REMOTE_MCP,
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
     calculate_cost,
     calculate_tool_cost,
     format_xai_error,
     truncate_text,
+    validate_mcp_server_input,
 )
 
 
@@ -281,6 +283,8 @@ async def run_chat_command(
     x_search: bool = False,
     code_execution: bool = False,
     collections_search: bool = False,
+    mcp: str | None = None,
+    mcp_allowed_tools: str | None = None,
     x_search_images: bool = False,
     x_search_videos: bool = False,
     x_search_date_range: str | None = None,
@@ -514,6 +518,20 @@ async def run_chat_command(
                 return
             web_search_kw["excluded_domains"] = domains
 
+        mcp_servers = []
+        mcp_server, mcp_error = validate_mcp_server_input(mcp, mcp_allowed_tools)
+        if mcp_error:
+            await ctx.send_followup(
+                embed=Embed(
+                    title="Error",
+                    description=mcp_error,
+                    color=Colour.red(),
+                )
+            )
+            return
+        if mcp_server is not None:
+            mcp_servers.append(mcp_server)
+
         selected_tool_names: list[str] = []
         if web_search:
             selected_tool_names.append(TOOL_WEB_SEARCH)
@@ -523,11 +541,14 @@ async def run_chat_command(
             selected_tool_names.append(TOOL_CODE_EXECUTION)
         if collections_search:
             selected_tool_names.append(TOOL_COLLECTIONS_SEARCH)
+        if mcp_servers:
+            selected_tool_names.append(TOOL_REMOTE_MCP)
 
         tools, tool_error = cog.resolve_selected_tools(
             selected_tool_names,
             x_search_kwargs=x_search_kw,
             web_search_kwargs=web_search_kw,
+            mcp_servers=mcp_servers,
         )
         if tool_error:
             await ctx.send_followup(
@@ -627,6 +648,15 @@ async def run_chat_command(
             description += f"**Agent Count:** {agent_count}\n"
         if selected_tool_names:
             description += f"**Tools:** {', '.join(selected_tool_names)}\n"
+        if mcp_servers:
+            mcp_server = mcp_servers[0]
+            description += f"**MCP Server:** {mcp_server.server_label} ({mcp_server.server_url})\n"
+            if mcp_server.allowed_tool_names:
+                description += (
+                    "**MCP Allowed Tools:** "
+                    + ", ".join(mcp_server.allowed_tool_names)
+                    + "\n"
+                )
 
         embeds = [
             Embed(
@@ -700,6 +730,7 @@ async def run_chat_command(
             reasoning_effort=reasoning_effort,
             agent_count=agent_count,
             tools=tools,
+            mcp_servers=mcp_servers,
             x_search_kwargs=x_search_kw,
             web_search_kwargs=web_search_kw,
             conversation_starter=ctx.author,
