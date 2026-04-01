@@ -1,5 +1,11 @@
 """Public namespace for the Discord Grok bot."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .cogs.grok.cog import GrokCog
+    from .config.auth import BOT_TOKEN
+
 __all__ = ["GrokCog", "BOT_TOKEN"]
 
 
