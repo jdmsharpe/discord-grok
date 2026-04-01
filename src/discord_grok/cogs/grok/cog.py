@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import Any
@@ -771,3 +769,16 @@ class GrokCog(commands.Cog):
             sample_rate=sample_rate,
             bit_rate=bit_rate,
         )
+
+
+def _refresh_group_command_options(group: SlashCommandGroup) -> None:
+    """Work around Pycord parsing grouped cog commands before group attachment."""
+    for command in group.subcommands:
+        command.attached_to_group = True
+        if isinstance(command, SlashCommandGroup):
+            _refresh_group_command_options(command)
+            continue
+        command._validate_parameters()
+
+
+_refresh_group_command_options(GrokCog.grok)

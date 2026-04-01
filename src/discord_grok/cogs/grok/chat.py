@@ -3,15 +3,11 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime
+from importlib import import_module
 from typing import Any, cast
 
 from discord import ApplicationContext, Attachment, Colour, Embed, Message, TextChannel
 
-from ...config.mcp import (
-    build_mcp_server_config,
-    parse_mcp_preset_names,
-    resolve_mcp_presets,
-)
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
 from .embeds import (
     append_pricing_embed,
@@ -35,6 +31,11 @@ from .tooling import (
     format_xai_error,
     truncate_text,
 )
+
+
+def _get_mcp_config_module():
+    """Resolve MCP config lazily so module reloads in tests don't leave stale refs."""
+    return import_module("discord_grok.config.mcp")
 
 
 async def keep_typing(cog, channel: Any) -> None:
@@ -425,8 +426,9 @@ async def run_chat_command(
         if web_search_images:
             web_search_kw["enable_image_understanding"] = True
 
-        mcp_preset_names = parse_mcp_preset_names(mcp)
-        mcp_presets, mcp_error = resolve_mcp_presets(mcp_preset_names)
+        mcp_config = _get_mcp_config_module()
+        mcp_preset_names = mcp_config.parse_mcp_preset_names(mcp)
+        mcp_presets, mcp_error = mcp_config.resolve_mcp_presets(mcp_preset_names)
         if mcp_error:
             await ctx.send_followup(
                 embed=Embed(
@@ -436,7 +438,7 @@ async def run_chat_command(
                 )
             )
             return
-        mcp_servers = [build_mcp_server_config(preset) for preset in mcp_presets]
+        mcp_servers = [mcp_config.build_mcp_server_config(preset) for preset in mcp_presets]
 
         selected_tool_names: list[str] = []
         if web_search:
