@@ -11,6 +11,9 @@
   bot.add_cog(GrokCog(bot=bot))
   ```
 
+- `discord_grok.bot.main()` now calls `validate_required_config()` before connecting, so missing or blank `BOT_TOKEN` and `XAI_API_KEY` values fail fast at startup.
+- `discord_grok` and `discord_grok.cogs.grok` both use lazy `__getattr__` exports so helper imports do not eagerly pull in Discord-heavy modules.
+
 ## Package Layout
 
 ```text
@@ -50,7 +53,7 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
 
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
-- The test suite is organized into module-aligned files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, and `tests/test_grok_tooling.py`.
+- The test suite is organized into module-aligned files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, `tests/test_grok_tooling.py`, `tests/test_config_auth.py`, and `tests/test_lazy_imports.py`.
 - `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
 - Examples:
