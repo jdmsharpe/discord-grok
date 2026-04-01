@@ -190,3 +190,32 @@ class TestResolveSelectedToolsUtil:
         assert error is None
         assert active_names == {"web_search"}
         assert [tool["type"] for tool in conversation.params.tools] == ["web_search", "mcp"]
+
+    def test_every_ui_selectable_tool_is_resolvable_and_buildable(self):
+        from discord_grok.cogs.grok.tooling import (
+            SELECTABLE_TOOLS,
+            TOOL_COLLECTIONS_SEARCH,
+            TOOL_REGISTRY,
+            resolve_selected_tools,
+            resolve_tool_name,
+        )
+
+        for tool_name in SELECTABLE_TOOLS:
+            assert tool_name in TOOL_REGISTRY
+            tool_kwargs = {}
+            collection_ids = []
+            if tool_name == TOOL_COLLECTIONS_SEARCH:
+                collection_ids = ["col_1"]
+            elif TOOL_REGISTRY[tool_name].supports_kwargs:
+                tool_kwargs = {"enabled": True}
+
+            tools, error = resolve_selected_tools(
+                [tool_name],
+                collection_ids=collection_ids,
+                x_search_kwargs=tool_kwargs if tool_name == "x_search" else None,
+                web_search_kwargs=tool_kwargs if tool_name == "web_search" else None,
+            )
+
+            assert error is None
+            assert len(tools) == 1
+            assert resolve_tool_name(tools[0]) == tool_name
