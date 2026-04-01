@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
@@ -155,19 +156,79 @@ AVAILABLE_TOOLS = {
 }
 
 # Tool names managed by the conversation tool dropdown.
+@dataclass(frozen=True)
+class ToolRegistryEntry:
+    """Single source of truth for supported tool metadata and builders."""
+
+    canonical_name: str
+    display_label: str
+    responses_api_type: str
+    description: str
+    builder: Callable[..., dict[str, Any]]
+    usage_key: str | None = None
+    ui_selectable: bool = False
+    supports_kwargs: bool = False
+    supports_domain_filters: bool = False
+
+
+# Tool registry keyed by canonical Discord-layer tool name.
+TOOL_REGISTRY: dict[str, ToolRegistryEntry] = {
+    TOOL_WEB_SEARCH: ToolRegistryEntry(
+        canonical_name=TOOL_WEB_SEARCH,
+        display_label="Web Search",
+        description="Search the web in real time.",
+        responses_api_type="web_search",
+        builder=lambda **kw: {"type": "web_search", **kw},
+        usage_key="SERVER_SIDE_TOOL_WEB_SEARCH",
+        ui_selectable=True,
+        supports_kwargs=True,
+        supports_domain_filters=True,
+    ),
+    TOOL_X_SEARCH: ToolRegistryEntry(
+        canonical_name=TOOL_X_SEARCH,
+        display_label="X Search",
+        description="Search X posts and threads.",
+        responses_api_type="x_search",
+        builder=lambda **kw: {"type": "x_search", **kw},
+        usage_key="SERVER_SIDE_TOOL_X_SEARCH",
+        ui_selectable=True,
+        supports_kwargs=True,
+    ),
+    TOOL_CODE_EXECUTION: ToolRegistryEntry(
+        canonical_name=TOOL_CODE_EXECUTION,
+        display_label="Code Execution",
+        description="Run Python code in a sandbox.",
+        responses_api_type="code_interpreter",
+        builder=lambda **kw: {"type": "code_interpreter"},  # noqa: ARG005
+        usage_key="SERVER_SIDE_TOOL_CODE_EXECUTION",
+        ui_selectable=True,
+    ),
+    TOOL_COLLECTIONS_SEARCH: ToolRegistryEntry(
+        canonical_name=TOOL_COLLECTIONS_SEARCH,
+        display_label="Collections Search",
+        description="Search configured collections.",
+        responses_api_type="file_search",
+        builder=lambda **kw: {"type": "file_search", **kw},
+        usage_key="SERVER_SIDE_TOOL_COLLECTIONS_SEARCH",
+        ui_selectable=True,
+    ),
+    TOOL_REMOTE_MCP: ToolRegistryEntry(
+        canonical_name=TOOL_REMOTE_MCP,
+        display_label="Remote MCP",
+        description="Use remote MCP server tools.",
+        responses_api_type="mcp",
+        builder=lambda **kw: {"type": "mcp", **kw},
+        usage_key="SERVER_SIDE_TOOL_MCP",
+    ),
+}
+
 SELECTABLE_TOOLS = {
-    TOOL_WEB_SEARCH: AVAILABLE_TOOLS[TOOL_WEB_SEARCH],
-    TOOL_X_SEARCH: AVAILABLE_TOOLS[TOOL_X_SEARCH],
-    TOOL_CODE_EXECUTION: AVAILABLE_TOOLS[TOOL_CODE_EXECUTION],
-    TOOL_COLLECTIONS_SEARCH: AVAILABLE_TOOLS[TOOL_COLLECTIONS_SEARCH],
+    key: entry.display_label for key, entry in TOOL_REGISTRY.items() if entry.ui_selectable
 }
 
 # Tool builders that produce Responses API JSON tool dicts.
 TOOL_BUILDERS: dict[str, Callable[..., dict[str, Any]]] = {
-    TOOL_WEB_SEARCH: lambda **kw: {"type": "web_search", **kw},
-    TOOL_X_SEARCH: lambda **kw: {"type": "x_search", **kw},
-    TOOL_CODE_EXECUTION: lambda **kw: {"type": "code_interpreter"},  # noqa: ARG005
-    TOOL_REMOTE_MCP: lambda **kw: {"type": "mcp", **kw},
+    key: entry.builder for key, entry in TOOL_REGISTRY.items()
 }
 
 
@@ -187,11 +248,7 @@ TOOL_USAGE_DISPLAY_NAMES: dict[str, str] = {
 
 
 _TOOL_TYPE_TO_CANONICAL: dict[str, str] = {
-    "web_search": TOOL_WEB_SEARCH,
-    "x_search": TOOL_X_SEARCH,
-    "code_interpreter": TOOL_CODE_EXECUTION,
-    "file_search": TOOL_COLLECTIONS_SEARCH,
-    "mcp": TOOL_REMOTE_MCP,
+    entry.responses_api_type: name for name, entry in TOOL_REGISTRY.items()
 }
 
 
@@ -356,32 +413,28 @@ def resolve_selected_tools(
     for tool_name in selected_tool_names:
         if tool_name == TOOL_REMOTE_MCP:
             continue
+        registry_entry = TOOL_REGISTRY.get(tool_name)
+        if registry_entry is None:
+            continue
+
         if tool_name == TOOL_COLLECTIONS_SEARCH:
             if not active_collection_ids:
                 return (
                     [],
                     "Collections search requires XAI_COLLECTION_IDS to be set in your .env.",
                 )
-            tools.append(
-                {
-                    "type": "file_search",
-                    "vector_store_ids": list(active_collection_ids),
-                }
-            )
+            tools.append(registry_entry.builder(vector_store_ids=list(active_collection_ids)))
             continue
 
         if tool_name == TOOL_X_SEARCH and x_search_kwargs:
-            tools.append({"type": "x_search", **x_search_kwargs})
+            tools.append(registry_entry.builder(**x_search_kwargs))
             continue
 
         if tool_name == TOOL_WEB_SEARCH and web_search_kwargs:
-            tools.append({"type": "web_search", **web_search_kwargs})
+            tools.append(registry_entry.builder(**web_search_kwargs))
             continue
 
-        tool_builder = TOOL_BUILDERS.get(tool_name)
-        if tool_builder is None:
-            continue
-        tools.append(tool_builder())
+        tools.append(registry_entry.builder())
 
     for mcp_server in mcp_servers or []:
         tools.append(build_mcp_tool(mcp_server))
@@ -403,6 +456,7 @@ __all__ = [
     "REASONING_EFFORT_MODELS",
     "TOOL_COLLECTIONS_SEARCH",
     "TOOL_CODE_EXECUTION",
+    "TOOL_REGISTRY",
     "TOOL_REMOTE_MCP",
     "TOOL_USAGE_DISPLAY_NAMES",
     "TOOL_WEB_SEARCH",

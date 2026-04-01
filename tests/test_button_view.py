@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from discord.ui import Select
 
-from discord_grok.cogs.grok.tooling import TOOL_BUILDERS
+from discord_grok.cogs.grok.tooling import SELECTABLE_TOOLS, TOOL_BUILDERS, TOOL_REGISTRY
 
 
 def _make_view(
@@ -40,7 +40,17 @@ class TestButtonView:
         selects = [item for item in view.children if isinstance(item, Select)]
         assert len(selects) == 1
         assert selects[0].min_values == 0
-        assert selects[0].max_values == 4
+        assert selects[0].max_values == len(SELECTABLE_TOOLS)
+
+    async def test_tool_select_options_match_registry(self, conversation_starter):
+        view = _make_view(conversation_starter=conversation_starter)
+        tool_select = next(item for item in view.children if isinstance(item, Select))
+
+        assert {option.value for option in tool_select.options} == set(SELECTABLE_TOOLS)
+        for option in tool_select.options:
+            entry = TOOL_REGISTRY[option.value]
+            assert option.label == entry.display_label
+            assert option.description == entry.description
 
     async def test_init_with_initial_tools_sets_defaults(self, conversation_starter):
         view = _make_view(
