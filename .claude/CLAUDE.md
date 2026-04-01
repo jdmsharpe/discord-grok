@@ -12,7 +12,7 @@
   ```
 
 - `discord_grok.bot.main()` now calls `validate_required_config()` before connecting, so missing or blank `BOT_TOKEN` and `XAI_API_KEY` values fail fast at startup.
-- `discord_grok` and `discord_grok.cogs.grok` both use lazy `__getattr__` exports so helper imports do not eagerly pull in Discord-heavy modules.
+- `discord_grok` and `discord_grok.cogs.grok` both use lazy `__getattr__` exports so helper imports do not eagerly pull in Discord-heavy modules. Type-only imports keep `pyright src/` aware of those public exports, including the compatibility `BOT_TOKEN` re-export.
 
 ## Package Layout
 
@@ -73,6 +73,8 @@ ruff format src/ tests/
 pyright src/
 pytest -q
 ```
+
+- The repo pre-commit hook prefers a repo-local `.venv` Ruff binary when available and falls back to `PATH`.
 
 ## Provider Notes
 

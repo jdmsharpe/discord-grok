@@ -12,11 +12,30 @@ if [ -z "$STAGED_PY" ]; then
     exit 0
 fi
 
-# Check for ruff
-if ! command -v ruff &>/dev/null; then
-    echo "⚠  ruff not found — skipping lint checks"
+resolve_ruff() {
+    if [ -f ".venv/bin/ruff" ]; then
+        printf '%s\n' ".venv/bin/ruff"
+        return 0
+    fi
+    if [ -f ".venv/Scripts/ruff.exe" ] && ! grep -qi microsoft /proc/version 2>/dev/null; then
+        printf '%s\n' ".venv/Scripts/ruff.exe"
+        return 0
+    fi
+    if [ -f ".venv/Scripts/ruff" ] && ! grep -qi microsoft /proc/version 2>/dev/null; then
+        printf '%s\n' ".venv/Scripts/ruff"
+        return 0
+    fi
+    if command -v ruff &>/dev/null; then
+        command -v ruff
+        return 0
+    fi
+    return 1
+}
+
+if ! RUFF=$(resolve_ruff); then
+    echo "⚠  ruff not found in .venv or PATH — skipping lint checks"
     exit 0
 fi
 
 # Lint check (strict — blocks commit on failure)
-echo "$STAGED_PY" | xargs ruff check
+echo "$STAGED_PY" | xargs "$RUFF" check

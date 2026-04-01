@@ -2,7 +2,7 @@ import logging
 
 from discord import Bot, Intents
 
-from . import GrokCog
+from .cogs.grok.cog import GrokCog
 from .config.auth import BOT_TOKEN, validate_required_config
 
 logging.basicConfig(

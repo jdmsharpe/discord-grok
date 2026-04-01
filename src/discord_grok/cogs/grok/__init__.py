@@ -1,5 +1,10 @@
 """Grok cog package exports."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .cog import GrokCog
+
 __all__ = ["GrokCog"]
 
 
