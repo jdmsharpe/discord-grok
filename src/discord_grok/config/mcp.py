@@ -8,9 +8,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from ..cogs.grok.models import McpServerConfig
-from ..cogs.grok.tooling import MAX_MCP_LABEL_LENGTH
 
 LOGGER = logging.getLogger(__name__)
+MAX_MCP_LABEL_LENGTH = 50
 
 
 @dataclass(frozen=True)
