@@ -1,5 +1,45 @@
 # Discord Grok Bot - Developer Reference
 
+## Quick Start
+
+```bash
+# Install dependencies
+pip install -e ".[dev]"        # or: pip install -r requirements.txt
+
+# Copy and fill in environment variables
+cp .env.example .env
+
+# Run the bot
+python src/bot.py
+
+# Or with Docker
+docker-compose up --build
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `BOT_TOKEN` | Yes | Discord bot token |
+| `XAI_API_KEY` | Yes | xAI API key for Grok requests |
+| `GUILD_IDS` | Yes | Comma-separated Discord guild IDs for slash command registration |
+| `XAI_COLLECTION_IDS` | No | Comma-separated collection IDs; enables `collections_search` tool |
+| `SHOW_COST_EMBEDS` | No | Show token/cost embeds on responses (default: `true`; accepts `true/1/yes`) |
+
+`validate_required_config()` raises `RuntimeError` at startup for missing/blank `BOT_TOKEN` or `XAI_API_KEY`.
+
+## Slash Commands
+
+All commands are nested under `/grok`:
+
+| Command | Description |
+| --- | --- |
+| `/grok chat` | Start a conversation with Grok (supports tools, MCP, file attachments) |
+| `/grok image` | Generate or edit an image |
+| `/grok video` | Generate a video from a prompt or image |
+| `/grok tts` | Convert text to speech audio |
+| `/grok check_permissions` | Verify bot permissions in the current channel |
+
 ## Supported Entry Points
 
 - Launcher: `python src/bot.py` remains supported and delegates to `discord_grok.bot.main`.
@@ -53,7 +93,7 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
 
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
-- The test suite is organized into module-aligned files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, `tests/test_grok_tooling.py`, `tests/test_config_auth.py`, and `tests/test_lazy_imports.py`.
+- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_button_view`, `test_config_auth`, `test_lazy_imports`, and `test_util`.
 - `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
 - Examples:
@@ -85,3 +125,4 @@ pytest -q
 - Remote MCP is configured per `/grok chat` invocation with raw `mcp` and `mcp_allowed_tools` inputs, then persisted as `mcp_servers` on `ChatCompletionParameters`.
 - `resolve_selected_tools()` skips the canonical `mcp` marker and only emits MCP tool payloads from validated `mcp_servers`, preventing duplicate MCP entries.
 - MCP is intentionally excluded from the built-in tool dropdown so dropdown changes only affect built-in tools.
+- Attachment size limits (from `discord_grok.cogs.grok.attachments`): images are capped at 20 MB (`MAX_IMAGE_SIZE`), other files at 48 MB (`MAX_FILE_SIZE`). Patch these constants when writing upload tests.
