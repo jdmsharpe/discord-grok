@@ -12,9 +12,9 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 - **Multiple Grok Models:** Choose from Grok 4.20 (Multi-Agent, Reasoning, Non-Reasoning), Grok 4.1 Fast, Grok Code Fast 1, Grok 4 (0709), and Grok 3 / 3 Mini.
 - **Multimodal Input:** Supports text, images (JPEG, PNG), and file attachments via the xAI Files API (PDF, TXT, CSV, code files, up to 48 MB).
 - **Reasoning & Research:** Reasoning content is displayed in spoilered embeds. Multi-agent research mode offers configurable agent counts (4 for quick, 16 for deep research).
-- **Built-In Tools:** Enable `web_search`, `x_search`, `code_execution`, and `collections_search` (requires `XAI_COLLECTION_IDS`). Tools can be toggled mid-conversation via a dropdown.
-- **Advanced Tool Settings:** X search supports date range filters, allowed/excluded handles, and image/video understanding. Web search supports allowed/excluded domains.
-- **Remote MCP Support:** Connect to trusted remote MCP servers with optional allow-lists. Validation enforces HTTPS and deduplicated tool tracking.
+- **Built-In Tools:** Enable `web_search`, `x_search`, `code_execution`, `collections_search`, and preset-backed `mcp`. Tools can be toggled mid-conversation via a dropdown.
+- **Advanced Tool Settings:** `/grok chat` exposes model tuning, X search date/media controls, and web search image analysis.
+- **Remote MCP Support:** Connect to trusted remote MCP servers via named presets loaded from env or JSON config. Validation enforces HTTPS and preset-level allow-lists.
 - **Citations & Cost Tracking:** Source citations shown in a dedicated "Sources" embed. Per-request cost and token usage tracking includes reasoning, cached token discounts, tool invocation costs, and TTS character-based costs.
 - **Media Generation:**
   - **Images:** Generate or remix images using Grok Imagine Image / Pro. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions.
@@ -25,9 +25,10 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 
 ### `/grok chat`
 Start a stateful, multi-turn conversation with Grok.
-* **Tuning Options:** Adjust temperature, top_p, frequency_penalty, presence_penalty, reasoning_effort, agent_count, and max_tokens.
-* **Customization:** Customize behavior with system prompts.
-* **MCP Integration:** Optional `mcp` parameter for remote server URLs and `mcp_allowed_tools` for allow-listing.
+* **Core Inputs:** `prompt`, `system_prompt`, `model`, `attachment`, tool toggles, and optional MCP preset names.
+* **Model Tuning:** Adjust `max_tokens`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `reasoning_effort`, and `agent_count`.
+* **Tool Refinements:** Configure `x_search_images`, `x_search_videos`, `x_search_date_range`, and `web_search_images`.
+* **MCP Integration:** Use `mcp` with comma-separated preset names defined in `XAI_MCP_PRESETS_JSON` or `XAI_MCP_PRESETS_PATH`.
 
 ### `/grok image`
 Generate images from text prompts, or edit/remix an existing image via attachment.
@@ -75,7 +76,30 @@ Verify the bot has the necessary permissions in the current channel.
 | `GUILD_IDS` | **Yes** | Comma-separated Discord server IDs |
 | `XAI_API_KEY` | **Yes** | Your xAI API key |
 | `XAI_COLLECTION_IDS` | No | Comma-separated collection IDs for `/grok chat collections_search` |
+| `XAI_MCP_PRESETS_JSON` | No | Inline JSON object of named remote MCP presets for `/grok chat` |
+| `XAI_MCP_PRESETS_PATH` | No | Path to a JSON file containing named remote MCP presets |
 | `SHOW_COST_EMBEDS` | No | Show cost/token usage details in Discord (Default: `true`) |
+
+### MCP Preset Example
+Use either `XAI_MCP_PRESETS_JSON` or `XAI_MCP_PRESETS_PATH` with a JSON object keyed by preset name:
+
+```json
+{
+  "trusted_docs": {
+    "url": "https://mcp.example.com/sse",
+    "allowed_tools": ["search", "browse"]
+  },
+  "private_ops": {
+    "url": "https://ops.example.com/sse",
+    "authorization_env_var": "OPS_MCP_TOKEN"
+  }
+}
+```
+
+Each preset supports:
+- `url`: Required HTTPS remote MCP server URL.
+- `authorization_env_var`: Optional env var that must be set for the preset to be available.
+- `allowed_tools`: Optional allow-list of remote MCP tool names.
 
 ### Running the Bot
 **Locally:**
@@ -109,12 +133,13 @@ bot.add_cog(GrokCog(bot=bot))
 
 ## Usage
 1. Use `/grok chat` to start a conversation.
-2. Type messages in the same channel to continue the conversation.
-3. Use interactive buttons below responses to:
+2. Use the optional `/grok chat` advanced knobs when you need model tuning or search media controls at conversation start.
+3. Type messages in the same channel to continue the conversation.
+4. Use interactive buttons below responses to:
    - 🔄 Regenerate the last response
    - ⏯️ Pause/resume the conversation
    - ⏹️ End the conversation
-4. **Remote MCP Safety:** `/grok chat` accepts raw remote MCP URLs. Use only HTTPS servers you control or trust, and prefer a narrow `mcp_allowed_tools` allow-list. Sensitive conversation context may be sent to the configured MCP server if the model chooses to call it.
+5. **Remote MCP Safety:** `mcp` now accepts preset names, not raw URLs. Define presets only for HTTPS servers you control or trust, and prefer narrow `allowed_tools` lists. Sensitive conversation context may be sent to the configured MCP server if the model chooses to call it.
 
 ## Development
 

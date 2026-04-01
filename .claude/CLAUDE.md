@@ -24,6 +24,8 @@ docker-compose up --build
 | `XAI_API_KEY` | Yes | xAI API key for Grok requests |
 | `GUILD_IDS` | Yes | Comma-separated Discord guild IDs for slash command registration |
 | `XAI_COLLECTION_IDS` | No | Comma-separated collection IDs; enables `collections_search` tool |
+| `XAI_MCP_PRESETS_JSON` | No | Inline JSON object of named HTTPS MCP presets for `/grok chat` |
+| `XAI_MCP_PRESETS_PATH` | No | Path to a JSON file containing named HTTPS MCP presets |
 | `SHOW_COST_EMBEDS` | No | Show token/cost embeds on responses (default: `true`; accepts `true/1/yes`) |
 
 `validate_required_config()` raises `RuntimeError` at startup for missing/blank `BOT_TOKEN` or `XAI_API_KEY`.
@@ -34,11 +36,17 @@ All commands are nested under `/grok`:
 
 | Command | Description |
 | --- | --- |
-| `/grok chat` | Start a conversation with Grok (supports tools, MCP, file attachments) |
+| `/grok chat` | Start a conversation with Grok (supports advanced tuning, tools, preset-backed MCP, and file attachments) |
 | `/grok image` | Generate or edit an image |
 | `/grok video` | Generate a video from a prompt or image |
 | `/grok tts` | Convert text to speech audio |
 | `/grok check_permissions` | Verify bot permissions in the current channel |
+
+`/grok chat` currently exposes:
+- Core inputs: `prompt`, `system_prompt`, `model`, `attachment`
+- Model tuning: `max_tokens`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `reasoning_effort`, `agent_count`
+- Tool toggles: `web_search`, `x_search`, `code_execution`, `collections_search`, `mcp`
+- Tool refinements: `x_search_images`, `x_search_videos`, `x_search_date_range`, `web_search_images`
 
 ## Supported Entry Points
 
@@ -64,7 +72,8 @@ src/
     ├── bot.py
     ├── config/
     │   ├── __init__.py
-    │   └── auth.py
+    │   ├── auth.py
+    │   └── mcp.py
     └── cogs/grok/
         ├── __init__.py
         ├── attachments.py
@@ -94,6 +103,7 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
 - The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_button_view`, `test_config_auth`, `test_lazy_imports`, and `test_util`.
+- MCP preset coverage now lives in `tests/test_config_mcp.py`, and documentation assertions live in `tests/test_readme.py`.
 - `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
 - Examples:
@@ -101,7 +111,8 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
   - `discord_grok.cogs.grok.client.RETRYABLE_STATUS_CODES`
   - `discord_grok.cogs.grok.tooling.XAI_COLLECTION_IDS`
   - `discord_grok.cogs.grok.views.ButtonView`
-  - `discord_grok.cogs.grok.tooling.validate_mcp_server_input`
+  - `discord_grok.config.mcp.XAI_MCP_PRESETS`
+  - `discord_grok.config.mcp.resolve_mcp_presets`
   - `discord_grok.cogs.grok.models.McpServerConfig`
 - Import `GrokCog` from `discord_grok`; do not reintroduce legacy `xai_api` shim paths.
 
@@ -122,7 +133,9 @@ pytest -q
 - `collections_search` requires `XAI_COLLECTION_IDS`.
 - Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`.
 - Chat, image, video, and TTS command bodies are delegated from `discord_grok.cogs.grok.cog` into feature modules.
-- Remote MCP is configured per `/grok chat` invocation with raw `mcp` and `mcp_allowed_tools` inputs, then persisted as `mcp_servers` on `ChatCompletionParameters`.
+- Remote MCP is configured per `/grok chat` invocation with comma-separated preset names. Presets are loaded from `XAI_MCP_PRESETS_JSON` and `XAI_MCP_PRESETS_PATH`, validated at config-load time, and then persisted as `mcp_servers` on `ChatCompletionParameters`.
+- Each MCP preset supports `url` (required HTTPS), `authorization_env_var` (optional), and `allowed_tools` (optional).
 - `resolve_selected_tools()` skips the canonical `mcp` marker and only emits MCP tool payloads from validated `mcp_servers`, preventing duplicate MCP entries.
 - MCP is intentionally excluded from the built-in tool dropdown so dropdown changes only affect built-in tools.
+- The slash-command surface no longer accepts X handle filters or web domain allow/block lists; only media toggles and `x_search_date_range` remain pre-start search refinements.
 - Attachment size limits (from `discord_grok.cogs.grok.attachments`): images are capped at 20 MB (`MAX_IMAGE_SIZE`), other files at 48 MB (`MAX_FILE_SIZE`). Patch these constants when writing upload tests.

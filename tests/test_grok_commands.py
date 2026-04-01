@@ -21,6 +21,34 @@ class TestGrokCommandSchema:
         choice_values = sorted(choice.value for choice in model_option.choices)
         assert choice_values == sorted(GROK_MODELS)
 
+    def test_chat_exposes_supported_grok_chat_options(self, cog):
+        """Chat command should expose the supported Grok chat surface."""
+        chat_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "chat")
+        option_names = {opt.name for opt in chat_cmd.options}
+
+        assert option_names == {
+            "prompt",
+            "system_prompt",
+            "model",
+            "attachment",
+            "max_tokens",
+            "temperature",
+            "top_p",
+            "frequency_penalty",
+            "presence_penalty",
+            "reasoning_effort",
+            "agent_count",
+            "web_search",
+            "x_search",
+            "code_execution",
+            "collections_search",
+            "mcp",
+            "x_search_images",
+            "x_search_videos",
+            "x_search_date_range",
+            "web_search_images",
+        }
+
     def test_image_model_choices_match_grok_image_models(self, cog):
         """Image command model choices should match GROK_IMAGE_MODELS."""
         from discord_grok.cogs.grok.tooling import GROK_IMAGE_MODELS
