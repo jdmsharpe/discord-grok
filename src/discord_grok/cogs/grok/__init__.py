@@ -1,5 +1,11 @@
 """Grok cog package exports."""
 
-from .cog import GrokCog
-
 __all__ = ["GrokCog"]
+
+
+def __getattr__(name: str):
+    if name == "GrokCog":
+        from .cog import GrokCog
+
+        return GrokCog
+    raise AttributeError(name)

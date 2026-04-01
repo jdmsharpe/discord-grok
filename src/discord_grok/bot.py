@@ -3,7 +3,7 @@ import logging
 from discord import Bot, Intents
 
 from . import GrokCog
-from .config.auth import BOT_TOKEN
+from .config.auth import BOT_TOKEN, validate_required_config
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -12,6 +12,7 @@ logging.basicConfig(
 
 
 def main() -> None:
+    validate_required_config()
     intents = Intents.default()
     intents.presences = False
     intents.members = True

@@ -128,7 +128,7 @@ All commands are grouped under `/grok` for clean namespacing.
    # Set this to enable the built-in collections search tool for chat requests
    # XAI_COLLECTION_IDS=collection_id_1,collection_id_2
 
-   # Optional: Show cost and token usage embeds on Grok responses (default: true)
+   # Optional: Show cost and token usage embeds on Grok responses (default: true; accepts true/1/yes)
    # Set this to false to hide pricing and usage details in Discord
    # SHOW_COST_EMBEDS=true
    ```
@@ -142,6 +142,7 @@ python src/bot.py
 ```
 
 `src/bot.py` remains a thin repo-local launcher that delegates to `discord_grok.bot.main`.
+`BOT_TOKEN` and `XAI_API_KEY` are required; the bot exits at startup with a clear error if either is missing or blank.
 
 ### Using as a Cog
 
@@ -209,15 +210,16 @@ docker-compose up -d
 ### Testing
 
 Tests use pytest with pytest-asyncio (`asyncio_mode = "auto"`). All tests are mocked — no real API calls.
-The suite is organized around the refactored package layout, with focused files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, and `tests/test_grok_tooling.py`.
-`tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
+The suite is organized around the refactored package layout, with focused files such as `tests/test_grok_cog.py`, `tests/test_grok_chat.py`, `tests/test_grok_client.py`, `tests/test_grok_commands.py`, `tests/test_grok_tooling.py`, `tests/test_config_auth.py`, and `tests/test_lazy_imports.py`.
+`tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers. `tests/test_lazy_imports.py` covers the lazy package exports used by `discord_grok` and `discord_grok.cogs.grok`.
 Import from `discord_grok` directly; legacy top-level shim modules are no longer part of the supported workflow.
 
 GitHub Actions runs the test suite against Python 3.10, 3.11, 3.12, and 3.13.
 
 ```bash
 # Run tests
-python -m pytest -q
+.venv/Scripts/python.exe -m pytest -q    # Windows
+.venv/bin/python -m pytest -q            # Unix
 
 # Run tests in Docker
 docker build --build-arg PYTHON_VERSION=3.13 -f Dockerfile.test -t discord-grok-test . && docker run --rm discord-grok-test
