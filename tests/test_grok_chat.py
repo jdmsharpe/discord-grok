@@ -86,19 +86,31 @@ class TestGrokChat:
         assert "reasoning.encrypted_content" in payload.get("include", [])
 
     async def test_chat_with_mcp_tool(self, cog, mock_discord_context):
-        """Chat should pass MCP tools through the Responses payload and persist config."""
+        """Chat should resolve MCP presets into Responses payload tools."""
+        from discord_grok.config.mcp import XaiMcpPreset
+
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
 
-        await cog.chat.callback(
-            cog,
-            ctx=mock_discord_context,
-            prompt="Use MCP",
-            model="grok-4.20",
-            mcp="https://mcp.example.com/sse",
-            mcp_allowed_tools="search,run,search",
-        )
+        with patch.dict(
+            "discord_grok.config.mcp.XAI_MCP_PRESETS",
+            {
+                "trusted": XaiMcpPreset(
+                    name="trusted",
+                    server_url="https://mcp.example.com/sse",
+                    allowed_tools=["search", "run"],
+                )
+            },
+            clear=True,
+        ):
+            await cog.chat.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="Use MCP",
+                model="grok-4.20",
+                mcp="trusted",
+            )
 
         payload = cog._call_responses_api.call_args[0][0]
         assert [tool["type"] for tool in payload["tools"]] == ["mcp"]
@@ -110,8 +122,8 @@ class TestGrokChat:
         assert conversation.params.mcp_servers[0].server_url == "https://mcp.example.com/sse"
         assert conversation.params.mcp_servers[0].allowed_tool_names == ["search", "run"]
 
-    async def test_chat_rejects_non_https_mcp(self, cog, mock_discord_context):
-        """MCP URLs must be HTTPS."""
+    async def test_chat_rejects_unknown_mcp_preset(self, cog, mock_discord_context):
+        """Unknown MCP preset names should return a user-facing error."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -120,11 +132,11 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Use MCP",
-            mcp="http://mcp.example.com/sse",
+            mcp="unknown",
         )
 
         call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert "HTTPS" in call_kwargs["embed"].description
+        assert "Unknown MCP preset" in call_kwargs["embed"].description
         cog._call_responses_api.assert_not_called()
 
     async def test_chat_prevents_duplicate_conversations(self, cog, mock_discord_context):
@@ -345,78 +357,6 @@ class TestGrokChat:
 
         payload = cog._call_responses_api.call_args[0][0]
         assert "reasoning.encrypted_content" in payload["include"]
-
-    async def test_rejects_both_x_search_handles(self, cog, mock_discord_context):
-        """Setting both allowed and excluded X handles should error."""
-        mock_discord_context.channel.typing = MagicMock()
-        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
-        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
-
-        await cog.chat.callback(
-            cog,
-            ctx=mock_discord_context,
-            prompt="test",
-            x_search=True,
-            x_search_allowed_handles="a",
-            x_search_excluded_handles="b",
-        )
-
-        call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert "Cannot use both" in call_kwargs["embed"].description
-
-    async def test_rejects_both_web_search_domains(self, cog, mock_discord_context):
-        """Setting both allowed and excluded web domains should error."""
-        mock_discord_context.channel.typing = MagicMock()
-        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
-        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
-
-        await cog.chat.callback(
-            cog,
-            ctx=mock_discord_context,
-            prompt="test",
-            web_search=True,
-            web_search_allowed_domains="a.com",
-            web_search_excluded_domains="b.com",
-        )
-
-        call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert "Cannot use both" in call_kwargs["embed"].description
-
-    async def test_rejects_too_many_x_handles(self, cog, mock_discord_context):
-        """More than 10 X handles should be rejected."""
-        mock_discord_context.channel.typing = MagicMock()
-        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
-        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
-
-        handles = ",".join(f"user{i}" for i in range(11))
-        await cog.chat.callback(
-            cog,
-            ctx=mock_discord_context,
-            prompt="test",
-            x_search=True,
-            x_search_allowed_handles=handles,
-        )
-
-        call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert "maximum of 10" in call_kwargs["embed"].description
-
-    async def test_rejects_too_many_web_domains(self, cog, mock_discord_context):
-        """More than 5 web domains should be rejected."""
-        mock_discord_context.channel.typing = MagicMock()
-        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
-        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
-
-        domains = ",".join(f"d{i}.com" for i in range(6))
-        await cog.chat.callback(
-            cog,
-            ctx=mock_discord_context,
-            prompt="test",
-            web_search=True,
-            web_search_allowed_domains=domains,
-        )
-
-        call_kwargs = mock_discord_context.send_followup.call_args[1]
-        assert "maximum of 5" in call_kwargs["embed"].description
 
 
 class TestHandleNewMessageInConversation:

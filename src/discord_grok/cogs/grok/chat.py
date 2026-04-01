@@ -7,6 +7,11 @@ from typing import Any, cast
 
 from discord import ApplicationContext, Attachment, Colour, Embed, Message, TextChannel
 
+from ...config.mcp import (
+    build_mcp_server_config,
+    parse_mcp_preset_names,
+    resolve_mcp_presets,
+)
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
 from .embeds import (
     append_pricing_embed,
@@ -29,7 +34,6 @@ from .tooling import (
     calculate_tool_cost,
     format_xai_error,
     truncate_text,
-    validate_mcp_server_input,
 )
 
 
@@ -284,14 +288,9 @@ async def run_chat_command(
     code_execution: bool = False,
     collections_search: bool = False,
     mcp: str | None = None,
-    mcp_allowed_tools: str | None = None,
     x_search_images: bool = False,
     x_search_videos: bool = False,
     x_search_date_range: str | None = None,
-    x_search_allowed_handles: str | None = None,
-    x_search_excluded_handles: str | None = None,
-    web_search_allowed_domains: str | None = None,
-    web_search_excluded_domains: str | None = None,
     web_search_images: bool = False,
 ) -> None:
     """Create a persistent Grok conversation session."""
@@ -421,105 +420,13 @@ async def run_chat_command(
                     )
                 )
                 return
-        if x_search_allowed_handles and x_search_excluded_handles:
-            await ctx.send_followup(
-                embed=Embed(
-                    title="Error",
-                    description=(
-                        "Cannot use both `x_search_allowed_handles` and "
-                        "`x_search_excluded_handles` at the same time."
-                    ),
-                    color=Colour.red(),
-                )
-            )
-            return
-        if x_search_allowed_handles:
-            handles = [
-                value.strip().lstrip("@")
-                for value in x_search_allowed_handles.split(",")
-                if value.strip()
-            ]
-            if len(handles) > 10:
-                await ctx.send_followup(
-                    embed=Embed(
-                        title="Error",
-                        description=(
-                            "`x_search_allowed_handles` supports a maximum of 10 handles."
-                        ),
-                        color=Colour.red(),
-                    )
-                )
-                return
-            x_search_kw["allowed_x_handles"] = handles
-        if x_search_excluded_handles:
-            handles = [
-                value.strip().lstrip("@")
-                for value in x_search_excluded_handles.split(",")
-                if value.strip()
-            ]
-            if len(handles) > 10:
-                await ctx.send_followup(
-                    embed=Embed(
-                        title="Error",
-                        description=(
-                            "`x_search_excluded_handles` supports a maximum of 10 handles."
-                        ),
-                        color=Colour.red(),
-                    )
-                )
-                return
-            x_search_kw["excluded_x_handles"] = handles
 
         web_search_kw: dict[str, Any] = {}
         if web_search_images:
             web_search_kw["enable_image_understanding"] = True
-        if web_search_allowed_domains and web_search_excluded_domains:
-            await ctx.send_followup(
-                embed=Embed(
-                    title="Error",
-                    description=(
-                        "Cannot use both `web_search_allowed_domains` and "
-                        "`web_search_excluded_domains` at the same time."
-                    ),
-                    color=Colour.red(),
-                )
-            )
-            return
-        if web_search_allowed_domains:
-            domains = [
-                value.strip() for value in web_search_allowed_domains.split(",") if value.strip()
-            ]
-            if len(domains) > 5:
-                await ctx.send_followup(
-                    embed=Embed(
-                        title="Error",
-                        description=(
-                            "`web_search_allowed_domains` supports a maximum of 5 domains."
-                        ),
-                        color=Colour.red(),
-                    )
-                )
-                return
-            web_search_kw["allowed_domains"] = domains
-        if web_search_excluded_domains:
-            domains = [
-                value.strip() for value in web_search_excluded_domains.split(",") if value.strip()
-            ]
-            if len(domains) > 5:
-                await ctx.send_followup(
-                    embed=Embed(
-                        title="Error",
-                        description=(
-                            "`web_search_excluded_domains` supports a maximum of 5 domains."
-                        ),
-                        color=Colour.red(),
-                    )
-                )
-                return
-            web_search_kw["excluded_domains"] = domains
 
-        mcp_servers = []
-        mcp_server, mcp_error = validate_mcp_server_input(mcp, mcp_allowed_tools)
+        mcp_preset_names = parse_mcp_preset_names(mcp)
+        mcp_presets, mcp_error = resolve_mcp_presets(mcp_preset_names)
         if mcp_error:
             await ctx.send_followup(
                 embed=Embed(
@@ -529,8 +436,7 @@ async def run_chat_command(
                 )
             )
             return
-        if mcp_server is not None:
-            mcp_servers.append(mcp_server)
+        mcp_servers = [build_mcp_server_config(preset) for preset in mcp_presets]
 
         selected_tool_names: list[str] = []
         if web_search:
@@ -648,15 +554,19 @@ async def run_chat_command(
             description += f"**Agent Count:** {agent_count}\n"
         if selected_tool_names:
             description += f"**Tools:** {', '.join(selected_tool_names)}\n"
-        if mcp_servers:
-            mcp_server = mcp_servers[0]
-            description += f"**MCP Server:** {mcp_server.server_label} ({mcp_server.server_url})\n"
-            if mcp_server.allowed_tool_names:
+        if mcp_preset_names:
+            description += f"**MCP Presets:** {', '.join(mcp_preset_names)}\n"
+            if mcp_servers:
+                mcp_server = mcp_servers[0]
                 description += (
-                    "**MCP Allowed Tools:** "
-                    + ", ".join(mcp_server.allowed_tool_names)
-                    + "\n"
+                    f"**MCP Server:** {mcp_server.server_label} ({mcp_server.server_url})\n"
                 )
+                if mcp_server.allowed_tool_names:
+                    description += (
+                        "**MCP Allowed Tools:** "
+                        + ", ".join(mcp_server.allowed_tool_names)
+                        + "\n"
+                    )
 
         embeds = [
             Embed(

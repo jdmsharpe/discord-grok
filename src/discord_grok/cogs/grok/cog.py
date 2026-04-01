@@ -98,6 +98,30 @@ __all__ = [
     "extract_usage",
 ]
 
+CHAT_MODEL_CHOICES = [
+    OptionChoice(name="Grok 4.20 Multi-Agent", value="grok-4.20-multi-agent"),
+    OptionChoice(name="Grok 4.20", value="grok-4.20"),
+    OptionChoice(name="Grok 4.20 Non-Reasoning", value="grok-4.20-non-reasoning"),
+    OptionChoice(name="Grok 4.1 Fast Reasoning", value="grok-4-1-fast-reasoning"),
+    OptionChoice(name="Grok 4.1 Fast Non-Reasoning", value="grok-4-1-fast-non-reasoning"),
+    OptionChoice(name="Grok Code Fast 1", value="grok-code-fast-1"),
+    OptionChoice(name="Grok 4 Fast Reasoning", value="grok-4-fast-reasoning"),
+    OptionChoice(name="Grok 4 Fast Non-Reasoning", value="grok-4-fast-non-reasoning"),
+    OptionChoice(name="Grok 4 (0709)", value="grok-4-0709"),
+    OptionChoice(name="Grok 3 Mini", value="grok-3-mini"),
+    OptionChoice(name="Grok 3", value="grok-3"),
+]
+
+REASONING_EFFORT_CHOICES = [
+    OptionChoice(name="Low", value="low"),
+    OptionChoice(name="High", value="high"),
+]
+
+AGENT_COUNT_CHOICES = [
+    OptionChoice(name="4 Agents (Quick)", value=4),
+    OptionChoice(name="16 Agents (Deep Research)", value=16),
+]
+
 
 class GrokCog(commands.Cog):
     grok = SlashCommandGroup("grok", "xAI Grok commands", guild_ids=GUILD_IDS)
@@ -360,19 +384,7 @@ class GrokCog(commands.Cog):
         "model",
         description="Choose from the following Grok models. (default: Grok 4.20)",
         required=False,
-        choices=[
-            OptionChoice(name="Grok 4.20 Multi-Agent", value="grok-4.20-multi-agent"),
-            OptionChoice(name="Grok 4.20", value="grok-4.20"),
-            OptionChoice(name="Grok 4.20 Non-Reasoning", value="grok-4.20-non-reasoning"),
-            OptionChoice(name="Grok 4.1 Fast Reasoning", value="grok-4-1-fast-reasoning"),
-            OptionChoice(name="Grok 4.1 Fast Non-Reasoning", value="grok-4-1-fast-non-reasoning"),
-            OptionChoice(name="Grok Code Fast 1", value="grok-code-fast-1"),
-            OptionChoice(name="Grok 4 Fast Reasoning", value="grok-4-fast-reasoning"),
-            OptionChoice(name="Grok 4 Fast Non-Reasoning", value="grok-4-fast-non-reasoning"),
-            OptionChoice(name="Grok 4 (0709)", value="grok-4-0709"),
-            OptionChoice(name="Grok 3 Mini", value="grok-3-mini"),
-            OptionChoice(name="Grok 3", value="grok-3"),
-        ],
+        choices=CHAT_MODEL_CHOICES,
         type=str,
     )
     @option(
@@ -416,20 +428,14 @@ class GrokCog(commands.Cog):
         description="(Advanced) How hard the model thinks. grok-3-mini only. (default: not set)",
         required=False,
         type=str,
-        choices=[
-            OptionChoice(name="Low", value="low"),
-            OptionChoice(name="High", value="high"),
-        ],
+        choices=REASONING_EFFORT_CHOICES,
     )
     @option(
         "agent_count",
         description="Number of agents for multi-agent model. 4=quick, 16=deep research. (default: not set)",
         required=False,
         type=int,
-        choices=[
-            OptionChoice(name="4 Agents (Quick)", value=4),
-            OptionChoice(name="16 Agents (Deep Research)", value=16),
-        ],
+        choices=AGENT_COUNT_CHOICES,
     )
     @option(
         "web_search",
@@ -457,13 +463,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "mcp",
-        description="HTTPS URL of a trusted remote MCP server to enable for this conversation.",
-        required=False,
-        type=str,
-    )
-    @option(
-        "mcp_allowed_tools",
-        description="Optional comma-separated MCP tool allow-list, max 20 names.",
+        description="Optional comma-separated MCP preset names to enable for this conversation.",
         required=False,
         type=str,
     )
@@ -482,30 +482,6 @@ class GrokCog(commands.Cog):
     @option(
         "x_search_date_range",
         description="X search date range as YYYY-MM-DD,YYYY-MM-DD (start,end). (default: not set)",
-        required=False,
-        type=str,
-    )
-    @option(
-        "x_search_allowed_handles",
-        description="Only search posts from these X handles, comma-separated, max 10. (default: not set)",
-        required=False,
-        type=str,
-    )
-    @option(
-        "x_search_excluded_handles",
-        description="Exclude posts from these X handles, comma-separated, max 10. (default: not set)",
-        required=False,
-        type=str,
-    )
-    @option(
-        "web_search_allowed_domains",
-        description="Only search these domains, comma-separated, max 5. (default: not set)",
-        required=False,
-        type=str,
-    )
-    @option(
-        "web_search_excluded_domains",
-        description="Exclude these domains from search, comma-separated, max 5. (default: not set)",
         required=False,
         type=str,
     )
@@ -534,14 +510,9 @@ class GrokCog(commands.Cog):
         code_execution: bool = False,
         collections_search: bool = False,
         mcp: str | None = None,
-        mcp_allowed_tools: str | None = None,
         x_search_images: bool = False,
         x_search_videos: bool = False,
         x_search_date_range: str | None = None,
-        x_search_allowed_handles: str | None = None,
-        x_search_excluded_handles: str | None = None,
-        web_search_allowed_domains: str | None = None,
-        web_search_excluded_domains: str | None = None,
         web_search_images: bool = False,
     ) -> None:
         await run_chat_command(
@@ -563,14 +534,9 @@ class GrokCog(commands.Cog):
             code_execution=code_execution,
             collections_search=collections_search,
             mcp=mcp,
-            mcp_allowed_tools=mcp_allowed_tools,
             x_search_images=x_search_images,
             x_search_videos=x_search_videos,
             x_search_date_range=x_search_date_range,
-            x_search_allowed_handles=x_search_allowed_handles,
-            x_search_excluded_handles=x_search_excluded_handles,
-            web_search_allowed_domains=web_search_allowed_domains,
-            web_search_excluded_domains=web_search_excluded_domains,
             web_search_images=web_search_images,
         )
 
