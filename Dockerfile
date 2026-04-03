@@ -1,7 +1,7 @@
 ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN python -m pip install --no-cache-dir .
 CMD ["python", "src/bot.py"]

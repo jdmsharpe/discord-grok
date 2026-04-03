@@ -91,14 +91,20 @@ Verify the bot has the necessary permissions in the current channel.
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
-3. Install dependencies:
+3. Install the package and its runtime dependencies:
    ```bash
-   pip install -r requirements.txt
+   python -m pip install .
    ```
 4. Copy the environment example file:
    ```bash
    cp .env.example .env
    ```
+
+### Contributor Setup
+Install development tooling for tests, linting, and type checking:
+```bash
+python -m pip install -e ".[dev]"
+```
 
 ### Configuration (`.env`)
 | Variable | Required | Description |
@@ -177,9 +183,11 @@ bot.add_cog(GrokCog(bot=bot))
 ### Testing
 Tests use `pytest` with `pytest-asyncio` (`asyncio_mode = "auto"`). All tests are mocked (no real API calls).
 ```bash
+# Install developer tooling if you have not already
+python -m pip install -e ".[dev]"
+
 # Run tests locally
-.venv/Scripts/python.exe -m pytest -q    # Windows
-.venv/bin/python -m pytest -q            # Unix
+python -m pytest -q
 
 # Run tests in Docker
 docker build --build-arg PYTHON_VERSION=3.13 -f Dockerfile.test -t discord-grok-test . 
