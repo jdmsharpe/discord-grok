@@ -15,6 +15,7 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 - **Built-In Tools:** Enable `web_search`, `x_search`, `code_execution`, `collections_search`, and preset-backed `mcp`. Tools can be toggled mid-conversation via a dropdown.
 - **Advanced Tool Settings:** `/grok chat` exposes model tuning, X search date/media controls, and web search image analysis.
 - **Remote MCP Support:** Connect to trusted remote MCP servers via named presets loaded from env or JSON config. Validation enforces HTTPS and preset-level allow-lists.
+- **Resilient Error Handling:** Retries transient xAI HTTP failures, preserves async cancellation, and returns safer user-facing Discord error messages for handled chat and conversation-control failures.
 - **Citations & Cost Tracking:** Source citations shown in a dedicated "Sources" embed. Per-request cost and token usage tracking includes reasoning, cached token discounts, tool invocation costs, and TTS character-based costs.
 - **Media Generation:**
   - **Images:** Generate or remix images using Grok Imagine Image / Pro. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions.

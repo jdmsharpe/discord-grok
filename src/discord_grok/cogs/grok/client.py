@@ -22,6 +22,10 @@ INITIAL_RETRY_DELAY_SECONDS = 0.5
 RETRY_JITTER_RATIO = 0.25
 
 
+class XaiApiError(Exception):
+    """Raised when xAI HTTP operations fail with a non-success status code."""
+
+
 def get_client(cog) -> Any:
     if cog.client is None:
         cog.client = xai_sdk.AsyncClient(api_key=XAI_API_KEY or None)
@@ -110,10 +114,12 @@ async def post_with_retries(
                     )
                     await asyncio.sleep(delay)
                     continue
-                raise Exception(f"{request_name} error (HTTP {resp.status}): {error_body}")
+                raise XaiApiError(f"{request_name} error (HTTP {resp.status}): {error_body}")
+        except asyncio.CancelledError:
+            raise
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
             if attempt >= MAX_API_ATTEMPTS:
-                raise Exception(
+                raise XaiApiError(
                     f"{request_name} request failed after {MAX_API_ATTEMPTS} attempts: {error}"
                 ) from error
             delay = compute_retry_delay(attempt)
@@ -240,8 +246,18 @@ async def upload_file_attachment(cog, attachment, *, fetch_bytes) -> str | None:
         uploaded = await client.files.upload(file_bytes, filename=attachment.filename)
         cog.logger.info("Uploaded file %s as %s", attachment.filename, uploaded.id)
         return uploaded.id
-    except Exception as error:
+    except asyncio.CancelledError:
+        raise
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
         cog.logger.warning("Failed to upload file %s to xAI: %s", attachment.filename, error)
+        return None
+    except Exception as error:
+        cog.logger.warning(
+            "Unexpected failure uploading file %s to xAI: %s",
+            attachment.filename,
+            error,
+            exc_info=True,
+        )
         return None
 
 
@@ -253,8 +269,17 @@ async def cleanup_conversation_files(cog, conversation) -> None:
         try:
             await client.files.delete(file_id)
             cog.logger.info("Deleted xAI file %s", file_id)
-        except Exception as error:
+        except asyncio.CancelledError:
+            raise
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
             cog.logger.warning("Failed to delete xAI file %s: %s", file_id, error)
+        except Exception as error:
+            cog.logger.warning(
+                "Unexpected failure deleting xAI file %s: %s",
+                file_id,
+                error,
+                exc_info=True,
+            )
     conversation.file_ids.clear()
 
 
@@ -277,6 +302,7 @@ __all__ = [
     "RETRY_JITTER_RATIO",
     "TTS_API_URL",
     "TTS_MAX_CHARS",
+    "XaiApiError",
     "build_xai_headers",
     "build_responses_payload",
     "call_responses_api",

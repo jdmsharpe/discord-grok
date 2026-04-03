@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from discord_grok.cogs.grok.client import XaiApiError
 from tests.support import MockHTTPSession, make_cog, make_http_response, make_raw_cog
 
 
@@ -214,7 +215,7 @@ class TestGrokHTTPRetries:
             patch(
                 "discord_grok.cogs.grok.client.asyncio.sleep", new_callable=AsyncMock
             ) as mock_sleep,
-            pytest.raises(Exception, match="bad input"),
+            pytest.raises(XaiApiError, match="bad input"),
         ):
             await cog._call_responses_api({"model": "grok-3"})
 

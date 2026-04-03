@@ -1,5 +1,7 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 from discord.ui import Select
 
@@ -307,3 +309,60 @@ class TestButtonView:
 
         call_args = interaction.response.send_message.call_args
         assert "No active conversation" in call_args.args[0]
+
+    async def test_tool_select_cancellation_propagates(self, conversation_starter):
+        conversation = MagicMock()
+        on_tools_changed = MagicMock(side_effect=asyncio.CancelledError())
+        view = _make_view(
+            conversation_starter=conversation_starter,
+            get_conversation=MagicMock(return_value=conversation),
+            on_tools_changed=on_tools_changed,
+        )
+        mock_select = MagicMock()
+        mock_select.values = ["web_search"]
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        with pytest.raises(asyncio.CancelledError):
+            await view.tool_select_callback(interaction, mock_select)
+
+    async def test_stop_button_handled_api_failure_has_consistent_message(self, conversation_starter):
+        conversation = MagicMock()
+        on_stop = AsyncMock(side_effect=aiohttp.ClientError("upstream unavailable"))
+        view = _make_view(
+            conversation_starter=conversation_starter,
+            get_conversation=MagicMock(return_value=conversation),
+            on_stop=on_stop,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.is_done = MagicMock(return_value=False)
+        interaction.response.send_message = AsyncMock()
+
+        await view.stop_button.callback(interaction)
+
+        sent_text = interaction.response.send_message.call_args.args[0]
+        assert "An error occurred while ending the conversation" in sent_text
+        assert "upstream unavailable" in sent_text
+
+    async def test_stop_button_unexpected_exception_not_silenced(self, conversation_starter):
+        conversation = MagicMock()
+        on_stop = AsyncMock(side_effect=RuntimeError("kaboom"))
+        view = _make_view(
+            conversation_starter=conversation_starter,
+            get_conversation=MagicMock(return_value=conversation),
+            on_stop=on_stop,
+        )
+
+        interaction = MagicMock()
+        interaction.user = conversation_starter
+        interaction.response = MagicMock()
+        interaction.response.send_message = AsyncMock()
+
+        with pytest.raises(RuntimeError, match="kaboom"):
+            await view.stop_button.callback(interaction)
