@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "discord-grok"
 version = "1.0.1"
@@ -8,13 +12,23 @@ license = { text = "MIT" }
 authors = [
   { name = "John Magnus-Sharpe" },
 ]
+dependencies = [
+  "aiohttp~=3.13",
+  "py-cord~=2.7",
+  "python-dotenv~=1.2",
+  "xai-sdk~=1.11",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest~=9.0",
+  "pytest-asyncio~=1.3",
+  "ruff~=0.15",
+  "pyright~=1.1",
+]
 
 [project.urls]
 Repository = "https://github.com/jdmsharpe/discord-grok"
-
-[build-system]
-requires = ["setuptools>=69", "wheel"]
-build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -39,12 +53,13 @@ quote-style = "double"
 include = ["src"]
 exclude = [".venv", "**/node_modules", "**/__pycache__", "**/.*"]
 extraPaths = ["src"]
+pythonVersion = "3.10"
 venvPath = "."
 venv = ".venv"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["discord_grok", "discord_grok.*"]
+include = ["discord_grok*"]
 
 [tool.setuptools.package-dir]
 "" = "src"
