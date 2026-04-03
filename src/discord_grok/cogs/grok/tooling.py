@@ -4,24 +4,18 @@ from typing import Any
 from urllib.parse import urlparse
 
 from ...config.auth import XAI_COLLECTION_IDS
+from .command_options import (
+    DEFAULT_CHAT_MODEL_ID,
+    build_model_pricing_map,
+    iter_slash_command_models,
+)
 from .models import ChatCompletionParameters, Conversation, McpServerConfig
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
 # Per-million-token pricing: (input_cost, cached_input_cost, output_cost)
-MODEL_PRICING: dict[str, tuple[float, float, float]] = {
-    "grok-4.20-multi-agent": (2.00, 0.20, 6.00),
-    "grok-4.20": (2.00, 0.20, 6.00),
-    "grok-4.20-non-reasoning": (2.00, 0.20, 6.00),
-    "grok-4-1-fast-reasoning": (0.20, 0.05, 0.50),
-    "grok-4-1-fast-non-reasoning": (0.20, 0.05, 0.50),
-    "grok-code-fast-1": (0.20, 0.02, 1.50),
-    "grok-4-fast-reasoning": (0.20, 0.05, 0.50),
-    "grok-4-fast-non-reasoning": (0.20, 0.05, 0.50),
-    "grok-4-0709": (3.00, 0.75, 15.00),
-    "grok-3-mini": (0.30, 0.07, 0.50),
-    "grok-3": (3.00, 0.75, 15.00),
-}
+MODEL_PRICING: dict[str, tuple[float, float, float]] = build_model_pricing_map()
+DEFAULT_MODEL_PRICING = MODEL_PRICING[DEFAULT_CHAT_MODEL_ID]
 
 # Flat per-image pricing
 IMAGE_PRICING: dict[str, float] = {
@@ -58,7 +52,7 @@ def calculate_cost(
 
     Cached tokens are a subset of input_tokens billed at a discounted rate.
     """
-    input_price, cached_price, output_price = MODEL_PRICING.get(model, (2.00, 0.20, 6.00))
+    input_price, cached_price, output_price = MODEL_PRICING.get(model, DEFAULT_MODEL_PRICING)
     non_cached = input_tokens - cached_tokens
     return (
         (non_cached / 1_000_000) * input_price
@@ -92,19 +86,7 @@ def calculate_video_cost(duration: int) -> float:
 
 
 # All available Grok language models
-GROK_MODELS = [
-    "grok-4.20-multi-agent",
-    "grok-4.20",
-    "grok-4.20-non-reasoning",
-    "grok-4-1-fast-reasoning",
-    "grok-4-1-fast-non-reasoning",
-    "grok-code-fast-1",
-    "grok-4-fast-reasoning",
-    "grok-4-fast-non-reasoning",
-    "grok-4-0709",
-    "grok-3-mini",
-    "grok-3",
-]
+GROK_MODELS = [entry.model_id for entry in iter_slash_command_models()]
 
 # Image generation models
 GROK_IMAGE_MODELS = [
@@ -123,16 +105,18 @@ TTS_VOICES = ["eve", "ara", "rex", "sal", "leo"]
 # Models that support frequency_penalty and presence_penalty parameters.
 # Reasoning models do NOT support these parameters.
 PENALTY_SUPPORTED_MODELS: set[str] = {
-    "grok-4.20-non-reasoning",
-    "grok-4-1-fast-non-reasoning",
-    "grok-4-fast-non-reasoning",
+    entry.model_id for entry in iter_slash_command_models() if entry.supports_penalties
 }
 
 # Models that support the reasoning_effort parameter.
-REASONING_EFFORT_MODELS: set[str] = {"grok-3-mini"}
+REASONING_EFFORT_MODELS: set[str] = {
+    entry.model_id for entry in iter_slash_command_models() if entry.supports_reasoning_effort
+}
 
 # Multi-agent models that support agent_count and have special parameter constraints.
-MULTI_AGENT_MODELS: set[str] = {"grok-4.20-multi-agent"}
+MULTI_AGENT_MODELS: set[str] = {
+    entry.model_id for entry in iter_slash_command_models() if entry.supports_multi_agent
+}
 
 # Built-in tools supported by /grok chat.
 TOOL_WEB_SEARCH = "web_search"
