@@ -147,7 +147,7 @@ python src/bot.py
 
 **With Docker:**
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
 **Using as a Cog:**
