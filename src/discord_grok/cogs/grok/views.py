@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
+import aiohttp
 from discord import (
     ButtonStyle,
+    DiscordException,
     Interaction,
     Member,
     SelectOption,
@@ -14,13 +17,20 @@ from discord import (
 )
 from discord.ui import Button, Select, View, button
 
-from .tooling import SELECTABLE_TOOLS, TOOL_REGISTRY, resolve_tool_name
+from .tooling import SELECTABLE_TOOLS, TOOL_REGISTRY, format_xai_error, resolve_tool_name
+
+
+def _format_user_error(error: Exception, *, context: str) -> str:
+    description = format_xai_error(error).strip()
+    if not description:
+        return f"An error occurred while {context}."
+    return f"An error occurred while {context}: {description}"
 
 
 async def _send_interaction_error(interaction: Interaction, context: str, error: Exception) -> None:
     """Log an error and send the user a safe ephemeral message."""
-    logging.error(f"Error in {context}: {error}", exc_info=True)
-    msg = f"An error occurred while {context}."
+    logging.error("Error in %s: %s", context, error, exc_info=True)
+    msg = _format_user_error(error, context=context)
     if interaction.response.is_done():
         await interaction.followup.send(msg, ephemeral=True)
     else:
@@ -119,7 +129,9 @@ class ButtonView(View):
                 message = "Tools disabled for this conversation."
 
             await interaction.response.send_message(message, ephemeral=True, delete_after=3)
-        except Exception as e:
+        except asyncio.CancelledError:
+            raise
+        except (aiohttp.ClientError, DiscordException, ValueError) as e:
             await _send_interaction_error(interaction, "updating tools", e)
 
     @button(emoji="🔄", style=ButtonStyle.green, row=0)
@@ -192,11 +204,10 @@ class ButtonView(View):
 
             await self._on_regenerate(user_message, conversation)
             await interaction.followup.send("Response regenerated.", ephemeral=True, delete_after=3)
-        except Exception as error:
-            logging.error(
-                f"Error in regenerate_button: {error}",
-                exc_info=True,
-            )
+        except asyncio.CancelledError:
+            raise
+        except (aiohttp.ClientError, DiscordException, ValueError) as error:
+            logging.error("Error in regenerate_button: %s", error, exc_info=True)
 
             if saved_response_id is not None:
                 conversation = self._get_conversation(self.conversation_id)
@@ -243,7 +254,9 @@ class ButtonView(View):
                 await interaction.response.send_message(
                     "No active conversation found.", ephemeral=True
                 )
-        except Exception as e:
+        except asyncio.CancelledError:
+            raise
+        except (aiohttp.ClientError, DiscordException, ValueError) as e:
             await _send_interaction_error(interaction, "toggling pause", e)
 
     @button(emoji="⏹️", style=ButtonStyle.blurple, row=0)
@@ -272,5 +285,7 @@ class ButtonView(View):
                 await interaction.response.send_message(
                     "No active conversation found.", ephemeral=True
                 )
-        except Exception as e:
+        except asyncio.CancelledError:
+            raise
+        except (aiohttp.ClientError, DiscordException, ValueError) as e:
             await _send_interaction_error(interaction, "ending the conversation", e)

@@ -6,9 +6,20 @@ from datetime import datetime
 from importlib import import_module
 from typing import Any, cast
 
-from discord import ApplicationContext, Attachment, Colour, Embed, Message, TextChannel
+import aiohttp
+from discord import (
+    ApplicationContext,
+    Attachment,
+    Colour,
+    DiscordException,
+    Embed,
+    HTTPException,
+    Message,
+    TextChannel,
+)
 
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
+from .client import XaiApiError
 from .embeds import (
     append_pricing_embed,
     append_reasoning_embeds,
@@ -36,6 +47,16 @@ from .tooling import (
 def _get_mcp_config_module():
     """Resolve MCP config lazily so module reloads in tests don't leave stale refs."""
     return import_module("discord_grok.config.mcp")
+
+
+def _format_user_error(error: Exception, *, fallback: str) -> str:
+    """Format user-safe errors while preserving full traceback logging elsewhere."""
+    description = format_xai_error(error).strip()
+    if not description:
+        description = fallback
+    if len(description) > 4000:
+        return description[:4000] + "\n\n... (error message truncated)"
+    return description
 
 
 async def keep_typing(cog, channel: Any) -> None:
@@ -232,7 +253,7 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
             try:
                 reply_message = await message.reply(embeds=embeds, view=view)
                 cog.last_view_messages[message.author] = reply_message
-            except Exception as embed_error:
+            except HTTPException as embed_error:
                 cog.logger.warning("Embed failed, sending as text: %s", embed_error)
                 safe_response_text = response_text or "No response text available"
                 reply_message = await message.reply(
@@ -251,15 +272,18 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
         if conversation.params.conversation_id is not None:
             await cog.end_conversation(conversation.params.conversation_id)
 
-    except Exception as error:
-        description = format_xai_error(error)
+    except asyncio.CancelledError:
+        raise
+    except (XaiApiError, aiohttp.ClientError, asyncio.TimeoutError, ValueError, DiscordException) as error:
+        description = _format_user_error(
+            error,
+            fallback="Failed to process your message with xAI. Please try again.",
+        )
         cog.logger.error(
             "Error in handle_new_message_in_conversation: %s",
             description,
             exc_info=True,
         )
-        if len(description) > 4000:
-            description = description[:4000] + "\n\n... (error message truncated)"
         await message.reply(embed=Embed(title="Error", description=description, color=Colour.red()))
         if conversation.params.conversation_id is not None:
             await cog.end_conversation(conversation.params.conversation_id)
@@ -659,8 +683,13 @@ async def run_chat_command(
         )
         cog.conversations[main_conversation_id] = conversation
 
-    except Exception as error:
-        description = format_xai_error(error)
+    except asyncio.CancelledError:
+        raise
+    except (XaiApiError, aiohttp.ClientError, asyncio.TimeoutError, ValueError, DiscordException) as error:
+        description = _format_user_error(
+            error,
+            fallback="Failed to start a chat conversation with xAI. Please try again.",
+        )
         cog.logger.error("Error in chat: %s", description, exc_info=True)
         await ctx.send_followup(
             embed=Embed(title="Error", description=description, color=Colour.red())
@@ -671,7 +700,7 @@ async def run_chat_command(
                 try:
                     await client.files.delete(file_id)
                     cog.logger.info("Cleaned up orphaned xAI file %s", file_id)
-                except Exception as cleanup_error:
+                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as cleanup_error:
                     cog.logger.warning(
                         "Failed to clean up orphaned xAI file %s: %s",
                         file_id,

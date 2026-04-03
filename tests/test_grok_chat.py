@@ -1,6 +1,8 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
+import aiohttp
 import pytest
 
 from tests.support import make_cog
@@ -444,7 +446,7 @@ class TestHandleNewMessageInConversation:
     async def test_api_error_ends_conversation(self, cog, message, conversation):
         """An API error should end the conversation and reply with an error embed."""
         cog.conversations[777888999] = conversation
-        cog._call_responses_api.side_effect = Exception("API failure")
+        cog._call_responses_api.side_effect = aiohttp.ClientError("API failure")
 
         await cog.handle_new_message_in_conversation(message, conversation)
 
@@ -470,6 +472,33 @@ class TestHandleNewMessageInConversation:
         message.reply.assert_called_once()
         embed = message.reply.call_args[1]["embed"]
         assert "supports only JPEG and PNG" in embed.description
+
+    async def test_follow_up_cancellation_propagates(self, cog, message, conversation):
+        """CancelledError should not be swallowed in async follow-up handling."""
+        cog._call_responses_api.side_effect = asyncio.CancelledError()
+
+        with pytest.raises(asyncio.CancelledError):
+            await cog.handle_new_message_in_conversation(message, conversation)
+
+        message.reply.assert_not_called()
+
+    async def test_follow_up_handled_api_failure_returns_user_error(self, cog, message, conversation):
+        """Handled transport failures should return a consistent user error embed."""
+        cog._call_responses_api.side_effect = aiohttp.ClientError("network down")
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        message.reply.assert_called_once()
+        embed = message.reply.call_args.kwargs["embed"]
+        assert embed.title == "Error"
+        assert "network down" in embed.description
+
+    async def test_follow_up_unexpected_exception_is_not_silenced(self, cog, message, conversation):
+        """Unexpected exceptions should propagate instead of being silently swallowed."""
+        cog._call_responses_api.side_effect = RuntimeError("unexpected boom")
+
+        with pytest.raises(RuntimeError, match="unexpected boom"):
+            await cog.handle_new_message_in_conversation(message, conversation)
 
 
 class TestOnMessageRouting:
