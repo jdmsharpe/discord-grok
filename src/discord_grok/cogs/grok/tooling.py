@@ -139,6 +139,7 @@ AVAILABLE_TOOLS = {
     TOOL_REMOTE_MCP: "Remote MCP",
 }
 
+
 # Tool names managed by the conversation tool dropdown.
 @dataclass(frozen=True)
 class ToolRegistryEntry:

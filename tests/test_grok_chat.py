@@ -484,7 +484,9 @@ class TestHandleNewMessageInConversation:
 
         message.reply.assert_not_called()
 
-    async def test_follow_up_handled_api_failure_returns_user_error(self, cog, message, conversation):
+    async def test_follow_up_handled_api_failure_returns_user_error(
+        self, cog, message, conversation
+    ):
         """Handled transport failures should return a consistent user error embed."""
         cog._call_responses_api.side_effect = aiohttp.ClientError("network down")
 

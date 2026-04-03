@@ -19,8 +19,8 @@ from discord import (
 )
 
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
-from .command_options import DEFAULT_CHAT_MODEL_ID
 from .client import XaiApiError
+from .command_options import DEFAULT_CHAT_MODEL_ID
 from .embeds import (
     append_pricing_embed,
     append_reasoning_embeds,
@@ -275,7 +275,13 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
 
     except asyncio.CancelledError:
         raise
-    except (XaiApiError, aiohttp.ClientError, asyncio.TimeoutError, ValueError, DiscordException) as error:
+    except (
+        XaiApiError,
+        aiohttp.ClientError,
+        asyncio.TimeoutError,
+        ValueError,
+        DiscordException,
+    ) as error:
         description = _format_user_error(
             error,
             fallback="Failed to process your message with xAI. Please try again.",
@@ -590,9 +596,7 @@ async def run_chat_command(
                 )
                 if mcp_server.allowed_tool_names:
                     description += (
-                        "**MCP Allowed Tools:** "
-                        + ", ".join(mcp_server.allowed_tool_names)
-                        + "\n"
+                        "**MCP Allowed Tools:** " + ", ".join(mcp_server.allowed_tool_names) + "\n"
                     )
 
         embeds = [
@@ -686,7 +690,13 @@ async def run_chat_command(
 
     except asyncio.CancelledError:
         raise
-    except (XaiApiError, aiohttp.ClientError, asyncio.TimeoutError, ValueError, DiscordException) as error:
+    except (
+        XaiApiError,
+        aiohttp.ClientError,
+        asyncio.TimeoutError,
+        ValueError,
+        DiscordException,
+    ) as error:
         description = _format_user_error(
             error,
             fallback="Failed to start a chat conversation with xAI. Please try again.",
