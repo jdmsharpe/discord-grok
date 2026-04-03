@@ -84,9 +84,7 @@ def resolve_tools_for_view(
 
     conversation.params.tools = tools
     active_names = {
-        tool_name
-        for tool in tools
-        if (tool_name := resolve_tool_name(tool)) in SELECTABLE_TOOLS
+        tool_name for tool in tools if (tool_name := resolve_tool_name(tool)) in SELECTABLE_TOOLS
     }
     return active_names, None
 

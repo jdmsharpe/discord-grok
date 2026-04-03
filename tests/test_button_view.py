@@ -329,7 +329,9 @@ class TestButtonView:
         with pytest.raises(asyncio.CancelledError):
             await view.tool_select_callback(interaction, mock_select)
 
-    async def test_stop_button_handled_api_failure_has_consistent_message(self, conversation_starter):
+    async def test_stop_button_handled_api_failure_has_consistent_message(
+        self, conversation_starter
+    ):
         conversation = MagicMock()
         on_stop = AsyncMock(side_effect=aiohttp.ClientError("upstream unavailable"))
         view = _make_view(
