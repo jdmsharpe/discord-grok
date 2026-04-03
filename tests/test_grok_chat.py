@@ -164,7 +164,9 @@ class TestGrokChat:
         assert "already have an active conversation" in call_kwargs["embed"].description
 
     async def test_chat_default_model(self, cog, mock_discord_context):
-        """Chat should use grok-4.20 as the default model."""
+        """Chat should use the shared default model."""
+        from discord_grok.cogs.grok.command_options import DEFAULT_CHAT_MODEL_ID
+
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -176,7 +178,7 @@ class TestGrokChat:
         )
 
         payload = cog._call_responses_api.call_args[0][0]
-        assert payload["model"] == "grok-4.20"
+        assert payload["model"] == DEFAULT_CHAT_MODEL_ID
 
     async def test_chat_rejects_frequency_penalty_on_reasoning_model(
         self, cog, mock_discord_context

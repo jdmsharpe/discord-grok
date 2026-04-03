@@ -47,6 +47,11 @@ from .client import (
     post_with_retries,
     upload_file_attachment,
 )
+from .command_options import (
+    DEFAULT_CHAT_MODEL_ENTRY,
+    DEFAULT_CHAT_MODEL_ID,
+    iter_slash_command_models,
+)
 from .embeds import (
     GROK_BLACK,
     append_generation_pricing_embed,
@@ -97,17 +102,8 @@ __all__ = [
 ]
 
 CHAT_MODEL_CHOICES = [
-    OptionChoice(name="Grok 4.20 Multi-Agent", value="grok-4.20-multi-agent"),
-    OptionChoice(name="Grok 4.20", value="grok-4.20"),
-    OptionChoice(name="Grok 4.20 Non-Reasoning", value="grok-4.20-non-reasoning"),
-    OptionChoice(name="Grok 4.1 Fast Reasoning", value="grok-4-1-fast-reasoning"),
-    OptionChoice(name="Grok 4.1 Fast Non-Reasoning", value="grok-4-1-fast-non-reasoning"),
-    OptionChoice(name="Grok Code Fast 1", value="grok-code-fast-1"),
-    OptionChoice(name="Grok 4 Fast Reasoning", value="grok-4-fast-reasoning"),
-    OptionChoice(name="Grok 4 Fast Non-Reasoning", value="grok-4-fast-non-reasoning"),
-    OptionChoice(name="Grok 4 (0709)", value="grok-4-0709"),
-    OptionChoice(name="Grok 3 Mini", value="grok-3-mini"),
-    OptionChoice(name="Grok 3", value="grok-3"),
+    OptionChoice(name=entry.display_name, value=entry.model_id)
+    for entry in iter_slash_command_models()
 ]
 
 REASONING_EFFORT_CHOICES = [
@@ -380,7 +376,10 @@ class GrokCog(commands.Cog):
     )
     @option(
         "model",
-        description="Choose from the following Grok models. (default: Grok 4.20)",
+        description=(
+            "Choose from the following Grok models. "
+            f"(default: {DEFAULT_CHAT_MODEL_ENTRY.display_name})"
+        ),
         required=False,
         choices=CHAT_MODEL_CHOICES,
         type=str,
@@ -493,7 +492,7 @@ class GrokCog(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
-        model: str = "grok-4.20",
+        model: str = DEFAULT_CHAT_MODEL_ID,
         system_prompt: str | None = None,
         attachment: Attachment | None = None,
         max_tokens: int | None = None,

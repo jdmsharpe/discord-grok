@@ -21,6 +21,30 @@ class TestGrokCommandSchema:
         choice_values = sorted(choice.value for choice in model_option.choices)
         assert choice_values == sorted(GROK_MODELS)
 
+    def test_chat_model_choices_exist_in_shared_metadata_with_pricing(self, cog):
+        """Every chat slash-choice model should exist in shared metadata with pricing."""
+        from discord_grok.cogs.grok.command_options import CHAT_MODEL_INDEX
+        from discord_grok.cogs.grok.tooling import MODEL_PRICING
+
+        chat_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "chat")
+        model_option = next(opt for opt in chat_cmd.options if opt.name == "model")
+
+        for choice in model_option.choices:
+            assert choice.value in CHAT_MODEL_INDEX
+            assert choice.value in MODEL_PRICING
+
+    def test_model_markdown_lines_match_visible_models(self, cog):
+        """README model-list helper should reflect the visible slash-command models."""
+        from discord_grok.cogs.grok.command_options import (
+            generate_model_markdown_lines,
+            iter_slash_command_models,
+        )
+
+        assert generate_model_markdown_lines() == [
+            f"- `{entry.model_id}` — {entry.display_name} ({entry.pricing_class})"
+            for entry in iter_slash_command_models()
+        ]
+
     def test_chat_exposes_supported_grok_chat_options(self, cog):
         """Chat command should expose the supported Grok chat surface."""
         chat_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "chat")

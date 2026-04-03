@@ -19,6 +19,7 @@ from discord import (
 )
 
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
+from .command_options import DEFAULT_CHAT_MODEL_ID
 from .client import XaiApiError
 from .embeds import (
     append_pricing_embed,
@@ -298,7 +299,7 @@ async def run_chat_command(
     *,
     ctx: ApplicationContext,
     prompt: str,
-    model: str = "grok-4.20",
+    model: str = DEFAULT_CHAT_MODEL_ID,
     system_prompt: str | None = None,
     attachment: Attachment | None = None,
     max_tokens: int | None = None,
