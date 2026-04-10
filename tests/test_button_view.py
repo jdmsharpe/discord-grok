@@ -29,6 +29,18 @@ def _make_view(
     )
 
 
+def test_init_without_running_event_loop():
+    conversation_starter = MagicMock()
+    conversation_starter.id = 12345
+
+    view = _make_view(conversation_starter=conversation_starter)
+
+    selects = [item for item in view.children if isinstance(item, Select)]
+    assert len(selects) == 1
+    assert selects[0].min_values == 0
+    assert selects[0].max_values == len(SELECTABLE_TOOLS)
+
+
 class TestButtonView:
     @pytest.fixture
     def conversation_starter(self):
