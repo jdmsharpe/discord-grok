@@ -386,7 +386,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "attachment",
-        description="Attach an image or document (PDF, TXT, CSV, code files, etc.).",
+        description="Attach an image or document. (default: not set)",
         required=False,
         type=Attachment,
     )
@@ -460,7 +460,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "mcp",
-        description="Optional comma-separated MCP preset names to enable for this conversation.",
+        description="Comma-separated MCP preset names to enable. (default: not set)",
         required=False,
         type=str,
     )
@@ -593,7 +593,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "attachment",
-        description="Image to edit or remix.",
+        description="Image to edit or remix. (default: not set)",
         required=False,
         type=Attachment,
     )
@@ -656,7 +656,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "attachment",
-        description="Image to use as the first frame (for image-to-video).",
+        description="Image to use as the first frame. (default: not set)",
         required=False,
         type=Attachment,
     )
