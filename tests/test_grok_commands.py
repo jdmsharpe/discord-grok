@@ -342,8 +342,10 @@ class TestImageBatchGeneration:
         expected_cost = calculate_image_cost("grok-imagine-image") * 2
         from datetime import date
 
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
         key = (mock_discord_context.author.id, date.today().isoformat())
-        assert abs(cog.daily_costs[key] - expected_cost) < 1e-9
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - expected_cost) < 1e-9
 
     async def test_image_batch_rejects_editing_mode(
         self, cog, mock_discord_context, mock_attachment

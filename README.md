@@ -118,6 +118,8 @@ python -m pip install -e ".[dev]"
 | `XAI_MCP_PRESETS_JSON` | No | Inline JSON object of named remote MCP presets for `/grok chat` |
 | `XAI_MCP_PRESETS_PATH` | No | Path to a JSON file containing named remote MCP presets |
 | `SHOW_COST_EMBEDS` | No | Show cost/token usage details in Discord (Default: `true`) |
+| `XAI_PRICING_PATH` | No | Path to a pricing YAML that overrides the bundled `src/discord_grok/config/pricing.yaml` |
+| `LOG_FORMAT` | No | `text` (default) for human-readable logs, or `json` for structured JSON-lines output with per-request IDs |
 
 ### MCP Preset Example
 Use either `XAI_MCP_PRESETS_JSON` or `XAI_MCP_PRESETS_PATH` with a JSON object keyed by preset name:

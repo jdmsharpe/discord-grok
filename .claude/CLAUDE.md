@@ -27,6 +27,8 @@ docker-compose up --build
 | `XAI_MCP_PRESETS_JSON` | No | Inline JSON object of named HTTPS MCP presets for `/grok chat` |
 | `XAI_MCP_PRESETS_PATH` | No | Path to a JSON file containing named HTTPS MCP presets |
 | `SHOW_COST_EMBEDS` | No | Show token/cost embeds on responses (default: `true`; accepts `true/1/yes`) |
+| `XAI_PRICING_PATH` | No | Override the bundled `src/discord_grok/config/pricing.yaml` |
+| `LOG_FORMAT` | No | `text` (default) or `json` for structured JSON-lines output |
 
 `validate_required_config()` raises `RuntimeError` at startup for missing/blank `BOT_TOKEN` or `XAI_API_KEY`.
 
@@ -70,10 +72,13 @@ src/
 └── discord_grok/
     ├── __init__.py
     ├── bot.py
+    ├── logging_setup.py             # Structured logging + request-id ContextVar
     ├── config/
     │   ├── __init__.py
     │   ├── auth.py
-    │   └── mcp.py
+    │   ├── mcp.py
+    │   ├── pricing.py                # YAML loader exposing MODEL_PRICING_CLASSES, IMAGE_PRICING, etc.
+    │   └── pricing.yaml              # Canonical pricing data (override via XAI_PRICING_PATH)
     └── cogs/grok/
         ├── __init__.py
         ├── attachments.py
@@ -125,7 +130,7 @@ pyright src/
 pytest -q
 ```
 
-- The repo pre-commit hook prefers a repo-local `.venv` Ruff binary when available and falls back to `PATH`.
+- The repo pre-commit hook (`.githooks/pre-commit`) runs `ruff format` (auto-applied + re-staged), then `ruff check` (blocking), then `pyright` and `pytest --collect-only` as warning-only smoke tests. Resolves tools from `.venv/bin` or `.venv/Scripts` first, then `PATH`.
 
 ## Provider Notes
 
@@ -139,3 +144,10 @@ pytest -q
 - MCP is intentionally excluded from the built-in tool dropdown so dropdown changes only affect built-in tools.
 - The slash-command surface no longer accepts X handle filters or web domain allow/block lists; only media toggles and `x_search_date_range` remain pre-start search refinements.
 - Attachment size limits (from `discord_grok.cogs.grok.attachments`): images are capped at 20 MB (`MAX_IMAGE_SIZE`), other files at 48 MB (`MAX_FILE_SIZE`). Patch these constants when writing upload tests.
+
+## Runtime Conventions (Cross-Project)
+
+- **Pricing** is loaded from `src/discord_grok/config/pricing.yaml` by `config/pricing.py` at import time. Chat pricing uses a class indirection (`MODEL_PRICING_CLASSES`) joined to `CHAT_MODEL_CATALOG` in `command_options.py`. Override the YAML via `XAI_PRICING_PATH`. Cross-referenced against [genai-prices/x_ai.yml](https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml).
+- **Retry**: `client.post_with_retries` wraps every xAI HTTP call with exponential backoff + jitter. `MAX_API_ATTEMPTS=5`, honors `Retry-After` on 429, retries on `RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}` and transport errors.
+- **Conversation TTL**: `prune_runtime_state` in `cogs/grok/state.py` evicts conversations older than `CONVERSATION_TTL` (12h) every 15 minutes via `@tasks.loop`. Caps at `MAX_ACTIVE_CONVERSATIONS`. Daily costs retained for `DAILY_COST_RETENTION_DAYS` (30).
+- **Request IDs**: `cog_before_invoke` (and `on_message`) bind a fresh 8-char hex id via `discord_grok.logging_setup.bind_request_id`. All downstream `logger.info`/`warning`/`error` calls automatically include the id. Set `LOG_FORMAT=json` for JSON-lines output.

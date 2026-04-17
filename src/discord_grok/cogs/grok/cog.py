@@ -5,9 +5,10 @@ from typing import Any
 import aiohttp
 from discord import ApplicationContext, Attachment, Bot, Member, Message, User
 from discord.commands import OptionChoice, SlashCommandGroup, option
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from ...config.auth import GUILD_IDS, SHOW_COST_EMBEDS
+from ...logging_setup import bind_request_id
 from .attachments import (
     MAX_FILE_SIZE,
     MAX_IMAGE_SIZE,
@@ -69,6 +70,7 @@ from .state import (
 )
 from .state import (
     log_chat_cost,
+    prune_runtime_state,
     resolve_tools_for_view,
     strip_previous_view,
     track_daily_cost,
@@ -292,10 +294,23 @@ class GrokCog(commands.Cog):
     async def end_conversation(self, conversation_id: int) -> None:
         await end_conversation_state(self, conversation_id)
 
+    async def _prune_runtime_state(self) -> None:
+        await prune_runtime_state(self)
+
+    @tasks.loop(minutes=15)
+    async def _runtime_cleanup_task(self) -> None:
+        await self._prune_runtime_state()
+
+    @_runtime_cleanup_task.before_loop
+    async def _before_runtime_cleanup_task(self) -> None:
+        await self.bot.wait_until_ready()
+
     async def _close_http_session(self) -> None:
         await close_http_session(self)
 
     def cog_unload(self) -> None:
+        if self._runtime_cleanup_task.is_running():
+            self._runtime_cleanup_task.cancel()
         loop = getattr(self.bot, "loop", None)
         session = self._http_session
         if session and not session.closed:
@@ -333,6 +348,10 @@ class GrokCog(commands.Cog):
     async def keep_typing(self, channel: Any) -> None:
         await keep_typing_loop(self, channel)
 
+    async def cog_before_invoke(self, ctx) -> None:
+        """Bind a fresh request id on every slash-command entry into this cog."""
+        bind_request_id()
+
     @commands.Cog.listener()
     async def on_ready(self) -> None:
         bot_user = self.bot.user
@@ -342,6 +361,8 @@ class GrokCog(commands.Cog):
             bot_user.id if bot_user else "unknown",
         )
         self.logger.info("Attempting to sync commands for guilds: %s", GUILD_IDS)
+        if not self._runtime_cleanup_task.is_running():
+            self._runtime_cleanup_task.start()
         try:
             await self.bot.sync_commands()
             self.logger.info("Commands synchronized successfully.")
@@ -350,6 +371,7 @@ class GrokCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: Message) -> None:
+        bind_request_id()
         await handle_on_message(self, message)
 
     @commands.Cog.listener()

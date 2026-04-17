@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextlib
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from discord import Member, User
 
@@ -9,12 +9,34 @@ from .client import cleanup_conversation_files
 from .tooling import SELECTABLE_TOOLS, resolve_selected_tools, resolve_tool_name
 from .views import ButtonView
 
+MAX_ACTIVE_CONVERSATIONS = 100
+CONVERSATION_TTL = timedelta(hours=12)
+DAILY_COST_RETENTION_DAYS = 30
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _extract_daily_total(value: float | tuple[float, datetime]) -> float:
+    return value[0] if isinstance(value, tuple) else value
+
 
 def track_daily_cost(cog, user_id: int, cost: float) -> float:
     """Add a cost to the user's daily total and return the new daily total."""
+    prune_daily_costs(cog)
     key = (user_id, date.today().isoformat())
-    cog.daily_costs[key] = cog.daily_costs.get(key, 0.0) + cost
-    return cog.daily_costs[key]
+    current_total = _extract_daily_total(cog.daily_costs.get(key, 0.0))
+    new_total = current_total + cost
+    cog.daily_costs[key] = (new_total, _now_utc())
+    return new_total
+
+
+def prune_daily_costs(cog) -> None:
+    cutoff = date.today() - timedelta(days=DAILY_COST_RETENTION_DAYS)
+    expired_keys = [key for key in cog.daily_costs if date.fromisoformat(key[1]) < cutoff]
+    for key in expired_keys:
+        cog.daily_costs.pop(key, None)
 
 
 def log_chat_cost(
@@ -65,6 +87,48 @@ async def end_conversation(cog, conversation_id: int) -> None:
         await strip_previous_view(cog, starter)
         cog.views.pop(starter, None)
     await cleanup_conversation_files(cog, conversation)
+    await prune_runtime_state(cog)
+
+
+async def prune_runtime_state(cog) -> None:
+    """Evict stale conversations, cascade-clean views, and prune old daily costs."""
+    now = _now_utc()
+
+    stale_conversation_ids = [
+        cid
+        for cid, conversation in cog.conversations.items()
+        if now - conversation.updated_at > CONVERSATION_TTL
+    ]
+
+    active_conversations = [
+        (cid, conversation)
+        for cid, conversation in cog.conversations.items()
+        if cid not in stale_conversation_ids
+    ]
+    overflow = len(active_conversations) - MAX_ACTIVE_CONVERSATIONS
+    if overflow > 0:
+        active_conversations.sort(key=lambda item: item[1].updated_at)
+        stale_conversation_ids.extend(cid for cid, _ in active_conversations[:overflow])
+
+    for cid in dict.fromkeys(stale_conversation_ids):
+        conversation = cog.conversations.pop(cid, None)
+        if conversation is None:
+            continue
+        starter = conversation.params.conversation_starter
+        if starter is not None:
+            await strip_previous_view(cog, starter)
+            cog.views.pop(starter, None)
+        with contextlib.suppress(Exception):
+            await cleanup_conversation_files(cog, conversation)
+
+    orphaned_users = [
+        user for user, view in cog.views.items() if view.conversation_id not in cog.conversations
+    ]
+    for user in orphaned_users:
+        await strip_previous_view(cog, user)
+        cog.views.pop(user, None)
+
+    prune_daily_costs(cog)
 
 
 def resolve_tools_for_view(
@@ -115,9 +179,14 @@ def create_button_view(
 
 
 __all__ = [
+    "CONVERSATION_TTL",
+    "DAILY_COST_RETENTION_DAYS",
+    "MAX_ACTIVE_CONVERSATIONS",
     "create_button_view",
     "end_conversation",
     "log_chat_cost",
+    "prune_daily_costs",
+    "prune_runtime_state",
     "resolve_tools_for_view",
     "strip_previous_view",
     "track_daily_cost",

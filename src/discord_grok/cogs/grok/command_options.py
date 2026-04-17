@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from ...config.pricing import MODEL_PRICING_CLASSES
+
 
 @dataclass(frozen=True)
 class ChatModelCatalogEntry:
@@ -23,14 +25,6 @@ class ChatModelCatalogEntry:
     def supports_multi_agent(self) -> bool:
         return "supports_multi_agent" in self.capabilities
 
-
-MODEL_PRICING_CLASSES: dict[str, tuple[float, float, float]] = {
-    "premium": (2.00, 0.20, 6.00),
-    "fast": (0.20, 0.05, 0.50),
-    "code_fast": (0.20, 0.02, 1.50),
-    "legacy_premium": (3.00, 0.75, 15.00),
-    "mini": (0.30, 0.07, 0.50),
-}
 
 CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
     ChatModelCatalogEntry(

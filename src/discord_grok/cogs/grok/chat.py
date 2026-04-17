@@ -204,6 +204,7 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
         if response_id:
             conversation.response_id_history.append(response_id)
             conversation.previous_response_id = response_id
+            conversation.touch()
 
         append_reasoning_embeds(embeds, reasoning_text)
         append_response_embeds(embeds, response_text)
