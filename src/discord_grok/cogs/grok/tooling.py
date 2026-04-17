@@ -4,6 +4,13 @@ from typing import Any
 from urllib.parse import urlparse
 
 from ...config.auth import XAI_COLLECTION_IDS
+from ...config.pricing import (  # noqa: F401 — re-exported for callers
+    IMAGE_PRICING,
+    TOOL_INVOCATION_PRICING,
+    TTS_PRICING_PER_MILLION_CHARS,
+    UNKNOWN_IMAGE_MODEL_PRICING,
+    VIDEO_PRICING_PER_SECOND,
+)
 from .command_options import (
     DEFAULT_CHAT_MODEL_ID,
     build_model_pricing_map,
@@ -13,32 +20,11 @@ from .models import ChatCompletionParameters, Conversation, McpServerConfig
 
 CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 
-# Per-million-token pricing: (input_cost, cached_input_cost, output_cost)
+# Per-million-token pricing: (input_cost, cached_input_cost, output_cost).
+# Built by combining the model catalog (command_options.CHAT_MODEL_CATALOG)
+# with the class → price mapping (config/pricing.yaml → MODEL_PRICING_CLASSES).
 MODEL_PRICING: dict[str, tuple[float, float, float]] = build_model_pricing_map()
 DEFAULT_MODEL_PRICING = MODEL_PRICING[DEFAULT_CHAT_MODEL_ID]
-
-# Flat per-image pricing
-IMAGE_PRICING: dict[str, float] = {
-    "grok-imagine-image-pro": 0.07,
-    "grok-imagine-image": 0.02,
-}
-
-# Per-second video pricing
-VIDEO_PRICING_PER_SECOND: float = 0.05
-
-# Per-1k-invocations pricing for server-side tools
-TOOL_INVOCATION_PRICING: dict[str, float] = {
-    "SERVER_SIDE_TOOL_WEB_SEARCH": 5.00,
-    "SERVER_SIDE_TOOL_X_SEARCH": 5.00,
-    "SERVER_SIDE_TOOL_CODE_EXECUTION": 5.00,
-    "SERVER_SIDE_TOOL_CODE_INTERPRETER": 5.00,
-    "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": 2.50,
-    "SERVER_SIDE_TOOL_FILE_SEARCH": 2.50,
-    "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH": 10.00,
-}
-
-# TTS pricing: dollars per million characters
-TTS_PRICING_PER_MILLION_CHARS: float = 4.20
 
 
 def calculate_cost(
@@ -77,7 +63,7 @@ def calculate_tts_cost(character_count: int) -> float:
 
 def calculate_image_cost(model: str) -> float:
     """Calculate the cost in dollars for an image generation."""
-    return IMAGE_PRICING.get(model, 0.07)
+    return IMAGE_PRICING.get(model, UNKNOWN_IMAGE_MODEL_PRICING)
 
 
 def calculate_video_cost(duration: int) -> float:

@@ -1,0 +1,47 @@
+# xAI Grok pricing catalog.
+#
+# Canonical source: https://docs.x.ai/docs/models
+# Cross-referenced against: https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
+# Last-verified: 2026-04-17
+#
+# Chat pricing is organized by pricing class (premium / fast / mini / etc.).
+# The model → class mapping lives in command_options.py alongside the catalog;
+# this file owns only the class → price mapping so several models can share
+# identical pricing without duplication.
+#
+# Override this file at runtime by setting XAI_PRICING_PATH to an alternate
+# YAML path — useful for pushing new pricing without a code release.
+
+# Per-million-token triples: (input, cached_input, output)
+pricing_classes:
+  premium:        { input_per_million: 2.00, cached_input_per_million: 0.20, output_per_million: 6.00 }
+  fast:           { input_per_million: 0.20, cached_input_per_million: 0.05, output_per_million: 0.50 }
+  code_fast:      { input_per_million: 0.20, cached_input_per_million: 0.02, output_per_million: 1.50 }
+  legacy_premium: { input_per_million: 3.00, cached_input_per_million: 0.75, output_per_million: 15.00 }
+  mini:           { input_per_million: 0.30, cached_input_per_million: 0.075, output_per_million: 0.50 }
+
+# Flat per-image pricing for Grok Imagine models.
+image_generation:
+  grok-imagine-image-pro: { per_image: 0.07 }
+  grok-imagine-image:     { per_image: 0.02 }
+
+# Video generation is currently a flat per-second rate across Grok video models.
+video_generation:
+  per_second: 0.05
+
+# Text-to-speech is charged per million characters.
+text_to_speech:
+  per_million_chars: 4.20
+
+# Server-side tool invocation pricing (dollars per 1,000 invocations).
+tools:
+  SERVER_SIDE_TOOL_WEB_SEARCH:         { per_1k_invocations: 5.00 }
+  SERVER_SIDE_TOOL_X_SEARCH:           { per_1k_invocations: 5.00 }
+  SERVER_SIDE_TOOL_CODE_EXECUTION:     { per_1k_invocations: 5.00 }
+  SERVER_SIDE_TOOL_CODE_INTERPRETER:   { per_1k_invocations: 5.00 }
+  SERVER_SIDE_TOOL_COLLECTIONS_SEARCH: { per_1k_invocations: 2.50 }
+  SERVER_SIDE_TOOL_FILE_SEARCH:        { per_1k_invocations: 2.50 }
+  SERVER_SIDE_TOOL_ATTACHMENT_SEARCH:  { per_1k_invocations: 10.00 }
+
+fallbacks:
+  unknown_image_model: { per_image: 0.07 }
