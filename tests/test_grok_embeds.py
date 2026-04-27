@@ -137,14 +137,14 @@ class TestAppendResponseEmbeds:
         assert embeds[0].title == "Response"
         assert "Part" in embeds[1].title
 
-    def test_very_long_response_truncated(self):
+    def test_very_long_response_preserved_for_delivery_batching(self):
         from discord_grok.cogs.grok.embeds import append_response_embeds
 
         embeds = []
         very_long_text = "a" * 25000
         append_response_embeds(embeds, very_long_text)
         total_text = "".join(embed.description for embed in embeds)
-        assert len(total_text) < 21000
+        assert total_text == very_long_text
 
 
 class TestAppendSourcesEmbed:

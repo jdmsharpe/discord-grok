@@ -13,7 +13,6 @@ from discord import (
     Colour,
     DiscordException,
     Embed,
-    HTTPException,
     Message,
     TextChannel,
 )
@@ -27,6 +26,7 @@ from .embeds import (
     append_response_embeds,
     append_sources_embed,
 )
+from .embed_delivery import send_embed_batches
 from .models import ChatCompletionParameters, Conversation
 from .state import create_button_view
 from .tooling import (
@@ -134,12 +134,14 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
                 if typing_task:
                     typing_task.cancel()
                     typing_task = None
-                await message.reply(
+                await send_embed_batches(
+                    message.reply,
                     embed=Embed(
                         title="Error",
                         description=unsupported_image_error,
                         color=Colour.red(),
-                    )
+                    ),
+                    logger=cog.logger,
                 )
                 return
 
@@ -252,20 +254,13 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
         view = cog.views.get(message.author)
 
         if embeds:
-            try:
-                reply_message = await message.reply(embeds=embeds, view=view)
-                cog.last_view_messages[message.author] = reply_message
-            except HTTPException as embed_error:
-                cog.logger.warning("Embed failed, sending as text: %s", embed_error)
-                safe_response_text = response_text or "No response text available"
-                reply_message = await message.reply(
-                    content=(
-                        f"**Response:**\n{safe_response_text[:1900]}"
-                        f"{'...' if len(safe_response_text) > 1900 else ''}"
-                    ),
-                    view=view,
-                )
-                cog.last_view_messages[message.author] = reply_message
+            reply_message = await send_embed_batches(
+                message.reply,
+                embeds=embeds,
+                view=view,
+                logger=cog.logger,
+            )
+            cog.last_view_messages[message.author] = reply_message
             cog.logger.debug("Replied with generated response.")
             return
 
@@ -292,7 +287,11 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
             description,
             exc_info=True,
         )
-        await message.reply(embed=Embed(title="Error", description=description, color=Colour.red()))
+        await send_embed_batches(
+            message.reply,
+            embed=Embed(title="Error", description=description, color=Colour.red()),
+            logger=cog.logger,
+        )
         if conversation.params.conversation_id is not None:
             await cog.end_conversation(conversation.params.conversation_id)
 
@@ -332,12 +331,14 @@ async def run_chat_command(
     uploaded_file_ids: list[str] = []
 
     if ctx.channel is None:
-        await ctx.send_followup(
+        await send_embed_batches(
+            ctx.send_followup,
             embed=Embed(
                 title="Error",
                 description="Cannot start conversation: channel context is unavailable.",
                 color=Colour.red(),
-            )
+            ),
+            logger=cog.logger,
         )
         return
 
@@ -346,7 +347,8 @@ async def run_chat_command(
             conversation.params.conversation_starter == ctx.author
             and conversation.params.channel_id == ctx.channel.id
         ):
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=(
@@ -354,7 +356,8 @@ async def run_chat_command(
                         "Please finish it before starting a new one."
                     ),
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
@@ -371,7 +374,8 @@ async def run_chat_command(
             if presence_penalty is not None:
                 unsupported.append("`presence_penalty`")
             param_list = " and ".join(unsupported)
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=(
@@ -379,12 +383,14 @@ async def run_chat_command(
                         f"not supported by reasoning model `{model}`."
                     ),
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
         if reasoning_effort is not None and model not in REASONING_EFFORT_MODELS:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=(
@@ -392,24 +398,28 @@ async def run_chat_command(
                         f"{', '.join(f'`{item}`' for item in sorted(REASONING_EFFORT_MODELS))}."
                     ),
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
         is_multi_agent = model in MULTI_AGENT_MODELS
 
         if max_tokens is not None and is_multi_agent:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=f"`max_tokens` is not supported by multi-agent model `{model}`.",
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
         if agent_count is not None and not is_multi_agent:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=(
@@ -417,7 +427,8 @@ async def run_chat_command(
                         f"({', '.join(f'`{item}`' for item in sorted(MULTI_AGENT_MODELS))})."
                     ),
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
@@ -429,28 +440,32 @@ async def run_chat_command(
         if x_search_date_range:
             date_parts = [part.strip() for part in x_search_date_range.split(",")]
             if len(date_parts) != 2 or not all(date_parts):
-                await ctx.send_followup(
+                await send_embed_batches(
+                    ctx.send_followup,
                     embed=Embed(
                         title="Error",
                         description=(
                             "Invalid `x_search_date_range` format. Use YYYY-MM-DD,YYYY-MM-DD."
                         ),
                         color=Colour.red(),
-                    )
+                    ),
+                    logger=cog.logger,
                 )
                 return
             try:
                 x_search_kw["from_date"] = datetime.fromisoformat(date_parts[0]).isoformat()
                 x_search_kw["to_date"] = datetime.fromisoformat(date_parts[1]).isoformat()
             except ValueError:
-                await ctx.send_followup(
+                await send_embed_batches(
+                    ctx.send_followup,
                     embed=Embed(
                         title="Error",
                         description=(
                             "Invalid `x_search_date_range` format. Use YYYY-MM-DD,YYYY-MM-DD."
                         ),
                         color=Colour.red(),
-                    )
+                    ),
+                    logger=cog.logger,
                 )
                 return
 
@@ -462,12 +477,14 @@ async def run_chat_command(
         mcp_preset_names = mcp_config.parse_mcp_preset_names(mcp)
         mcp_presets, mcp_error = mcp_config.resolve_mcp_presets(mcp_preset_names)
         if mcp_error:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=mcp_error,
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
         mcp_servers = [mcp_config.build_mcp_server_config(preset) for preset in mcp_presets]
@@ -491,12 +508,14 @@ async def run_chat_command(
             mcp_servers=mcp_servers,
         )
         if tool_error:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=tool_error,
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
@@ -508,25 +527,29 @@ async def run_chat_command(
         if attachment:
             unsupported_image_error = cog._unsupported_image_type_error(attachment)
             if unsupported_image_error:
-                await ctx.send_followup(
+                await send_embed_batches(
+                    ctx.send_followup,
                     embed=Embed(
                         title="Error",
                         description=unsupported_image_error,
                         color=Colour.red(),
-                    )
+                    ),
+                    logger=cog.logger,
                 )
                 return
 
             content_type = (attachment.content_type or "").lower()
             if content_type in SUPPORTED_IMAGE_TYPES:
                 if attachment.size > MAX_IMAGE_SIZE:
-                    await ctx.send_followup(
+                    await send_embed_batches(
+                        ctx.send_followup,
                         embed=Embed(
                             title="Error",
                             description=f"Image `{attachment.filename}` exceeds the 20 MiB limit.",
                             color=Colour.red(),
                         ),
                         ephemeral=True,
+                        logger=cog.logger,
                     )
                     return
                 content_parts.append(
@@ -658,7 +681,12 @@ async def run_chat_command(
             initial_tools=tools,
         )
 
-        message = await ctx.send_followup(embeds=embeds, view=view)
+        message = await send_embed_batches(
+            ctx.send_followup,
+            embeds=embeds,
+            view=view,
+            logger=cog.logger,
+        )
         cog.last_view_messages[ctx.author] = message
 
         response_id = response_json.get("id")
@@ -703,8 +731,10 @@ async def run_chat_command(
             fallback="Failed to start a chat conversation with xAI. Please try again.",
         )
         cog.logger.error("Error in chat: %s", description, exc_info=True)
-        await ctx.send_followup(
-            embed=Embed(title="Error", description=description, color=Colour.red())
+        await send_embed_batches(
+            ctx.send_followup,
+            embed=Embed(title="Error", description=description, color=Colour.red()),
+            logger=cog.logger,
         )
         if uploaded_file_ids:
             client = cog._get_client()

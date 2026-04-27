@@ -57,6 +57,62 @@ class TestGrokChat:
         assert conversation.previous_response_id == "resp_01XFDUDYJgAACzvnptvVoYEL"
         assert conversation.response_id_history == ["resp_01XFDUDYJgAACzvnptvVoYEL"]
 
+    async def test_chat_batches_long_response_with_sidecar_without_plain_text_fallback(
+        self, mock_bot, mock_discord_context
+    ):
+        """Long chat responses with sidecars should batch as embeds, not text fallback."""
+        long_text = "Long response. " + ("x" * 9000)
+        response = {
+            "id": "resp_long",
+            "output": [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": long_text,
+                            "annotations": [
+                                {
+                                    "type": "url_citation",
+                                    "url": "https://example.com/source",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "usage": {
+                "input_tokens": 25,
+                "output_tokens": 50,
+                "input_tokens_details": {"cached_tokens": 0, "image_tokens": 0},
+                "output_tokens_details": {"reasoning_tokens": 0},
+            },
+            "server_side_tool_usage": {},
+        }
+        cog = make_cog(mock_bot, response)
+        cog.show_cost_embeds = True
+        mock_discord_context.send_followup = AsyncMock(return_value="message")
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Long please",
+            model="grok-4.20-non-reasoning",
+        )
+
+        assert mock_discord_context.send_followup.await_count > 1
+        assert all(
+            "embeds" in call.kwargs for call in mock_discord_context.send_followup.await_args_list
+        )
+        assert all(
+            "content" not in call.kwargs
+            for call in mock_discord_context.send_followup.await_args_list
+        )
+        assert mock_discord_context.send_followup.await_args_list[-1].kwargs["view"] is not None
+
     async def test_chat_with_four_tools(self, cog, mock_discord_context):
         """Chat should pass the selected four tools in the payload."""
         mock_discord_context.channel.typing = MagicMock()

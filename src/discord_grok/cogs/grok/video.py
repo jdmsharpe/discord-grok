@@ -6,6 +6,7 @@ from typing import cast
 from discord import ApplicationContext, Attachment, Colour, Embed, File
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
+from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import GROK_VIDEO_MODELS, calculate_video_cost, format_xai_error, truncate_text
 
@@ -76,14 +77,21 @@ async def run_video_command(
         ]
         if cog.show_cost_embeds:
             append_generation_pricing_embed(embeds, video_cost, daily_cost)
-        await ctx.send_followup(embeds=embeds, file=File(data, "video.mp4"))
+        await send_embed_batches(
+            ctx.send_followup,
+            embeds=embeds,
+            file=File(data, "video.mp4"),
+            logger=cog.logger,
+        )
         cog.logger.info("Successfully generated and sent video")
 
     except Exception as error:
         description = format_xai_error(error)
         cog.logger.error("Video generation failed: %s", description, exc_info=True)
-        await ctx.send_followup(
-            embed=Embed(title="Error", description=description, color=Colour.red())
+        await send_embed_batches(
+            ctx.send_followup,
+            embed=Embed(title="Error", description=description, color=Colour.red()),
+            logger=cog.logger,
         )
 
 

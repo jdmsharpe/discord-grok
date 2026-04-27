@@ -5,6 +5,7 @@ import io
 from discord import ApplicationContext, Colour, Embed, File
 
 from .client import TTS_MAX_CHARS
+from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import calculate_tts_cost, format_xai_error, truncate_text
 
@@ -25,7 +26,8 @@ async def run_tts_command(
 
     try:
         if len(text) > TTS_MAX_CHARS:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=(
@@ -33,7 +35,8 @@ async def run_tts_command(
                         f"({len(text):,} characters provided)."
                     ),
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
@@ -84,17 +87,21 @@ async def run_tts_command(
         if cog.show_cost_embeds:
             append_generation_pricing_embed(embeds, tts_cost, daily_cost)
         extension = "ulaw" if output_format == "mulaw" else output_format
-        await ctx.send_followup(
+        await send_embed_batches(
+            ctx.send_followup,
             embeds=embeds,
             file=File(io.BytesIO(audio_bytes), f"speech.{extension}"),
+            logger=cog.logger,
         )
         cog.logger.info("Successfully generated and sent TTS audio")
 
     except Exception as error:
         description = format_xai_error(error)
         cog.logger.error("TTS generation failed: %s", description, exc_info=True)
-        await ctx.send_followup(
-            embed=Embed(title="Error", description=description, color=Colour.red())
+        await send_embed_batches(
+            ctx.send_followup,
+            embed=Embed(title="Error", description=description, color=Colour.red()),
+            logger=cog.logger,
         )
 
 
