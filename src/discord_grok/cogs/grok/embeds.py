@@ -10,9 +10,6 @@ from .tooling import (
 )
 
 GROK_BLACK = Colour(0x000000)
-MAX_TOTAL_EMBED_CHARS = 6000
-EMBED_HEADROOM = 500
-MIN_EMBED_SPACE = 500
 REASONING_TRUNCATION_SUFFIX = "\n\n... [reasoning truncated]"
 
 
@@ -36,13 +33,6 @@ def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
 
 def append_response_embeds(embeds: list[Embed], response_text: str) -> None:
     """Append response text as Discord embeds, handling chunking for long responses."""
-    existing_chars = sum(len(e.title or "") + len(e.description or "") for e in embeds)
-    available = max(MIN_EMBED_SPACE, MAX_TOTAL_EMBED_CHARS - existing_chars - EMBED_HEADROOM)
-    if len(response_text) > available:
-        response_text = (
-            response_text[: available - 40] + "\n\n... [Response truncated due to length]"
-        )
-
     for index, chunk in enumerate(chunk_text(response_text), start=1):
         embeds.append(
             Embed(

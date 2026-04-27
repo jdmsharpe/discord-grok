@@ -7,6 +7,7 @@ from typing import Any, cast
 from discord import ApplicationContext, Attachment, Colour, Embed, File
 from xai_sdk.image import ImageAspectRatio, ImageResolution
 
+from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import calculate_image_cost, format_xai_error, truncate_text
 
@@ -30,12 +31,14 @@ async def run_image_command(
         mode = "Image Editing" if is_editing else "Image Generation"
 
         if is_editing and count > 1:
-            await ctx.send_followup(
+            await send_embed_batches(
+                ctx.send_followup,
                 embed=Embed(
                     title="Error",
                     description=("Multi-image generation is not supported in Image Editing mode."),
                     color=Colour.red(),
-                )
+                ),
+                logger=cog.logger,
             )
             return
 
@@ -105,14 +108,16 @@ async def run_image_command(
         embeds = [embed]
         if cog.show_cost_embeds:
             append_generation_pricing_embed(embeds, image_cost, daily_cost)
-        await ctx.send_followup(embeds=embeds, files=files)
+        await send_embed_batches(ctx.send_followup, embeds=embeds, files=files, logger=cog.logger)
         cog.logger.info("Successfully generated and sent %d image(s)", len(results))
 
     except Exception as error:
         description = format_xai_error(error)
         cog.logger.error("Image generation failed: %s", description, exc_info=True)
-        await ctx.send_followup(
-            embed=Embed(title="Error", description=description, color=Colour.red())
+        await send_embed_batches(
+            ctx.send_followup,
+            embed=Embed(title="Error", description=description, color=Colour.red()),
+            logger=cog.logger,
         )
 
 
