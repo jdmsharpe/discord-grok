@@ -1,4 +1,5 @@
 import copy
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from tests.fixtures import MOCK_RESPONSES_API_RESPONSE
@@ -52,7 +53,7 @@ class MockPostContextManager:
 class MockHTTPSession:
     def __init__(self, post_results: list[object]):
         self.post_results = list(post_results)
-        self.post_calls: list[dict[str, object]] = []
+        self.post_calls: list[dict[str, Any]] = []
 
     def post(self, *args, **kwargs):
         self.post_calls.append({"args": args, "kwargs": kwargs})

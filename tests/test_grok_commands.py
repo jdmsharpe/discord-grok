@@ -33,7 +33,7 @@ class TestGrokCommandSchema:
             assert choice.value in CHAT_MODEL_INDEX
             assert choice.value in MODEL_PRICING
 
-    def test_model_markdown_lines_match_visible_models(self, cog):
+    def test_model_markdown_lines_match_visible_models(self):
         """README model-list helper should reflect the visible slash-command models."""
         from discord_grok.cogs.grok.command_options import (
             generate_model_markdown_lines,
@@ -347,6 +347,69 @@ class TestImageBatchGeneration:
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - expected_cost) < 1e-9
 
+    async def test_image_cost_prefers_sdk_reported_cost_usd(self, cog, mock_discord_context):
+        """When the SDK response carries cost_usd, that value should be used over YAML pricing."""
+        cog.client.image.sample.return_value.cost_usd = 0.123
+
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image-pro",
+                count=1,
+            )
+
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - 0.123) < 1e-9
+
+    async def test_image_batch_cost_mixes_sdk_and_yaml_per_result(self, cog, mock_discord_context):
+        """Mixed Some/None cost_usd across batch should sum SDK values + YAML fallback per missing."""
+        from discord_grok.cogs.grok.tooling import calculate_image_cost
+
+        reported = MagicMock()
+        reported.url = "https://example.com/r1.png"
+        reported.base64 = None
+        reported.cost_usd = 0.05
+
+        unreported = MagicMock()
+        unreported.url = "https://example.com/r2.png"
+        unreported.base64 = None
+        unreported.cost_usd = None
+
+        cog.client.image.sample_batch.return_value = [reported, unreported]
+
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image",
+                count=2,
+            )
+
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        expected = 0.05 + calculate_image_cost("grok-imagine-image")
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
+
     async def test_image_batch_rejects_editing_mode(
         self, cog, mock_discord_context, mock_attachment
     ):
@@ -437,6 +500,29 @@ class TestVideoCommand:
 
         call_kwargs = mock_discord_context.send_followup.call_args[1]
         assert call_kwargs["embed"].title == "Error"
+
+    async def test_video_cost_prefers_sdk_reported_cost_usd(self, cog, mock_discord_context):
+        """When the SDK response carries cost_usd, that value should be used over YAML pricing."""
+        cog.client.video.generate.return_value.cost_usd = 0.42
+
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.video.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A sunset",
+            )
+
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - 0.42) < 1e-9
 
     async def test_video_no_url_returns_error(self, cog, mock_discord_context):
         """No video URL from API should display an error."""
