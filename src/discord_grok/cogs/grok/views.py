@@ -52,7 +52,10 @@ def _initialize_view(view: View, *, timeout: float | None) -> None:
             loop.run_until_complete(_build_view_on_running_loop(view, timeout=timeout))
         finally:
             loop.close()
-        view._stopped = ConcurrentFuture()
+        # discord.py types _stopped as Future[bool], but tests need a concurrent
+        # Future when constructing a view outside a running loop; wait() handles
+        # both shapes. The cast acknowledges this deliberate private-attr poke.
+        view._stopped = cast(Any, ConcurrentFuture())
     else:
         View.__init__(view, timeout=timeout)
 

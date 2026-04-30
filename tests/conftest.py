@@ -23,6 +23,9 @@ def mock_xai_client():
         mock_image_response = MagicMock()
         mock_image_response.url = "https://example.com/generated-image.png"
         mock_image_response.base64 = None
+        # Default to None so the YAML-fallback cost path is exercised; tests
+        # opting into SDK-reported cost should override cost_usd explicitly.
+        mock_image_response.cost_usd = None
         client.image = MagicMock()
         client.image.sample = AsyncMock(return_value=mock_image_response)
         client.image.sample_batch = AsyncMock(
@@ -32,6 +35,7 @@ def mock_xai_client():
         # Mock video.generate
         mock_video_response = MagicMock()
         mock_video_response.url = "https://example.com/generated-video.mp4"
+        mock_video_response.cost_usd = None
         client.video = MagicMock()
         client.video.generate = AsyncMock(return_value=mock_video_response)
 

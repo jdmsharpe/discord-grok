@@ -20,13 +20,13 @@ from discord import (
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
 from .client import XaiApiError
 from .command_options import DEFAULT_CHAT_MODEL_ID
+from .embed_delivery import send_embed_batches
 from .embeds import (
     append_pricing_embed,
     append_reasoning_embeds,
     append_response_embeds,
     append_sources_embed,
 )
-from .embed_delivery import send_embed_batches
 from .models import ChatCompletionParameters, Conversation
 from .state import create_button_view
 from .tooling import (

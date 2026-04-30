@@ -20,13 +20,19 @@ class TestFileUploadAndCleanup:
 
     async def test_upload_file_attachment_success(self, cog, mock_file_attachment):
         """Should download from Discord and upload to xAI, returning the file ID."""
+        from discord_grok.cogs.grok.state import CONVERSATION_TTL
+
         with patch.object(cog, "_fetch_attachment_bytes", new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = b"file content"
 
             file_id = await cog._upload_file_attachment(mock_file_attachment)
 
         assert file_id == "file-abc123"
-        cog.client.files.upload.assert_awaited_once_with(b"file content", filename="document.pdf")
+        cog.client.files.upload.assert_awaited_once_with(
+            b"file content",
+            filename="document.pdf",
+            expires_after=CONVERSATION_TTL,
+        )
 
     async def test_upload_file_attachment_too_large(self, cog, mock_file_attachment):
         """Files exceeding 48 MB should be rejected."""

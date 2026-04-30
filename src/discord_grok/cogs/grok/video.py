@@ -50,7 +50,11 @@ async def run_video_command(
                 raise Exception(f"Failed to download video: HTTP {response.status}")
             video_bytes = await response.read()
 
-        video_cost = calculate_video_cost(duration)
+        # Prefer SDK-reported cost (xai-sdk 1.12+); fall back to YAML pricing
+        # when the API does not report cost on this response.
+        video_cost = (
+            result.cost_usd if result.cost_usd is not None else calculate_video_cost(duration)
+        )
         daily_cost = cog._track_daily_cost(ctx.author.id, video_cost)
 
         cog.logger.info(

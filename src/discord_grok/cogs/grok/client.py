@@ -231,6 +231,10 @@ def build_responses_payload(
 
 
 async def upload_file_attachment(cog, attachment, *, fetch_bytes) -> str | None:
+    # Late import: state.py imports from this module at top level, so importing
+    # CONVERSATION_TTL at module load would close the cycle.
+    from .state import CONVERSATION_TTL
+
     if attachment.size > MAX_FILE_SIZE:
         cog.logger.warning(
             "Attachment %s exceeds 48 MB limit (%s bytes)",
@@ -243,7 +247,11 @@ async def upload_file_attachment(cog, attachment, *, fetch_bytes) -> str | None:
         return None
     client = get_client(cog)
     try:
-        uploaded = await client.files.upload(file_bytes, filename=attachment.filename)
+        uploaded = await client.files.upload(
+            file_bytes,
+            filename=attachment.filename,
+            expires_after=CONVERSATION_TTL,
+        )
         cog.logger.info("Uploaded file %s as %s", attachment.filename, uploaded.id)
         return uploaded.id
     except asyncio.CancelledError:
