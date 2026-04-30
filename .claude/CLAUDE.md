@@ -4,7 +4,7 @@
 
 ```bash
 # Install dependencies
-pip install -e ".[dev]"        # or: pip install -r requirements.txt
+pip install -e ".[dev]"
 
 # Copy and fill in environment variables
 cp .env.example .env
@@ -45,6 +45,7 @@ All commands are nested under `/grok`:
 | `/grok check_permissions` | Verify bot permissions in the current channel |
 
 `/grok chat` currently exposes:
+
 - Core inputs: `prompt`, `system_prompt`, `model`, `attachment`
 - Model tuning: `max_tokens`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `reasoning_effort`, `agent_count`
 - Tool toggles: `web_search`, `x_search`, `code_execution`, `collections_search`, `mcp`
@@ -85,6 +86,8 @@ src/
         ├── chat.py
         ├── client.py
         ├── cog.py
+        ├── command_options.py        # Chat model catalog + slash-command option choices
+        ├── embed_delivery.py         # Discord embed batching + send helpers (6000-char/10-embed limits)
         ├── embeds.py
         ├── image.py
         ├── models.py
@@ -107,8 +110,8 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
 
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
-- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_button_view`, `test_config_auth`, `test_lazy_imports`, and `test_util`.
-- MCP preset coverage now lives in `tests/test_config_mcp.py`, and documentation assertions live in `tests/test_readme.py`.
+- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_embed_delivery`, `test_button_view`, `test_config_auth`, `test_config_pricing`, `test_logging_setup`, `test_lazy_imports`, and `test_util`.
+- MCP preset coverage lives in `tests/test_config_mcp.py`.
 - `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
 - Examples:
@@ -136,7 +139,7 @@ pytest -q
 
 - Conversation state still preserves `previous_response_id`, `response_id_history`, `prompt_cache_key`, and `grok_conv_id`.
 - `collections_search` requires `XAI_COLLECTION_IDS`.
-- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`.
+- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`. Chat uses raw HTTP rather than the SDK because xai-sdk does not yet expose a Responses API surface or `prompt_cache_key`; once both land, migrate `chat.py`/`client.py` onto the SDK like image/video/TTS already are.
 - Chat, image, video, and TTS command bodies are delegated from `discord_grok.cogs.grok.cog` into feature modules.
 - Remote MCP is configured per `/grok chat` invocation with comma-separated preset names. Presets are loaded from `XAI_MCP_PRESETS_JSON` and `XAI_MCP_PRESETS_PATH`, validated at config-load time, and then persisted as `mcp_servers` on `ChatCompletionParameters`.
 - Each MCP preset supports `url` (required HTTPS), `authorization_env_var` (optional), and `allowed_tools` (optional).
@@ -144,6 +147,7 @@ pytest -q
 - MCP is intentionally excluded from the built-in tool dropdown so dropdown changes only affect built-in tools.
 - The slash-command surface no longer accepts X handle filters or web domain allow/block lists; only media toggles and `x_search_date_range` remain pre-start search refinements.
 - Attachment size limits (from `discord_grok.cogs.grok.attachments`): images are capped at 20 MB (`MAX_IMAGE_SIZE`), other files at 48 MB (`MAX_FILE_SIZE`). Patch these constants when writing upload tests.
+- Image/video/TTS cost: prefer `result.cost_usd` reported by xai-sdk 1.12+; fall back to bundled YAML pricing only when the SDK does not return a cost. Mock `cost_usd=None` in tests to exercise the YAML fallback path.
 
 ## Runtime Conventions (Cross-Project)
 
