@@ -46,7 +46,7 @@ class TestPruneRuntimeState:
         )
 
         params = ChatCompletionParameters(
-            model="grok-4.20",
+            model="grok-4.3",
             conversation_starter=starter,
         )
         conversation = Conversation(params=params)
@@ -137,7 +137,7 @@ class TestConversationTouch:
             Conversation,
         )
 
-        conv = Conversation(params=ChatCompletionParameters(model="grok-4.20"))
+        conv = Conversation(params=ChatCompletionParameters(model="grok-4.3"))
         original = conv.updated_at
         # Force a measurable gap.
         conv.updated_at = original - timedelta(hours=1)

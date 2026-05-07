@@ -160,7 +160,7 @@ class TestChatCompletionParameters:
     def test_all_params_set(self):
         """All parameters should be stored correctly."""
         params = ChatCompletionParameters(
-            model="grok-4.20",
+            model="grok-4.3",
             temperature=0.7,
             top_p=0.9,
             max_tokens=2048,
@@ -180,7 +180,7 @@ class TestChatCompletionParameters:
                 )
             ],
         )
-        assert params.model == "grok-4.20"
+        assert params.model == "grok-4.3"
         assert params.temperature == 0.7
         assert params.top_p == 0.9
         assert params.max_tokens == 2048
@@ -368,7 +368,7 @@ class TestPricing:
     def test_calculate_cost_unknown_model_uses_default(self):
         """Unknown models should fall back to the default pricing."""
         cost = calculate_cost("unknown-model", 1_000_000, 1_000_000)
-        assert cost == 2.00 + 6.00
+        assert cost == 1.25 + 2.50
 
     def test_calculate_cost_with_reasoning_tokens(self):
         """Reasoning tokens should be billed at the output rate."""
