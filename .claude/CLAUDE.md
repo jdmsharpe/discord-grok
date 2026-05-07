@@ -13,7 +13,7 @@ cp .env.example .env
 python src/bot.py
 
 # Or with Docker
-docker-compose up --build
+docker compose up --build
 ```
 
 ## Environment Variables
@@ -139,7 +139,7 @@ pytest -q
 
 - Conversation state still preserves `previous_response_id`, `response_id_history`, `prompt_cache_key`, and `grok_conv_id`.
 - `collections_search` requires `XAI_COLLECTION_IDS`.
-- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`. Chat uses raw HTTP rather than the SDK because xai-sdk does not yet expose a Responses API surface or `prompt_cache_key`; once both land, migrate `chat.py`/`client.py` onto the SDK like image/video/TTS already are.
+- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`. Chat uses raw HTTP rather than the SDK because xai-sdk does not yet expose a Responses API surface or `prompt_cache_key`; once both land, migrate `chat.py`/`client.py` onto the SDK like image/video/TTS already are. (Last checked xai-sdk 1.12.2 on 2026-05-06; recheck on next minor bump.)
 - Chat, image, video, and TTS command bodies are delegated from `discord_grok.cogs.grok.cog` into feature modules.
 - Remote MCP is configured per `/grok chat` invocation with comma-separated preset names. Presets are loaded from `XAI_MCP_PRESETS_JSON` and `XAI_MCP_PRESETS_PATH`, validated at config-load time, and then persisted as `mcp_servers` on `ChatCompletionParameters`.
 - Each MCP preset supports `url` (required HTTPS), `authorization_env_var` (optional), and `allowed_tools` (optional).
@@ -155,3 +155,4 @@ pytest -q
 - **Retry**: `client.post_with_retries` wraps every xAI HTTP call with exponential backoff + jitter. `MAX_API_ATTEMPTS=5`, honors `Retry-After` on 429, retries on `RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}` and transport errors.
 - **Conversation TTL**: `prune_runtime_state` in `cogs/grok/state.py` evicts conversations older than `CONVERSATION_TTL` (12h) every 15 minutes via `@tasks.loop`. Caps at `MAX_ACTIVE_CONVERSATIONS`. Daily costs retained for `DAILY_COST_RETENTION_DAYS` (30).
 - **Request IDs**: `cog_before_invoke` (and `on_message`) bind a fresh 8-char hex id via `discord_grok.logging_setup.bind_request_id`. All downstream `logger.info`/`warning`/`error` calls automatically include the id. Set `LOG_FORMAT=json` for JSON-lines output.
+- **Async file I/O**: blocking `open()` and `pathlib` methods (`read_bytes`, `write_bytes`, `unlink`, etc.) inside `async def` freeze the Discord event loop and stall every concurrent slash command. Wrap them with `asyncio.to_thread(...)` so the I/O runs on a worker thread. Enforced by `ruff` (`ASYNC230`/`ASYNC240`).

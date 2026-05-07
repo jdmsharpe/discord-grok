@@ -282,8 +282,8 @@ def _text_len(value: Any) -> int:
 
 
 __all__ = [
-    "DISCORD_EMBED_TOTAL_LIMIT",
     "DISCORD_EMBEDS_PER_MESSAGE_LIMIT",
+    "DISCORD_EMBED_TOTAL_LIMIT",
     "count_embed_chars",
     "pack_embeds",
     "send_embed_batches",

@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import json
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, cast
 
@@ -68,8 +68,8 @@ def parse_retry_after(retry_after: str | None) -> float | None:
     with contextlib.suppress(TypeError, ValueError, OverflowError):
         retry_at = parsedate_to_datetime(retry_after)
         if retry_at.tzinfo is None:
-            retry_at = retry_at.replace(tzinfo=timezone.utc)
-        return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+            retry_at = retry_at.replace(tzinfo=UTC)
+        return max(0.0, (retry_at - datetime.now(UTC)).total_seconds())
     return None
 
 
@@ -117,7 +117,7 @@ async def post_with_retries(
                 raise XaiApiError(f"{request_name} error (HTTP {resp.status}): {error_body}")
         except asyncio.CancelledError:
             raise
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+        except (TimeoutError, aiohttp.ClientError) as error:
             if attempt >= MAX_API_ATTEMPTS:
                 raise XaiApiError(
                     f"{request_name} request failed after {MAX_API_ATTEMPTS} attempts: {error}"
@@ -256,7 +256,7 @@ async def upload_file_attachment(cog, attachment, *, fetch_bytes) -> str | None:
         return uploaded.id
     except asyncio.CancelledError:
         raise
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+    except (TimeoutError, aiohttp.ClientError, ValueError) as error:
         cog.logger.warning("Failed to upload file %s to xAI: %s", attachment.filename, error)
         return None
     except Exception as error:
@@ -279,7 +279,7 @@ async def cleanup_conversation_files(cog, conversation) -> None:
             cog.logger.info("Deleted xAI file %s", file_id)
         except asyncio.CancelledError:
             raise
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        except (TimeoutError, aiohttp.ClientError, ValueError) as error:
             cog.logger.warning("Failed to delete xAI file %s: %s", file_id, error)
         except Exception as error:
             cog.logger.warning(
@@ -302,7 +302,6 @@ async def close_http_session(cog) -> None:
 
 
 __all__ = [
-    "ClientTimeout",
     "INITIAL_RETRY_DELAY_SECONDS",
     "MAX_API_ATTEMPTS",
     "RESPONSES_API_URL",
@@ -310,9 +309,10 @@ __all__ = [
     "RETRY_JITTER_RATIO",
     "TTS_API_URL",
     "TTS_MAX_CHARS",
+    "ClientTimeout",
     "XaiApiError",
-    "build_xai_headers",
     "build_responses_payload",
+    "build_xai_headers",
     "call_responses_api",
     "call_tts_api",
     "cleanup_conversation_files",

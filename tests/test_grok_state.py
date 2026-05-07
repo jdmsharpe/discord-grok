@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -50,7 +50,7 @@ class TestPruneRuntimeState:
             conversation_starter=starter,
         )
         conversation = Conversation(params=params)
-        conversation.updated_at = datetime.now(timezone.utc) - age
+        conversation.updated_at = datetime.now(UTC) - age
         return conversation
 
     async def test_drops_conversations_older_than_ttl(self, cog):
@@ -113,12 +113,10 @@ class TestPruneRuntimeState:
             prune_runtime_state,
         )
 
-        old_date = (
-            datetime.now(timezone.utc) - timedelta(days=DAILY_COST_RETENTION_DAYS + 2)
-        ).date()
-        fresh_date = datetime.now(timezone.utc).date()
-        cog.daily_costs[(1, old_date.isoformat())] = (10.0, datetime.now(timezone.utc))
-        cog.daily_costs[(1, fresh_date.isoformat())] = (5.0, datetime.now(timezone.utc))
+        old_date = (datetime.now(UTC) - timedelta(days=DAILY_COST_RETENTION_DAYS + 2)).date()
+        fresh_date = datetime.now(UTC).date()
+        cog.daily_costs[(1, old_date.isoformat())] = (10.0, datetime.now(UTC))
+        cog.daily_costs[(1, fresh_date.isoformat())] = (5.0, datetime.now(UTC))
 
         with patch(
             "discord_grok.cogs.grok.state.cleanup_conversation_files",

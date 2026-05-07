@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .cogs.grok.cog import GrokCog
     from .config.auth import BOT_TOKEN
 
-__all__ = ["GrokCog", "BOT_TOKEN"]
+__all__ = ["BOT_TOKEN", "GrokCog"]
 
 
 def __getattr__(name: str):
