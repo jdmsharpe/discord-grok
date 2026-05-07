@@ -330,6 +330,46 @@ class TestGrokChat:
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["reasoning_effort"] == "high"
 
+    @pytest.mark.parametrize("rejected_effort", ["medium", "none"])
+    async def test_chat_rejects_unsupported_effort_value(
+        self, cog, mock_discord_context, rejected_effort
+    ):
+        """grok-3-mini accepts only `low`/`high`; other dropdown values must be rejected."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-3-mini",
+            reasoning_effort=rejected_effort,
+        )
+
+        cog._call_responses_api.assert_not_called()
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        description = call_kwargs["embed"].description
+        assert rejected_effort in description
+        assert "grok-3-mini" in description
+
+    async def test_chat_passes_none_effort_for_grok_4_3(self, cog, mock_discord_context):
+        """grok-4.3 accepts `none` per its spec; should be forwarded unchanged."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model="grok-4.3",
+            reasoning_effort="none",
+        )
+
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["reasoning_effort"] == "none"
+
     async def test_chat_rejects_max_tokens_on_multi_agent(self, cog, mock_discord_context):
         """max_tokens should be rejected for multi-agent models."""
         mock_discord_context.channel.typing = MagicMock()

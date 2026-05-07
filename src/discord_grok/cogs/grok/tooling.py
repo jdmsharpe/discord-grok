@@ -99,6 +99,14 @@ REASONING_EFFORT_MODELS: set[str] = {
     entry.model_id for entry in iter_slash_command_models() if entry.supports_reasoning_effort
 }
 
+# Per-model accepted reasoning_effort values. Different reasoning models accept
+# different subsets (e.g. grok-3-mini accepts low/high; grok-4.3 adds none/medium).
+MODEL_REASONING_EFFORTS: dict[str, frozenset[str]] = {
+    entry.model_id: entry.reasoning_efforts
+    for entry in iter_slash_command_models()
+    if entry.reasoning_efforts
+}
+
 # Multi-agent models that support agent_count and have special parameter constraints.
 MULTI_AGENT_MODELS: set[str] = {
     entry.model_id for entry in iter_slash_command_models() if entry.supports_multi_agent
@@ -422,6 +430,7 @@ __all__ = [
     "GROK_MODELS",
     "GROK_VIDEO_MODELS",
     "MODEL_PRICING",
+    "MODEL_REASONING_EFFORTS",
     "MULTI_AGENT_MODELS",
     "PENALTY_SUPPORTED_MODELS",
     "REASONING_EFFORT_MODELS",
