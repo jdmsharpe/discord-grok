@@ -272,13 +272,7 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
 
     except asyncio.CancelledError:
         raise
-    except (
-        XaiApiError,
-        aiohttp.ClientError,
-        asyncio.TimeoutError,
-        ValueError,
-        DiscordException,
-    ) as error:
+    except (TimeoutError, XaiApiError, aiohttp.ClientError, ValueError, DiscordException) as error:
         description = _format_user_error(
             error,
             fallback="Failed to process your message with xAI. Please try again.",
@@ -738,13 +732,7 @@ async def run_chat_command(
 
     except asyncio.CancelledError:
         raise
-    except (
-        XaiApiError,
-        aiohttp.ClientError,
-        asyncio.TimeoutError,
-        ValueError,
-        DiscordException,
-    ) as error:
+    except (TimeoutError, XaiApiError, aiohttp.ClientError, ValueError, DiscordException) as error:
         description = _format_user_error(
             error,
             fallback="Failed to start a chat conversation with xAI. Please try again.",
@@ -761,7 +749,7 @@ async def run_chat_command(
                 try:
                     await client.files.delete(file_id)
                     cog.logger.info("Cleaned up orphaned xAI file %s", file_id)
-                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as cleanup_error:
+                except (TimeoutError, aiohttp.ClientError, ValueError) as cleanup_error:
                     cog.logger.warning(
                         "Failed to clean up orphaned xAI file %s: %s",
                         file_id,

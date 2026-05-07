@@ -1,4 +1,3 @@
-import asyncio
 import json
 from unittest.mock import AsyncMock, patch
 
@@ -233,7 +232,7 @@ class TestGrokHTTPRetries:
     async def test_call_tts_api_retries_timeouts(self, cog):
         session = MockHTTPSession(
             [
-                asyncio.TimeoutError("timed out"),
+                TimeoutError("timed out"),
                 make_http_response(200, b"audio-bytes"),
             ]
         )
