@@ -261,7 +261,14 @@ class TestReasoningConstants:
     def test_reasoning_effort_models(self):
         from discord_grok.cogs.grok.tooling import REASONING_EFFORT_MODELS
 
-        assert {"grok-3-mini"} == REASONING_EFFORT_MODELS
+        assert {"grok-3-mini", "grok-4.3"} == REASONING_EFFORT_MODELS
+
+    def test_model_reasoning_efforts_per_model(self):
+        from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
+
+        assert MODEL_REASONING_EFFORTS["grok-3-mini"] == frozenset({"low", "high"})
+        assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset({"none", "low", "medium", "high"})
+        assert "grok-4.20" not in MODEL_REASONING_EFFORTS
 
     def test_multi_agent_models(self):
         from discord_grok.cogs.grok.tooling import MULTI_AGENT_MODELS

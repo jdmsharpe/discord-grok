@@ -15,6 +15,7 @@ def _reload_pricing():
 class TestPricingLoader:
     def test_bundled_yaml_loads_pricing_classes(self):
         pricing = _reload_pricing()
+        assert pricing.MODEL_PRICING_CLASSES["flagship"] == (1.25, 0.20, 2.50)
         assert pricing.MODEL_PRICING_CLASSES["premium"] == (2.00, 0.20, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["fast"] == (0.20, 0.05, 0.50)
         assert pricing.MODEL_PRICING_CLASSES["mini"] == (0.30, 0.075, 0.50)
@@ -47,6 +48,8 @@ class TestPricingLoader:
         from discord_grok.cogs.grok.command_options import build_model_pricing_map
 
         pricing_map = build_model_pricing_map()
+        # grok-4.3 is in the 'flagship' class.
+        assert pricing_map["grok-4.3"] == (1.25, 0.20, 2.50)
         # grok-4.20 is in the 'premium' class.
         assert pricing_map["grok-4.20"] == (2.00, 0.20, 6.00)
         # grok-3-mini is in the 'mini' class.

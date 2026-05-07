@@ -109,7 +109,9 @@ CHAT_MODEL_CHOICES = [
 ]
 
 REASONING_EFFORT_CHOICES = [
+    OptionChoice(name="None", value="none"),
     OptionChoice(name="Low", value="low"),
+    OptionChoice(name="Medium", value="medium"),
     OptionChoice(name="High", value="high"),
 ]
 
@@ -444,7 +446,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "reasoning_effort",
-        description="(Advanced) How hard the model thinks. grok-3-mini only. (default: not set)",
+        description="(Advanced) How hard the model thinks. Reasoning models only. (default: not set)",
         required=False,
         type=str,
         choices=REASONING_EFFORT_CHOICES,

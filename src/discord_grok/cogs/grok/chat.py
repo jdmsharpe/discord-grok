@@ -30,6 +30,7 @@ from .embeds import (
 from .models import ChatCompletionParameters, Conversation
 from .state import create_button_view
 from .tooling import (
+    MODEL_REASONING_EFFORTS,
     MULTI_AGENT_MODELS,
     PENALTY_SUPPORTED_MODELS,
     REASONING_EFFORT_MODELS,
@@ -388,20 +389,38 @@ async def run_chat_command(
             )
             return
 
-        if reasoning_effort is not None and model not in REASONING_EFFORT_MODELS:
-            await send_embed_batches(
-                ctx.send_followup,
-                embed=Embed(
-                    title="Error",
-                    description=(
-                        "`reasoning_effort` is only supported by "
-                        f"{', '.join(f'`{item}`' for item in sorted(REASONING_EFFORT_MODELS))}."
+        if reasoning_effort is not None:
+            if model not in REASONING_EFFORT_MODELS:
+                await send_embed_batches(
+                    ctx.send_followup,
+                    embed=Embed(
+                        title="Error",
+                        description=(
+                            "`reasoning_effort` is only supported by "
+                            f"{', '.join(f'`{item}`' for item in sorted(REASONING_EFFORT_MODELS))}."
+                        ),
+                        color=Colour.red(),
                     ),
-                    color=Colour.red(),
-                ),
-                logger=cog.logger,
-            )
-            return
+                    logger=cog.logger,
+                )
+                return
+
+            accepted_efforts = MODEL_REASONING_EFFORTS.get(model, frozenset())
+            if reasoning_effort not in accepted_efforts:
+                await send_embed_batches(
+                    ctx.send_followup,
+                    embed=Embed(
+                        title="Error",
+                        description=(
+                            f"`reasoning_effort={reasoning_effort}` is not supported by "
+                            f"`{model}`. Accepted values: "
+                            f"{', '.join(f'`{e}`' for e in sorted(accepted_efforts))}."
+                        ),
+                        color=Colour.red(),
+                    ),
+                    logger=cog.logger,
+                )
+                return
 
         is_multi_agent = model in MULTI_AGENT_MODELS
 

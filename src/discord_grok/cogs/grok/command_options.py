@@ -11,6 +11,7 @@ class ChatModelCatalogEntry:
     display_name: str
     pricing_class: str
     capabilities: frozenset[str]
+    reasoning_efforts: frozenset[str] = frozenset()
     slash_command_visible: bool = True
 
     @property
@@ -19,7 +20,7 @@ class ChatModelCatalogEntry:
 
     @property
     def supports_reasoning_effort(self) -> bool:
-        return "supports_reasoning_effort" in self.capabilities
+        return bool(self.reasoning_efforts)
 
     @property
     def supports_multi_agent(self) -> bool:
@@ -27,6 +28,13 @@ class ChatModelCatalogEntry:
 
 
 CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
+    ChatModelCatalogEntry(
+        model_id="grok-4.3",
+        display_name="Grok 4.3",
+        pricing_class="flagship",
+        capabilities=frozenset(),
+        reasoning_efforts=frozenset({"none", "low", "medium", "high"}),
+    ),
     ChatModelCatalogEntry(
         model_id="grok-4.20-multi-agent",
         display_name="Grok 4.20 Multi-Agent",
@@ -85,7 +93,8 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
         model_id="grok-3-mini",
         display_name="Grok 3 Mini",
         pricing_class="mini",
-        capabilities=frozenset({"supports_reasoning_effort"}),
+        capabilities=frozenset(),
+        reasoning_efforts=frozenset({"low", "high"}),
     ),
     ChatModelCatalogEntry(
         model_id="grok-3",
