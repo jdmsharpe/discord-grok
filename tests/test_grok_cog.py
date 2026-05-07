@@ -1,9 +1,32 @@
 import asyncio
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from tests.support import make_cog
+
+
+def _serialize_command_group_payload(group):
+    return {
+        "name": group.name,
+        "description": group.description,
+        "options": [
+            {
+                "name": command.name,
+                "description": command.description,
+                "options": [
+                    option.to_dict()
+                    for option in command.options
+                    if option.input_type is not None
+                ],
+                "type": 1,
+                "nsfw": False,
+            }
+            for command in group.subcommands
+        ],
+        "nsfw": False,
+    }
 
 
 class TestGrokCog:
@@ -18,6 +41,38 @@ class TestGrokCog:
         assert cog.bot == mock_bot
         assert cog.conversations == {}
         assert cog.views == {}
+
+    def test_registered_command_groups_fit_discord_size_limit(self, cog):
+        """Discord rejects any single top-level command payload over 8000 bytes."""
+
+        commands_by_name = {command.name: command for command in cog.get_commands()}
+
+        assert set(commands_by_name) == {"grok", "grok-media", "grok-tools"}
+        assert [command.name for command in commands_by_name["grok"].subcommands] == [
+            "check_permissions",
+            "chat",
+        ]
+        assert [command.name for command in commands_by_name["grok-media"].subcommands] == [
+            "image",
+            "video",
+        ]
+        assert [command.name for command in commands_by_name["grok-tools"].subcommands] == [
+            "tts",
+        ]
+
+        payload_sizes = {
+            name: len(
+                json.dumps(
+                    _serialize_command_group_payload(command),
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+            for name, command in commands_by_name.items()
+        }
+
+        assert payload_sizes["grok"] < 8000
+        assert payload_sizes["grok-media"] < 8000
+        assert payload_sizes["grok-tools"] < 8000
 
     async def test_on_message_ignores_bot_messages(self, cog, mock_discord_message):
         """Test that the bot ignores its own messages."""
