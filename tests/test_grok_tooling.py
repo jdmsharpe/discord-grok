@@ -173,7 +173,7 @@ class TestResolveSelectedToolsUtil:
 
         conversation = Conversation(
             params=ChatCompletionParameters(
-                model="grok-4.20",
+                model="grok-4.3",
                 mcp_servers=[
                     McpServerConfig(
                         server_url="https://mcp.example.com/sse",

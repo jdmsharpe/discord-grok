@@ -124,7 +124,7 @@ class TestGrokChat:
                 cog,
                 ctx=mock_discord_context,
                 prompt="Tool test",
-                model="grok-4.20",
+                model="grok-4.3",
                 web_search=True,
                 x_search=True,
                 code_execution=True,
@@ -166,7 +166,7 @@ class TestGrokChat:
                 cog,
                 ctx=mock_discord_context,
                 prompt="Use MCP",
-                model="grok-4.20",
+                model="grok-4.3",
                 mcp="trusted",
             )
 
@@ -451,7 +451,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Search for news",
-            model="grok-4.20",
+            model="grok-4.3",
             web_search=True,
         )
 

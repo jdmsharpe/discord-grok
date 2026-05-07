@@ -11,7 +11,7 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 
 ## Features
 - **Multi-turn Conversations:** Persistent conversation history with interactive button controls (regenerate, pause/resume, stop) and automatic prompt caching.
-- **Multiple Grok Models:** Choose from Grok 4.20 (Multi-Agent, Reasoning, Non-Reasoning), Grok 4.1 Fast (Reasoning, Non-Reasoning), Grok Code Fast 1, Grok 4 Fast (Reasoning, Non-Reasoning), Grok 4 (0709), and Grok 3 / 3 Mini.
+- **Multiple Grok Models:** Choose from Grok 4.3, Grok 4.20 (Multi-Agent, Reasoning, Non-Reasoning), Grok 4.1 Fast (Reasoning, Non-Reasoning), Grok Code Fast 1, Grok 4 Fast (Reasoning, Non-Reasoning), Grok 4 (0709), and Grok 3 / 3 Mini.
 - **Multimodal Input:** Supports text, images (JPEG, PNG), and file attachments via the xAI Files API (PDF, TXT, CSV, code files, up to 48 MB).
 - **Reasoning & Research:** Reasoning content is displayed in spoilered embeds. Multi-agent research mode offers configurable agent counts (4 for quick, 16 for deep research).
 - **Built-In Tools:** Enable `web_search`, `x_search`, `code_execution`, `collections_search`, and preset-backed `mcp`. Tools can be toggled mid-conversation via a dropdown.
@@ -26,9 +26,10 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 
 ### Chat Model Metadata
 Shared chat model metadata lives in `src/discord_grok/cogs/grok/command_options.py`. It defines each slash-visible chat model's id, display name, pricing class, capability flags, and default selection, and it is reused by both `/grok chat` command choices and pricing/capability checks.
-The current default chat model is `grok-4.20`.
+The current default chat model is `grok-4.3`.
 
 Current slash-visible chat models:
+- `grok-4.3` — Grok 4.3 (flagship)
 - `grok-4.20-multi-agent` — Grok 4.20 Multi-Agent (premium)
 - `grok-4.20` — Grok 4.20 (premium)
 - `grok-4.20-non-reasoning` — Grok 4.20 Non-Reasoning (premium)
