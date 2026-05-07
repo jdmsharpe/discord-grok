@@ -42,15 +42,15 @@ docker compose up --build
 
 ## Slash Commands
 
-All commands are nested under `/grok`:
+Commands are split across three groups to keep each top-level command under Discord's 8000-byte payload limit:
 
 | Command | Description |
 | --- | --- |
 | `/grok chat` | Start a conversation with Grok (supports advanced tuning, tools, preset-backed MCP, and file attachments) |
-| `/grok image` | Generate or edit an image |
-| `/grok video` | Generate a video from a prompt or image |
-| `/grok tts` | Convert text to speech audio |
 | `/grok check_permissions` | Verify bot permissions in the current channel |
+| `/grok-media image` | Generate or edit an image |
+| `/grok-media video` | Generate a video from a prompt or image |
+| `/grok-tools tts` | Convert text to speech audio |
 
 `/grok chat` currently exposes:
 
