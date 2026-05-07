@@ -77,7 +77,7 @@ class TestGrokCommandSchema:
         """Image command model choices should match GROK_IMAGE_MODELS."""
         from discord_grok.cogs.grok.tooling import GROK_IMAGE_MODELS
 
-        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        image_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "image")
         model_option = next(opt for opt in image_cmd.options if opt.name == "model")
         choice_values = sorted(choice.value for choice in model_option.choices)
         assert choice_values == sorted(GROK_IMAGE_MODELS)
@@ -86,7 +86,7 @@ class TestGrokCommandSchema:
         """Image command aspect ratios should match xai-sdk ImageAspectRatio."""
         from xai_sdk.image import ImageAspectRatio
 
-        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        image_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "image")
         ar_option = next(opt for opt in image_cmd.options if opt.name == "aspect_ratio")
         choice_values = sorted(choice.value for choice in ar_option.choices)
         assert choice_values == sorted(ImageAspectRatio.__args__)
@@ -95,14 +95,14 @@ class TestGrokCommandSchema:
         """Image command resolution choices should match xai-sdk ImageResolution."""
         from xai_sdk.image import ImageResolution
 
-        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        image_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "image")
         res_option = next(opt for opt in image_cmd.options if opt.name == "resolution")
         choice_values = sorted(choice.value for choice in res_option.choices)
         assert choice_values == sorted(ImageResolution.__args__)
 
     def test_image_has_attachment_option(self, cog):
         """Image command should have an optional attachment parameter."""
-        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        image_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "image")
         att_option = next((opt for opt in image_cmd.options if opt.name == "attachment"), None)
         assert att_option is not None
         assert att_option.required is False
@@ -111,14 +111,14 @@ class TestGrokCommandSchema:
         """Video command aspect ratios should match xai-sdk VideoAspectRatio."""
         from xai_sdk.video import VideoAspectRatio
 
-        video_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "video")
+        video_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "video")
         ar_option = next(opt for opt in video_cmd.options if opt.name == "aspect_ratio")
         choice_values = sorted(choice.value for choice in ar_option.choices)
         assert choice_values == sorted(VideoAspectRatio.__args__)
 
     def test_video_has_attachment_option(self, cog):
         """Video command should have an optional attachment parameter."""
-        video_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "video")
+        video_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "video")
         att_option = next((opt for opt in video_cmd.options if opt.name == "attachment"), None)
         assert att_option is not None
         assert att_option.required is False
@@ -127,14 +127,14 @@ class TestGrokCommandSchema:
         """TTS command voice choices should match TTS_VOICES."""
         from discord_grok.cogs.grok.tooling import TTS_VOICES
 
-        tts_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "tts")
+        tts_cmd = next(cmd for cmd in cog.grok_tools.walk_commands() if cmd.name == "tts")
         voice_option = next(opt for opt in tts_cmd.options if opt.name == "voice")
         choice_values = sorted(choice.value for choice in voice_option.choices)
         assert choice_values == sorted(TTS_VOICES)
 
 
 class TestTTSCommand:
-    """Tests for the /grok tts command."""
+    """Tests for the /grok-tools tts command."""
 
     @pytest.fixture
     def cog(self, mock_bot):
@@ -252,7 +252,7 @@ class TestImageBatchGeneration:
 
     def test_image_has_count_option(self, cog):
         """Image command should have a count parameter with min=1, max=10."""
-        image_cmd = next(cmd for cmd in cog.grok.walk_commands() if cmd.name == "image")
+        image_cmd = next(cmd for cmd in cog.grok_media.walk_commands() if cmd.name == "image")
         count_option = next((opt for opt in image_cmd.options if opt.name == "count"), None)
         assert count_option is not None
         assert count_option.required is False
@@ -430,7 +430,7 @@ class TestImageBatchGeneration:
 
 
 class TestVideoCommand:
-    """Integration tests for the /grok video command."""
+    """Integration tests for the /grok-media video command."""
 
     @pytest.fixture
     def cog(self, mock_bot, mock_xai_client):

@@ -123,6 +123,16 @@ AGENT_COUNT_CHOICES = [
 
 class GrokCog(commands.Cog):
     grok = SlashCommandGroup("grok", "xAI Grok commands", guild_ids=GUILD_IDS)
+    grok_media = SlashCommandGroup(
+        "grok-media",
+        "Grok image and video commands",
+        guild_ids=GUILD_IDS,
+    )
+    grok_tools = SlashCommandGroup(
+        "grok-tools",
+        "Grok speech commands",
+        guild_ids=GUILD_IDS,
+    )
 
     def __init__(self, bot: Bot) -> None:
         self.bot = bot
@@ -561,7 +571,7 @@ class GrokCog(commands.Cog):
             web_search_images=web_search_images,
         )
 
-    @grok.command(
+    @grok_media.command(
         name="image",
         description="Generates or edits an image from a prompt.",
     )
@@ -642,7 +652,7 @@ class GrokCog(commands.Cog):
             attachment=attachment,
         )
 
-    @grok.command(
+    @grok_media.command(
         name="video",
         description="Generates a video from a prompt or an image.",
     )
@@ -703,7 +713,7 @@ class GrokCog(commands.Cog):
             attachment=attachment,
         )
 
-    @grok.command(
+    @grok_tools.command(
         name="tts",
         description="Converts text to speech audio.",
     )

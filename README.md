@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 
 ## Overview
-A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides stateful multi-turn conversations, image generation, video generation, and text-to-speech accessible through Discord slash commands. Chat uses the xAI Responses API directly via `aiohttp` for automatic billing optimization, while image, video, and file operations use the official xAI Python SDK. All commands are cleanly grouped under the `/grok` namespace.
+A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides stateful multi-turn conversations, image generation, video generation, and text-to-speech accessible through Discord slash commands. Chat uses the xAI Responses API directly via `aiohttp` for automatic billing optimization, while image, video, and file operations use the official xAI Python SDK.
 
 ## Features
 - **Multi-turn Conversations:** Persistent conversation history with interactive button controls (regenerate, pause/resume, stop) and automatic prompt caching.
@@ -64,13 +64,13 @@ Start a stateful, multi-turn conversation with Grok.
 * **Tool Refinements:** Configure `x_search_images`, `x_search_videos`, `x_search_date_range`, and `web_search_images`.
 * **MCP Integration:** Use `mcp` with comma-separated preset names defined in `XAI_MCP_PRESETS_JSON` or `XAI_MCP_PRESETS_PATH`.
 
-### `/grok image`
+### `/grok-media image`
 Generate images from text prompts, or edit/remix an existing image via attachment.
 
-### `/grok video`
+### `/grok-media video`
 Generate videos from text prompts or transform an image into a video.
 
-### `/grok tts`
+### `/grok-tools tts`
 Convert text to speech audio (Maximum 15,000 characters per request).
 
 ### `/grok check_permissions`
