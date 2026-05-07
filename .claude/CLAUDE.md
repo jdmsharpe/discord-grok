@@ -9,12 +9,20 @@ pip install -e ".[dev]"
 # Copy and fill in environment variables
 cp .env.example .env
 
+# Enable repo pre-commit hook (one-time setup)
+git config core.hooksPath .githooks
+
 # Run the bot
 python src/bot.py
 
 # Or with Docker
 docker compose up --build
 ```
+
+## Gotchas
+
+- Uses **`py-cord`** (not `discord.py`). The slash-command API differs; don't mix docs between the two.
+- `GUILD_IDS` empty → commands register globally (up to 1-hour propagation delay). Set it to a test guild ID during development for instant updates.
 
 ## Environment Variables
 
