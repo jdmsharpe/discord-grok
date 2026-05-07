@@ -415,8 +415,7 @@ def resolve_selected_tools(
 
         tools.append(registry_entry.builder())
 
-    for mcp_server in mcp_servers or []:
-        tools.append(build_mcp_tool(mcp_server))
+    tools.extend(build_mcp_tool(mcp_server) for mcp_server in mcp_servers or [])
 
     return tools, None
 

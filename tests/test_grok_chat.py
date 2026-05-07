@@ -30,7 +30,7 @@ class TestGrokChat:
 
         cog._call_responses_api.assert_called_once()
         assert len(cog.conversations) == 1
-        conversation = list(cog.conversations.values())[0]
+        conversation = next(iter(cog.conversations.values()))
 
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["model"] == "grok-3"
@@ -53,7 +53,7 @@ class TestGrokChat:
             model="grok-3",
         )
 
-        conversation = list(cog.conversations.values())[0]
+        conversation = next(iter(cog.conversations.values()))
         assert conversation.previous_response_id == "resp_01XFDUDYJgAACzvnptvVoYEL"
         assert conversation.response_id_history == ["resp_01XFDUDYJgAACzvnptvVoYEL"]
 
@@ -176,7 +176,7 @@ class TestGrokChat:
         assert payload["tools"][0]["server_label"] == "mcp.example.com"
         assert payload["tools"][0]["allowed_tool_names"] == ["search", "run"]
 
-        conversation = list(cog.conversations.values())[0]
+        conversation = next(iter(cog.conversations.values()))
         assert conversation.params.mcp_servers[0].server_url == "https://mcp.example.com/sse"
         assert conversation.params.mcp_servers[0].allowed_tool_names == ["search", "run"]
 
