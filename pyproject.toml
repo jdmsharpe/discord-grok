@@ -14,7 +14,7 @@ authors = [
 ]
 dependencies = [
   "aiohttp~=3.13",
-  "py-cord~=2.7",
+  "py-cord~=2.8",
   "python-dotenv~=1.2",
   "PyYAML~=6.0",
   "xai-sdk~=1.12.2",
