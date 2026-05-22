@@ -138,7 +138,9 @@ class ButtonView(View):
                 )
                 return
 
-            selected_values = [value for value in tool_select.values if value in SELECTABLE_TOOLS]
+            selected_values = [
+                value for value in (tool_select.values or []) if value in SELECTABLE_TOOLS
+            ]
 
             active_names, error_message = self._on_tools_changed(selected_values, conversation)
             if error_message and not active_names:
