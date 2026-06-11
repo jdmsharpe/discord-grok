@@ -67,7 +67,7 @@ def calculate_image_cost(model: str) -> float:
     return IMAGE_PRICING.get(model, UNKNOWN_IMAGE_MODEL_PRICING)
 
 
-def calculate_video_cost(duration: int, model: str = "grok-imagine-video") -> float:
+def calculate_video_cost(duration: int, model: str = "grok-imagine-video-1.5-preview") -> float:
     """Calculate the cost in dollars for a video generation."""
     return duration * VIDEO_PRICING.get(model, UNKNOWN_VIDEO_MODEL_PRICING)
 
@@ -84,8 +84,8 @@ GROK_IMAGE_MODELS = [
 
 # Video generation models (index 0 is the default)
 GROK_VIDEO_MODELS = [
-    "grok-imagine-video",
     "grok-imagine-video-1.5-preview",
+    "grok-imagine-video",
 ]
 
 # TTS voices

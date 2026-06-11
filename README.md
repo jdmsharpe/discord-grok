@@ -21,7 +21,7 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 - **Citations & Cost Tracking:** Source citations shown in a dedicated "Sources" embed. Per-request cost and token usage tracking includes reasoning, cached token discounts, tool invocation costs, and TTS character-based costs.
 - **Media Generation:**
   - **Images:** Generate or remix images using Grok Imagine Image / Quality / Pro. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions.
-  - **Video:** Generate videos from text or image-to-video using Grok Imagine Video or Video 1.5 (Preview), with adjustable duration (1–15s), aspect ratios, and resolution (720p/480p).
+  - **Video:** Generate videos from text or image-to-video using Grok Imagine Video 1.5 (Preview, default) or Grok Imagine Video, with adjustable duration (1–15s), aspect ratios, and resolution (720p/480p).
   - **Text-to-Speech:** 5 expressive voices, 20+ languages (with auto-detection), multiple output codecs (MP3, WAV, PCM, etc.), configurable sample/bit rates, and support for xAI speech tags.
 
 ### Chat Model Metadata

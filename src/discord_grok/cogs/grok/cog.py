@@ -660,12 +660,12 @@ class GrokCog(commands.Cog):
     @option("prompt", description="Prompt", required=True, type=str)
     @option(
         "model",
-        description="Choose from the following video generation models. (default: Grok Imagine Video)",
+        description="Choose from the following video generation models. (default: Grok Imagine Video 1.5)",
         required=False,
         type=str,
         choices=[
-            OptionChoice(name="Grok Imagine Video", value="grok-imagine-video"),
             OptionChoice(name="Grok Imagine Video 1.5 (Preview)", value="grok-imagine-video-1.5-preview"),
+            OptionChoice(name="Grok Imagine Video", value="grok-imagine-video"),
         ],
     )
     @option(
@@ -709,7 +709,7 @@ class GrokCog(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
-        model: str = "grok-imagine-video",
+        model: str = "grok-imagine-video-1.5-preview",
         aspect_ratio: str = "16:9",
         duration: int = 5,
         resolution: str = "720p",

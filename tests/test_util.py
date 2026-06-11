@@ -462,9 +462,10 @@ class TestPricing:
         assert calculate_tts_cost(0) == 0.0
 
     def test_calculate_video_cost(self):
-        assert calculate_video_cost(5) == 5 * VIDEO_PRICING["grok-imagine-video"]
-        assert calculate_video_cost(5, "grok-imagine-video-1.5-preview") == (
-            5 * VIDEO_PRICING["grok-imagine-video-1.5-preview"]
+        # Bare call uses the default video model (grok-imagine-video-1.5-preview).
+        assert calculate_video_cost(5) == 5 * VIDEO_PRICING["grok-imagine-video-1.5-preview"]
+        assert calculate_video_cost(5, "grok-imagine-video") == (
+            5 * VIDEO_PRICING["grok-imagine-video"]
         )
         assert calculate_video_cost(0) == 0.0
 
