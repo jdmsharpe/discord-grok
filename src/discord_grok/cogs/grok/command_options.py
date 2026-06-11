@@ -66,6 +66,12 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
         capabilities=frozenset({"supports_penalties"}),
     ),
     ChatModelCatalogEntry(
+        model_id="grok-build-0.1",
+        display_name="Grok Build 0.1",
+        pricing_class="build",
+        capabilities=frozenset(),
+    ),
+    ChatModelCatalogEntry(
         model_id="grok-code-fast-1",
         display_name="Grok Code Fast 1",
         pricing_class="code_fast",

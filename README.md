@@ -20,8 +20,8 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 - **Resilient Error Handling:** Retries transient xAI HTTP failures, preserves async cancellation, and returns safer user-facing Discord error messages for handled chat and conversation-control failures.
 - **Citations & Cost Tracking:** Source citations shown in a dedicated "Sources" embed. Per-request cost and token usage tracking includes reasoning, cached token discounts, tool invocation costs, and TTS character-based costs.
 - **Media Generation:**
-  - **Images:** Generate or remix images using Grok Imagine Image / Pro. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions.
-  - **Video:** Generate videos from text or image-to-video with adjustable duration (1–15s), aspect ratios, and resolution (720p/480p).
+  - **Images:** Generate or remix images using Grok Imagine Image / Quality / Pro. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions.
+  - **Video:** Generate videos from text or image-to-video using Grok Imagine Video or Video 1.5 (Preview), with adjustable duration (1–15s), aspect ratios, and resolution (720p/480p).
   - **Text-to-Speech:** 5 expressive voices, 20+ languages (with auto-detection), multiple output codecs (MP3, WAV, PCM, etc.), configurable sample/bit rates, and support for xAI speech tags.
 
 ### Chat Model Metadata
@@ -35,6 +35,7 @@ Current slash-visible chat models:
 - `grok-4.20-non-reasoning` — Grok 4.20 Non-Reasoning (premium)
 - `grok-4-1-fast-reasoning` — Grok 4.1 Fast Reasoning (fast)
 - `grok-4-1-fast-non-reasoning` — Grok 4.1 Fast Non-Reasoning (fast)
+- `grok-build-0.1` — Grok Build 0.1 (build)
 - `grok-code-fast-1` — Grok Code Fast 1 (code_fast)
 - `grok-4-fast-reasoning` — Grok 4 Fast Reasoning (fast)
 - `grok-4-fast-non-reasoning` — Grok 4 Fast Non-Reasoning (fast)

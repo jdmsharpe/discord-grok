@@ -269,7 +269,7 @@ wheels = [
 
 [[package]]
 name = "discord-grok"
-version = "1.4.0"
+version = "1.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -299,7 +299,7 @@ requires-dist = [
     { name = "pyyaml", specifier = "~=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "~=0.15" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = "~=6.0" },
-    { name = "xai-sdk", specifier = "~=1.15" },
+    { name = "xai-sdk", specifier = "~=1.16" },
 ]
 provides-extras = ["dev"]
 
@@ -1124,7 +1124,7 @@ wheels = [
 
 [[package]]
 name = "xai-sdk"
-version = "1.15.0"
+version = "1.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1136,9 +1136,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/0a/74a835cff3c2c5135bcbdca152eed1bd0b7b2c9156e457dfc0d9af987df9/xai_sdk-1.15.0.tar.gz", hash = "sha256:6508b702d01da9c55c15cdcb329c4ad58eb9251340b2514d0974bcba11e764e3", size = 433102, upload-time = "2026-05-30T01:42:15.977Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/18/57628a18ca2ea780b6a6e2117827559074c217c909e1a3e89995563662b1/xai_sdk-1.16.0.tar.gz", hash = "sha256:1a3486876f822483684daafa267c24786d88854d749699ab58b64432749fbae1", size = 451363, upload-time = "2026-06-10T17:41:31.354Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f5/39/7513677c0dafc5171ca4a78f9af3a2acfb9c8798aab62bc4464452ac277f/xai_sdk-1.15.0-py3-none-any.whl", hash = "sha256:de1dcb856941bcbc64c0e61b7202395593c1950e0e00e6aa0ca7657448c03aca", size = 260289, upload-time = "2026-05-30T01:42:14.431Z" },
+    { url = "https://files.pythonhosted.org/packages/56/b3/d04fe1d5d7355a7b662f9db67bb89ac9407e4573d670f276884ce754bb06/xai_sdk-1.16.0-py3-none-any.whl", hash = "sha256:3e0b7e50bc869ce68f7e541a254cdc654f88a8a3c354ead81456cb54e28f943b", size = 272072, upload-time = "2026-06-10T17:41:29.897Z" },
 ]
 
 [[package]]

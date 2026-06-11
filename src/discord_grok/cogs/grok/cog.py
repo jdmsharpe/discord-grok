@@ -583,6 +583,7 @@ class GrokCog(commands.Cog):
         type=str,
         choices=[
             OptionChoice(name="Grok Imagine Image Pro", value="grok-imagine-image-pro"),
+            OptionChoice(name="Grok Imagine Image Quality", value="grok-imagine-image-quality"),
             OptionChoice(name="Grok Imagine Image", value="grok-imagine-image"),
         ],
     )
@@ -658,6 +659,16 @@ class GrokCog(commands.Cog):
     )
     @option("prompt", description="Prompt", required=True, type=str)
     @option(
+        "model",
+        description="Choose from the following video generation models. (default: Grok Imagine Video)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="Grok Imagine Video", value="grok-imagine-video"),
+            OptionChoice(name="Grok Imagine Video 1.5 (Preview)", value="grok-imagine-video-1.5-preview"),
+        ],
+    )
+    @option(
         "aspect_ratio",
         description="Aspect ratio of the video. (default: 16:9)",
         required=False,
@@ -698,6 +709,7 @@ class GrokCog(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
+        model: str = "grok-imagine-video",
         aspect_ratio: str = "16:9",
         duration: int = 5,
         resolution: str = "720p",
@@ -707,6 +719,7 @@ class GrokCog(commands.Cog):
             self,
             ctx=ctx,
             prompt=prompt,
+            model=model,
             aspect_ratio=aspect_ratio,
             duration=duration,
             resolution=resolution,

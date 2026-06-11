@@ -20,6 +20,7 @@ async def run_video_command(
     duration: int,
     resolution: str,
     attachment: Attachment | None,
+    model: str = GROK_VIDEO_MODELS[0],
 ) -> None:
     """Generate a video from text or an image using Grok Imagine Video."""
     await ctx.defer()
@@ -27,11 +28,11 @@ async def run_video_command(
     try:
         is_image_to_video = attachment is not None
         mode = "Image-to-Video" if is_image_to_video else "Text-to-Video"
-        cog.logger.info("Starting video generation with grok-imagine-video (mode=%s)", mode)
+        cog.logger.info("Starting video generation with %s (mode=%s)", model, mode)
 
         generate_kwargs = {
             "prompt": prompt,
-            "model": GROK_VIDEO_MODELS[0],
+            "model": model,
             "aspect_ratio": cast(VideoAspectRatio, aspect_ratio),
             "duration": duration,
             "resolution": cast(VideoResolution, resolution),
@@ -53,7 +54,9 @@ async def run_video_command(
         # Prefer SDK-reported cost (xai-sdk 1.12+); fall back to YAML pricing
         # when the API does not report cost on this response.
         video_cost = (
-            result.cost_usd if result.cost_usd is not None else calculate_video_cost(duration)
+            result.cost_usd
+            if result.cost_usd is not None
+            else calculate_video_cost(duration, model)
         )
         daily_cost = cog._track_daily_cost(ctx.author.id, video_cost)
 
@@ -67,6 +70,7 @@ async def run_video_command(
 
         data = io.BytesIO(video_bytes)
         description = f"**Prompt:** {truncate_text(prompt, 2000)}\n"
+        description += f"**Model:** {model}\n"
         description += f"**Mode:** {mode}\n"
         description += f"**Aspect Ratio:** {aspect_ratio}\n"
         description += f"**Duration:** {duration}s\n"
