@@ -75,9 +75,10 @@ def calculate_video_cost(duration: int, model: str = "grok-imagine-video-1.5-pre
 # All available Grok language models
 GROK_MODELS = [entry.model_id for entry in iter_slash_command_models()]
 
-# Image generation models
+# Image generation models (index 0 is the default).
+# grok-imagine-image-pro is now an alias of grok-imagine-image-quality
+# (the canonical id), so only the canonical id is exposed in the menu.
 GROK_IMAGE_MODELS = [
-    "grok-imagine-image-pro",
     "grok-imagine-image-quality",
     "grok-imagine-image",
 ]
