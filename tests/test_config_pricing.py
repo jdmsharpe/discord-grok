@@ -17,17 +17,24 @@ class TestPricingLoader:
         pricing = _reload_pricing()
         assert pricing.MODEL_PRICING_CLASSES["flagship"] == (1.25, 0.20, 2.50)
         assert pricing.MODEL_PRICING_CLASSES["premium"] == (2.00, 0.20, 6.00)
+        assert pricing.MODEL_PRICING_CLASSES["build"] == (1.00, 0.20, 2.00)
         assert pricing.MODEL_PRICING_CLASSES["fast"] == (0.20, 0.05, 0.50)
         assert pricing.MODEL_PRICING_CLASSES["mini"] == (0.30, 0.075, 0.50)
 
     def test_bundled_yaml_loads_image_pricing(self):
         pricing = _reload_pricing()
         assert pricing.IMAGE_PRICING["grok-imagine-image-pro"] == 0.07
+        assert pricing.IMAGE_PRICING["grok-imagine-image-quality"] == 0.05
         assert pricing.IMAGE_PRICING["grok-imagine-image"] == 0.02
+
+    def test_bundled_yaml_loads_video_pricing(self):
+        pricing = _reload_pricing()
+        assert pricing.VIDEO_PRICING["grok-imagine-video"] == 0.05
+        assert pricing.VIDEO_PRICING["grok-imagine-video-1.5-preview"] == 0.08
+        assert pricing.UNKNOWN_VIDEO_MODEL_PRICING == 0.08
 
     def test_bundled_yaml_loads_flat_rates(self):
         pricing = _reload_pricing()
-        assert pricing.VIDEO_PRICING_PER_SECOND == 0.05
         assert pricing.TTS_PRICING_PER_MILLION_CHARS == 4.20
 
     def test_tool_invocation_pricing(self):
@@ -81,6 +88,9 @@ class TestPricingLoader:
 
         assert pricing.MODEL_PRICING_CLASSES == {"premium": (10.0, 1.0, 30.0)}
         assert pricing.IMAGE_PRICING == {"custom-img": 0.50}
-        assert pricing.VIDEO_PRICING_PER_SECOND == 0.15
+        # Legacy flat video shape: no per-model rows; the flat rate becomes
+        # the unknown-model fallback.
+        assert pricing.VIDEO_PRICING == {}
+        assert pricing.UNKNOWN_VIDEO_MODEL_PRICING == 0.15
         assert pricing.TTS_PRICING_PER_MILLION_CHARS == 9.0
         assert pricing.UNKNOWN_IMAGE_MODEL_PRICING == 0.99

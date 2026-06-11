@@ -12,7 +12,7 @@ from discord_grok.cogs.grok.tooling import (
     TOOL_WEB_SEARCH,
     TOOL_X_SEARCH,
     TTS_PRICING_PER_MILLION_CHARS,
-    VIDEO_PRICING_PER_SECOND,
+    VIDEO_PRICING,
     ChatCompletionParameters,
     Conversation,
     McpServerConfig,
@@ -462,7 +462,10 @@ class TestPricing:
         assert calculate_tts_cost(0) == 0.0
 
     def test_calculate_video_cost(self):
-        assert calculate_video_cost(5) == 5 * VIDEO_PRICING_PER_SECOND
+        assert calculate_video_cost(5) == 5 * VIDEO_PRICING["grok-imagine-video"]
+        assert calculate_video_cost(5, "grok-imagine-video-1.5-preview") == (
+            5 * VIDEO_PRICING["grok-imagine-video-1.5-preview"]
+        )
         assert calculate_video_cost(0) == 0.0
 
 

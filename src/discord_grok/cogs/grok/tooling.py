@@ -9,7 +9,8 @@ from ...config.pricing import (
     TOOL_INVOCATION_PRICING,
     TTS_PRICING_PER_MILLION_CHARS,
     UNKNOWN_IMAGE_MODEL_PRICING,
-    VIDEO_PRICING_PER_SECOND,
+    UNKNOWN_VIDEO_MODEL_PRICING,
+    VIDEO_PRICING,
 )
 from .command_options import (
     DEFAULT_CHAT_MODEL_ID,
@@ -66,9 +67,9 @@ def calculate_image_cost(model: str) -> float:
     return IMAGE_PRICING.get(model, UNKNOWN_IMAGE_MODEL_PRICING)
 
 
-def calculate_video_cost(duration: int) -> float:
+def calculate_video_cost(duration: int, model: str = "grok-imagine-video") -> float:
     """Calculate the cost in dollars for a video generation."""
-    return duration * VIDEO_PRICING_PER_SECOND
+    return duration * VIDEO_PRICING.get(model, UNKNOWN_VIDEO_MODEL_PRICING)
 
 
 # All available Grok language models
@@ -77,12 +78,14 @@ GROK_MODELS = [entry.model_id for entry in iter_slash_command_models()]
 # Image generation models
 GROK_IMAGE_MODELS = [
     "grok-imagine-image-pro",
+    "grok-imagine-image-quality",
     "grok-imagine-image",
 ]
 
-# Video generation models
+# Video generation models (index 0 is the default)
 GROK_VIDEO_MODELS = [
     "grok-imagine-video",
+    "grok-imagine-video-1.5-preview",
 ]
 
 # TTS voices

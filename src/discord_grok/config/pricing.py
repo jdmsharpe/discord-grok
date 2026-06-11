@@ -55,7 +55,21 @@ IMAGE_PRICING: dict[str, float] = {
     model_id: float(cfg["per_image"]) for model_id, cfg in _IMAGE.items()
 }
 
-VIDEO_PRICING_PER_SECOND: float = float(_VIDEO.get("per_second", 0.05))
+# Per-model per-second video pricing. A legacy flat shape
+# (video_generation: {per_second: X}) yields an empty map with X as the
+# fallback rate, so XAI_PRICING_PATH overrides written before the
+# per-model split keep working.
+VIDEO_PRICING: dict[str, float] = {
+    model_id: float(cfg["per_second"]) for model_id, cfg in _VIDEO.items() if isinstance(cfg, dict)
+}
+
+_LEGACY_VIDEO_RATE = _VIDEO.get("per_second")
+UNKNOWN_VIDEO_MODEL_PRICING: float = float(
+    (_FALLBACKS.get("unknown_video_model") or {}).get(
+        "per_second",
+        _LEGACY_VIDEO_RATE if isinstance(_LEGACY_VIDEO_RATE, int | float) else 0.05,
+    )
+)
 
 TTS_PRICING_PER_MILLION_CHARS: float = float(_TTS.get("per_million_chars", 4.20))
 
@@ -74,5 +88,6 @@ __all__ = [
     "TOOL_INVOCATION_PRICING",
     "TTS_PRICING_PER_MILLION_CHARS",
     "UNKNOWN_IMAGE_MODEL_PRICING",
-    "VIDEO_PRICING_PER_SECOND",
+    "UNKNOWN_VIDEO_MODEL_PRICING",
+    "VIDEO_PRICING",
 ]

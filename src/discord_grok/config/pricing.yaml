@@ -2,7 +2,7 @@
 #
 # Canonical source: https://docs.x.ai/docs/models
 # Cross-referenced against: https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
-# Last-verified: 2026-05-06
+# Last-verified: 2026-06-10
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;
@@ -16,6 +16,7 @@
 pricing_classes:
   flagship:       { input_per_million: 1.25, cached_input_per_million: 0.20, output_per_million: 2.50 }
   premium:        { input_per_million: 2.00, cached_input_per_million: 0.20, output_per_million: 6.00 }
+  build:          { input_per_million: 1.00, cached_input_per_million: 0.20, output_per_million: 2.00 }
   fast:           { input_per_million: 0.20, cached_input_per_million: 0.05, output_per_million: 0.50 }
   code_fast:      { input_per_million: 0.20, cached_input_per_million: 0.02, output_per_million: 1.50 }
   legacy_premium: { input_per_million: 3.00, cached_input_per_million: 0.75, output_per_million: 15.00 }
@@ -23,12 +24,14 @@ pricing_classes:
 
 # Flat per-image pricing for Grok Imagine models.
 image_generation:
-  grok-imagine-image-pro: { per_image: 0.07 }
-  grok-imagine-image:     { per_image: 0.02 }
+  grok-imagine-image-pro:     { per_image: 0.07 }
+  grok-imagine-image-quality: { per_image: 0.05 }
+  grok-imagine-image:         { per_image: 0.02 }
 
-# Video generation is currently a flat per-second rate across Grok video models.
+# Per-second pricing for Grok Imagine video models.
 video_generation:
-  per_second: 0.05
+  grok-imagine-video:             { per_second: 0.05 }
+  grok-imagine-video-1.5-preview: { per_second: 0.08 }
 
 # Text-to-speech is charged per million characters.
 text_to_speech:
@@ -46,3 +49,4 @@ tools:
 
 fallbacks:
   unknown_image_model: { per_image: 0.07 }
+  unknown_video_model: { per_second: 0.08 }
