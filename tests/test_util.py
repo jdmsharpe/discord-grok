@@ -383,10 +383,11 @@ class TestPricing:
 
     def test_calculate_image_cost_known_model(self):
         assert calculate_image_cost("grok-imagine-image") == 0.02
-        assert calculate_image_cost("grok-imagine-image-pro") == 0.07
+        assert calculate_image_cost("grok-imagine-image-pro") == 0.05
+        assert calculate_image_cost("grok-imagine-image-quality") == 0.05
 
     def test_calculate_image_cost_unknown_model(self):
-        assert calculate_image_cost("unknown") == 0.07
+        assert calculate_image_cost("unknown") == 0.05
 
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""

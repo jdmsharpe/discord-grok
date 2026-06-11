@@ -16,9 +16,7 @@ def _serialize_command_group_payload(group):
                 "name": command.name,
                 "description": command.description,
                 "options": [
-                    option.to_dict()
-                    for option in command.options
-                    if option.input_type is not None
+                    option.to_dict() for option in command.options if option.input_type is not None
                 ],
                 "type": 1,
                 "nsfw": False,
