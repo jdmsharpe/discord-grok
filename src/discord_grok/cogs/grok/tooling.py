@@ -104,7 +104,7 @@ REASONING_EFFORT_MODELS: set[str] = {
 }
 
 # Per-model accepted reasoning_effort values. Different reasoning models accept
-# different subsets (e.g. grok-3-mini accepts low/high; grok-4.3 adds none/medium).
+# different subsets (e.g. grok-4.3 accepts none/low/medium/high).
 MODEL_REASONING_EFFORTS: dict[str, frozenset[str]] = {
     entry.model_id: entry.reasoning_efforts
     for entry in iter_slash_command_models()

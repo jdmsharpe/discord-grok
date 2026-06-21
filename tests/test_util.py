@@ -140,8 +140,8 @@ class TestChatCompletionParameters:
 
     def test_default_values(self):
         """Default values should be set correctly."""
-        params = ChatCompletionParameters(model="grok-3")
-        assert params.model == "grok-3"
+        params = ChatCompletionParameters(model="grok-4.3")
+        assert params.model == "grok-4.3"
         assert params.temperature is None
         assert params.top_p is None
         assert params.max_tokens is None
@@ -195,15 +195,15 @@ class TestChatCompletionParameters:
 
     def test_default_tools_isolated(self):
         """Default tools list should not be shared across instances."""
-        params_one = ChatCompletionParameters(model="grok-3")
+        params_one = ChatCompletionParameters(model="grok-4.3")
         params_one.tools.append(TOOL_BUILDERS[TOOL_WEB_SEARCH]())
 
-        params_two = ChatCompletionParameters(model="grok-3")
+        params_two = ChatCompletionParameters(model="grok-4.3")
         assert params_two.tools == []
         assert params_one.tools is not params_two.tools
 
     def test_default_mcp_servers_isolated(self):
-        params_one = ChatCompletionParameters(model="grok-3")
+        params_one = ChatCompletionParameters(model="grok-4.3")
         params_one.mcp_servers.append(
             McpServerConfig(
                 server_url="https://mcp.example.com/sse",
@@ -211,7 +211,7 @@ class TestChatCompletionParameters:
             )
         )
 
-        params_two = ChatCompletionParameters(model="grok-3")
+        params_two = ChatCompletionParameters(model="grok-4.3")
         assert params_two.mcp_servers == []
         assert params_one.mcp_servers is not params_two.mcp_servers
 
@@ -254,19 +254,17 @@ class TestReasoningConstants:
     def test_reasoning_models_excluded_from_penalty_support(self):
         from discord_grok.cogs.grok.tooling import PENALTY_SUPPORTED_MODELS
 
-        assert "grok-3-mini" not in PENALTY_SUPPORTED_MODELS
-        assert "grok-3" not in PENALTY_SUPPORTED_MODELS
-        assert "grok-4-0709" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-4.3" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-4.20" not in PENALTY_SUPPORTED_MODELS
 
     def test_reasoning_effort_models(self):
         from discord_grok.cogs.grok.tooling import REASONING_EFFORT_MODELS
 
-        assert {"grok-3-mini", "grok-4.3"} == REASONING_EFFORT_MODELS
+        assert {"grok-4.3"} == REASONING_EFFORT_MODELS
 
     def test_model_reasoning_efforts_per_model(self):
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
-        assert MODEL_REASONING_EFFORTS["grok-3-mini"] == frozenset({"low", "high"})
         assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset({"none", "low", "medium", "high"})
         assert "grok-4.20" not in MODEL_REASONING_EFFORTS
 
@@ -362,8 +360,9 @@ class TestPricing:
 
     def test_calculate_cost_known_model(self):
         """Cost should use the model's pricing rates."""
-        cost = calculate_cost("grok-3", 1_000_000, 1_000_000)
-        assert cost == 3.00 + 15.00
+        # grok-4.20 (premium): $2/M in, $6/M out
+        cost = calculate_cost("grok-4.20", 1_000_000, 1_000_000)
+        assert cost == 2.00 + 6.00
 
     def test_calculate_cost_unknown_model_uses_default(self):
         """Unknown models should fall back to the default pricing."""
@@ -372,14 +371,14 @@ class TestPricing:
 
     def test_calculate_cost_with_reasoning_tokens(self):
         """Reasoning tokens should be billed at the output rate."""
-        # grok-3: $3/M in, $15/M out
-        cost = calculate_cost("grok-3", 1_000_000, 500_000, reasoning_tokens=500_000)
-        # 1M in * $3 + (500k out + 500k reasoning) * $15
-        assert cost == 3.00 + 15.00
+        # grok-4.20 (premium): $2/M in, $6/M out
+        cost = calculate_cost("grok-4.20", 1_000_000, 500_000, reasoning_tokens=500_000)
+        # 1M in * $2 + (500k out + 500k reasoning) * $6
+        assert cost == 2.00 + 6.00
 
     def test_calculate_cost_zero_tokens(self):
         """Zero tokens should return zero cost."""
-        assert calculate_cost("grok-3", 0, 0) == 0.0
+        assert calculate_cost("grok-4.20", 0, 0) == 0.0
 
     def test_calculate_image_cost_known_model(self):
         assert calculate_image_cost("grok-imagine-image") == 0.02
@@ -391,16 +390,16 @@ class TestPricing:
 
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""
-        # grok-3: $3/M in, $0.75/M cached, $15/M out
-        # 1M input with 500k cached: 500k * $3 + 500k * $0.75 + 0 out
-        cost = calculate_cost("grok-3", 1_000_000, 0, cached_tokens=500_000)
-        assert cost == pytest.approx(1.50 + 0.375)
+        # grok-4.20 (premium): $2/M in, $0.20/M cached, $6/M out
+        # 1M input with 500k cached: 500k * $2 + 500k * $0.20 + 0 out
+        cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=500_000)
+        assert cost == pytest.approx(1.00 + 0.10)
 
     def test_calculate_cost_all_cached(self):
         """If all input tokens are cached, only cached rate applies."""
-        # grok-3: $0.75/M cached
-        cost = calculate_cost("grok-3", 1_000_000, 0, cached_tokens=1_000_000)
-        assert cost == pytest.approx(0.75)
+        # grok-4.20 (premium): $0.20/M cached
+        cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=1_000_000)
+        assert cost == pytest.approx(0.20)
 
     def test_model_pricing_has_three_values(self):
         """Each MODEL_PRICING entry should be a 3-tuple (input, cached, output)."""
@@ -448,13 +447,13 @@ class TestPricing:
 
     def test_calculate_tts_cost(self):
         """TTS cost should be based on character count."""
-        # 1M chars at $4.20/M = $4.20
+        # 1M chars at $15.00/M = $15.00
         cost = calculate_tts_cost(1_000_000)
         assert cost == pytest.approx(TTS_PRICING_PER_MILLION_CHARS)
 
     def test_calculate_tts_cost_small(self):
         """Small TTS should be proportional."""
-        # 100 chars at $4.20/M
+        # 100 chars at $15.00/M
         cost = calculate_tts_cost(100)
         assert cost == pytest.approx(100 / 1_000_000 * TTS_PRICING_PER_MILLION_CHARS)
 
@@ -476,7 +475,7 @@ class TestConversation:
 
     def test_conversation_creation(self):
         """Conversation should store params and response ID state."""
-        params = ChatCompletionParameters(model="grok-3")
+        params = ChatCompletionParameters(model="grok-4.3")
         conv = Conversation(params=params)
 
         assert conv.params == params
@@ -487,7 +486,7 @@ class TestConversation:
 
     def test_conversation_with_response_id(self):
         """Conversation should store response ID and history."""
-        params = ChatCompletionParameters(model="grok-3")
+        params = ChatCompletionParameters(model="grok-4.3")
         conv = Conversation(
             params=params,
             previous_response_id="resp_123",
@@ -502,7 +501,7 @@ class TestConversation:
 
     def test_default_file_ids_isolated(self):
         """Default file_ids list should not be shared across instances."""
-        params = ChatCompletionParameters(model="grok-3")
+        params = ChatCompletionParameters(model="grok-4.3")
         conv_one = Conversation(params=params)
         conv_one.file_ids.append("file-1")
 
@@ -512,7 +511,7 @@ class TestConversation:
 
     def test_default_response_id_history_isolated(self):
         """Default response_id_history should not be shared across instances."""
-        params = ChatCompletionParameters(model="grok-3")
+        params = ChatCompletionParameters(model="grok-4.3")
         conv_one = Conversation(params=params)
         conv_one.response_id_history.append("resp_1")
 

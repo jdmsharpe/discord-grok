@@ -25,7 +25,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello Grok!",
-            model="grok-3",
+            model="grok-4.3",
         )
 
         cog._call_responses_api.assert_called_once()
@@ -33,7 +33,7 @@ class TestGrokChat:
         conversation = next(iter(cog.conversations.values()))
 
         payload = cog._call_responses_api.call_args[0][0]
-        assert payload["model"] == "grok-3"
+        assert payload["model"] == "grok-4.3"
         assert payload["store"] is True
         assert cog._call_responses_api.call_args.kwargs["grok_conv_id"] == conversation.grok_conv_id
         assert conversation.grok_conv_id is not None
@@ -50,7 +50,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello!",
-            model="grok-3",
+            model="grok-4.3",
         )
 
         conversation = next(iter(cog.conversations.values()))
@@ -202,7 +202,7 @@ class TestGrokChat:
         from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         existing_params = ChatCompletionParameters(
-            model="grok-3",
+            model="grok-4.3",
             conversation_starter=mock_discord_context.author,
             channel_id=mock_discord_context.channel.id,
             conversation_id=123,
@@ -248,7 +248,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-3-mini",
+            model="grok-4.3",
             frequency_penalty=0.5,
         )
 
@@ -266,7 +266,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-3",
+            model="grok-4.3",
             frequency_penalty=0.5,
             presence_penalty=0.3,
         )
@@ -304,7 +304,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-3",
+            model="grok-4.20",
             reasoning_effort="high",
         )
 
@@ -314,7 +314,7 @@ class TestGrokChat:
     async def test_chat_passes_reasoning_effort_for_supported_model(
         self, cog, mock_discord_context
     ):
-        """reasoning_effort should be passed to the API for grok-3-mini."""
+        """reasoning_effort should be passed to the API for grok-4.3."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -323,35 +323,12 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-3-mini",
+            model="grok-4.3",
             reasoning_effort="high",
         )
 
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["reasoning_effort"] == "high"
-
-    @pytest.mark.parametrize("rejected_effort", ["medium", "none"])
-    async def test_chat_rejects_unsupported_effort_value(
-        self, cog, mock_discord_context, rejected_effort
-    ):
-        """grok-3-mini accepts only `low`/`high`; other dropdown values must be rejected."""
-        mock_discord_context.channel.typing = MagicMock()
-        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
-        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
-
-        await cog.chat.callback(
-            cog,
-            ctx=mock_discord_context,
-            prompt="Hello",
-            model="grok-3-mini",
-            reasoning_effort=rejected_effort,
-        )
-
-        cog._call_responses_api.assert_not_called()
-        call_kwargs = mock_discord_context.send_followup.call_args[1]
-        description = call_kwargs["embed"].description
-        assert rejected_effort in description
-        assert "grok-3-mini" in description
 
     async def test_chat_passes_none_effort_for_grok_4_3(self, cog, mock_discord_context):
         """grok-4.3 accepts `none` per its spec; should be forwarded unchanged."""
@@ -398,7 +375,7 @@ class TestGrokChat:
             cog,
             ctx=mock_discord_context,
             prompt="Hello",
-            model="grok-3",
+            model="grok-4.3",
             agent_count=4,
         )
 
@@ -473,7 +450,7 @@ class TestHandleNewMessageInConversation:
         starter = MagicMock()
         starter.id = 111222333
         params = ChatCompletionParameters(
-            model="grok-3",
+            model="grok-4.3",
             conversation_starter=starter,
             channel_id=444555666,
             conversation_id=777888999,
@@ -614,7 +591,7 @@ class TestOnMessageRouting:
 
         starter = mock_discord_message.author
         params = ChatCompletionParameters(
-            model="grok-3",
+            model="grok-4.3",
             conversation_starter=starter,
             channel_id=mock_discord_message.channel.id,
             conversation_id=111,
@@ -632,7 +609,7 @@ class TestOnMessageRouting:
 
         starter = mock_discord_message.author
         params = ChatCompletionParameters(
-            model="grok-3",
+            model="grok-4.3",
             conversation_starter=starter,
             channel_id=999999,
             conversation_id=111,
@@ -651,7 +628,7 @@ class TestOnMessageRouting:
         other_user = MagicMock()
         other_user.id = 999
         params = ChatCompletionParameters(
-            model="grok-3",
+            model="grok-4.3",
             conversation_starter=other_user,
             channel_id=mock_discord_message.channel.id,
             conversation_id=111,
