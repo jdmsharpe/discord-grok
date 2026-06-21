@@ -2,7 +2,7 @@
 #
 # Canonical source: https://docs.x.ai/docs/models
 # Cross-referenced against: https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
-# Last-verified: 2026-06-10
+# Last-verified: 2026-06-21
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;
@@ -37,7 +37,7 @@ video_generation:
 
 # Text-to-speech is charged per million characters.
 text_to_speech:
-  per_million_chars: 4.20
+  per_million_chars: 15.00
 
 # Server-side tool invocation pricing (dollars per 1,000 invocations).
 tools:

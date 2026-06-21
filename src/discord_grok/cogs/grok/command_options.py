@@ -54,58 +54,9 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
         capabilities=frozenset({"supports_penalties"}),
     ),
     ChatModelCatalogEntry(
-        model_id="grok-4-1-fast-reasoning",
-        display_name="Grok 4.1 Fast Reasoning",
-        pricing_class="fast",
-        capabilities=frozenset(),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-4-1-fast-non-reasoning",
-        display_name="Grok 4.1 Fast Non-Reasoning",
-        pricing_class="fast",
-        capabilities=frozenset({"supports_penalties"}),
-    ),
-    ChatModelCatalogEntry(
         model_id="grok-build-0.1",
         display_name="Grok Build 0.1",
         pricing_class="build",
-        capabilities=frozenset(),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-code-fast-1",
-        display_name="Grok Code Fast 1",
-        pricing_class="code_fast",
-        capabilities=frozenset(),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-4-fast-reasoning",
-        display_name="Grok 4 Fast Reasoning",
-        pricing_class="fast",
-        capabilities=frozenset(),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-4-fast-non-reasoning",
-        display_name="Grok 4 Fast Non-Reasoning",
-        pricing_class="fast",
-        capabilities=frozenset({"supports_penalties"}),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-4-0709",
-        display_name="Grok 4 (0709)",
-        pricing_class="legacy_premium",
-        capabilities=frozenset(),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-3-mini",
-        display_name="Grok 3 Mini",
-        pricing_class="mini",
-        capabilities=frozenset(),
-        reasoning_efforts=frozenset({"low", "high"}),
-    ),
-    ChatModelCatalogEntry(
-        model_id="grok-3",
-        display_name="Grok 3",
-        pricing_class="legacy_premium",
         capabilities=frozenset(),
     ),
 )

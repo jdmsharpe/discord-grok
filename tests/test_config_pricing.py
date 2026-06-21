@@ -35,7 +35,7 @@ class TestPricingLoader:
 
     def test_bundled_yaml_loads_flat_rates(self):
         pricing = _reload_pricing()
-        assert pricing.TTS_PRICING_PER_MILLION_CHARS == 4.20
+        assert pricing.TTS_PRICING_PER_MILLION_CHARS == 15.00
 
     def test_tool_invocation_pricing(self):
         pricing = _reload_pricing()
@@ -59,8 +59,8 @@ class TestPricingLoader:
         assert pricing_map["grok-4.3"] == (1.25, 0.20, 2.50)
         # grok-4.20 is in the 'premium' class.
         assert pricing_map["grok-4.20"] == (2.00, 0.20, 6.00)
-        # grok-3-mini is in the 'mini' class.
-        assert pricing_map["grok-3-mini"] == (0.30, 0.075, 0.50)
+        # grok-build-0.1 is in the 'build' class.
+        assert pricing_map["grok-build-0.1"] == (1.00, 0.20, 2.00)
 
     def test_env_var_override_path(self, monkeypatch, tmp_path: Path):
         custom_yaml = tmp_path / "custom-pricing.yaml"

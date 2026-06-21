@@ -67,7 +67,7 @@ class TestFileUploadAndCleanup:
         from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         conversation = Conversation(
-            params=ChatCompletionParameters(model="grok-3"),
+            params=ChatCompletionParameters(model="grok-4.3"),
             file_ids=["file-1", "file-2", "file-3"],
         )
 
@@ -84,7 +84,7 @@ class TestFileUploadAndCleanup:
         from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         conversation = Conversation(
-            params=ChatCompletionParameters(model="grok-3"),
+            params=ChatCompletionParameters(model="grok-4.3"),
             file_ids=["file-1", "file-2"],
         )
         cog.client.files.delete.side_effect = [Exception("Failed"), None]
@@ -99,7 +99,7 @@ class TestFileUploadAndCleanup:
         from discord_grok.cogs.grok.tooling import ChatCompletionParameters, Conversation
 
         conversation = Conversation(
-            params=ChatCompletionParameters(model="grok-3"),
+            params=ChatCompletionParameters(model="grok-4.3"),
             file_ids=["file-1"],
         )
         cog.conversations[999] = conversation
@@ -170,7 +170,7 @@ class TestGrokHTTPRetries:
             ) as mock_sleep,
         ):
             response = await cog._call_responses_api(
-                {"model": "grok-3"},
+                {"model": "grok-4.3"},
                 grok_conv_id="conv-cache-123",
             )
 
@@ -202,7 +202,7 @@ class TestGrokHTTPRetries:
             ) as mock_sleep,
             patch("discord_grok.cogs.grok.client.random.uniform", return_value=0.0),
         ):
-            response = await cog._call_responses_api({"model": "grok-3"})
+            response = await cog._call_responses_api({"model": "grok-4.3"})
 
         assert response["id"] == "resp_ok"
         mock_sleep.assert_awaited_once_with(0.5)
@@ -222,7 +222,7 @@ class TestGrokHTTPRetries:
             ) as mock_sleep,
             pytest.raises(XaiApiError, match="bad input"),
         ):
-            await cog._call_responses_api({"model": "grok-3"})
+            await cog._call_responses_api({"model": "grok-4.3"})
 
         mock_sleep.assert_not_awaited()
         assert len(session.post_calls) == 1
