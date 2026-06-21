@@ -11,7 +11,7 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 
 ## Features
 - **Multi-turn Conversations:** Persistent conversation history with interactive button controls (regenerate, pause/resume, stop) and automatic prompt caching.
-- **Multiple Grok Models:** Choose from Grok 4.3, Grok 4.20 (Multi-Agent, Reasoning, Non-Reasoning), Grok 4.1 Fast (Reasoning, Non-Reasoning), Grok Code Fast 1, Grok 4 Fast (Reasoning, Non-Reasoning), Grok 4 (0709), and Grok 3 / 3 Mini.
+- **Multiple Grok Models:** Choose from Grok 4.3, Grok 4.20 (Multi-Agent, Reasoning, Non-Reasoning), and Grok Build 0.1.
 - **Multimodal Input:** Supports text, images (JPEG, PNG), and file attachments via the xAI Files API (PDF, TXT, CSV, code files, up to 48 MB).
 - **Reasoning & Research:** Reasoning content is displayed in spoilered embeds. Multi-agent research mode offers configurable agent counts (4 for quick, 16 for deep research).
 - **Built-In Tools:** Enable `web_search`, `x_search`, `code_execution`, `collections_search`, and preset-backed `mcp`. Tools can be toggled mid-conversation via a dropdown.
@@ -33,15 +33,7 @@ Current slash-visible chat models:
 - `grok-4.20-multi-agent` — Grok 4.20 Multi-Agent (premium)
 - `grok-4.20` — Grok 4.20 (premium)
 - `grok-4.20-non-reasoning` — Grok 4.20 Non-Reasoning (premium)
-- `grok-4-1-fast-reasoning` — Grok 4.1 Fast Reasoning (fast)
-- `grok-4-1-fast-non-reasoning` — Grok 4.1 Fast Non-Reasoning (fast)
 - `grok-build-0.1` — Grok Build 0.1 (build)
-- `grok-code-fast-1` — Grok Code Fast 1 (code_fast)
-- `grok-4-fast-reasoning` — Grok 4 Fast Reasoning (fast)
-- `grok-4-fast-non-reasoning` — Grok 4 Fast Non-Reasoning (fast)
-- `grok-4-0709` — Grok 4 (0709) (legacy_premium)
-- `grok-3-mini` — Grok 3 Mini (mini)
-- `grok-3` — Grok 3 (legacy_premium)
 
 To regenerate the model list above from the shared metadata:
 ```bash
