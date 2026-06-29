@@ -134,6 +134,34 @@ class TestFormatXAIError:
         assert "gRPC error" in result
         assert "Status: 14" in result
 
+    def test_grpc_aio_rpc_error_is_humanized(self):
+        """A real grpc.aio.AioRpcError (code()/details() are methods, no
+        .message, verbose __str__) must be humanized to its details + status,
+        not leak a bound-method repr or duplicate the verbose repr."""
+
+        class _Status:
+            name = "INVALID_ARGUMENT"
+
+        class _FakeAioRpcError(Exception):
+            def code(self):
+                return _Status()
+
+            def details(self):
+                return "Text-to-video is not supported for this model."
+
+            def __str__(self):
+                return (
+                    "<_FakeAioRpcError of RPC that terminated with:\n"
+                    "\tstatus = StatusCode.INVALID_ARGUMENT\n"
+                    '\tdetails = "Text-to-video is not supported for this model."\n>'
+                )
+
+        result = format_xai_error(_FakeAioRpcError())
+        assert "Text-to-video is not supported for this model." in result
+        assert "Status: INVALID_ARGUMENT" in result
+        assert "bound method" not in result
+        assert "RPC that terminated with" not in result
+
 
 class TestChatCompletionParameters:
     """Tests for the ChatCompletionParameters dataclass."""
