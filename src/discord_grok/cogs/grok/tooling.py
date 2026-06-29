@@ -354,14 +354,50 @@ def truncate_text(text: str | None, max_length: int, suffix: str = "...") -> str
 
 
 def format_xai_error(error: Exception) -> str:
-    """Return a readable description for exceptions raised by xAI operations."""
-    message = getattr(error, "message", None)
-    if not isinstance(message, str) or not message.strip():
-        message = str(error).strip()
+    """Return a readable description for exceptions raised by xAI operations.
 
-    status = getattr(error, "status_code", None) or getattr(error, "code", None)
+    gRPC ``AioRpcError`` (raised by xai-sdk) needs special handling: its
+    ``code()`` and ``details()`` are *methods*, it has no ``message`` attribute,
+    and ``str(error)`` is a verbose multi-line repr. Reading ``error.code``
+    naively captures the bound method object (rendering
+    ``Status: <bound method AioRpcError.code ...>``) and ``str(error)``
+    duplicates the whole repr, so detect gRPC errors and call the accessors.
+    """
+    message: str | None = None
+    status: Any = None
+
+    details_accessor = getattr(error, "details", None)
+    code_accessor = getattr(error, "code", None)
+    if callable(details_accessor) and callable(code_accessor):
+        # gRPC AioRpcError: code()/details() are methods, not attributes.
+        try:
+            detail = details_accessor()
+            if isinstance(detail, str) and detail.strip():
+                message = detail.strip()
+        except Exception:  # never fail while formatting an error
+            pass
+        try:
+            code_value = code_accessor()
+            if code_value is not None:
+                status = getattr(code_value, "name", code_value)
+        except Exception:  # never fail while formatting an error
+            pass
+
+    if message is None:
+        candidate = getattr(error, "message", None)
+        if isinstance(candidate, str) and candidate.strip():
+            message = candidate.strip()
+        else:
+            message = str(error).strip()
+
+    if status is None:
+        status = getattr(error, "status_code", None)
+        if status is None:
+            code_attr = getattr(error, "code", None)
+            if code_attr is not None and not callable(code_attr):
+                status = code_attr
+
     error_type = type(error).__name__
-
     details = []
     if status is not None:
         details.append(f"Status: {status}")
