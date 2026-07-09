@@ -284,17 +284,25 @@ class TestReasoningConstants:
 
         assert "grok-4.3" not in PENALTY_SUPPORTED_MODELS
         assert "grok-4.20" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-4.5" not in PENALTY_SUPPORTED_MODELS
 
     def test_reasoning_effort_models(self):
         from discord_grok.cogs.grok.tooling import REASONING_EFFORT_MODELS
 
-        assert {"grok-4.3"} == REASONING_EFFORT_MODELS
+        assert {"grok-4.3", "grok-4.5"} == REASONING_EFFORT_MODELS
 
     def test_model_reasoning_efforts_per_model(self):
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
         assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset({"none", "low", "medium", "high"})
         assert "grok-4.20" not in MODEL_REASONING_EFFORTS
+
+    def test_grok_4_5_reasoning_cannot_be_disabled(self):
+        """xAI rejects reasoning_effort="none" on grok-4.5; exposing it would 400 live."""
+        from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
+
+        assert MODEL_REASONING_EFFORTS["grok-4.5"] == frozenset({"low", "medium", "high"})
+        assert "none" not in MODEL_REASONING_EFFORTS["grok-4.5"]
 
     def test_multi_agent_models(self):
         from discord_grok.cogs.grok.tooling import MULTI_AGENT_MODELS
@@ -388,9 +396,9 @@ class TestPricing:
 
     def test_calculate_cost_known_model(self):
         """Cost should use the model's pricing rates."""
-        # grok-4.20 (premium): $2/M in, $6/M out
+        # grok-4.20 (flagship): $1.25/M in, $2.50/M out
         cost = calculate_cost("grok-4.20", 1_000_000, 1_000_000)
-        assert cost == 2.00 + 6.00
+        assert cost == 1.25 + 2.50
 
     def test_calculate_cost_unknown_model_uses_default(self):
         """Unknown models should fall back to the default pricing."""
@@ -399,10 +407,10 @@ class TestPricing:
 
     def test_calculate_cost_with_reasoning_tokens(self):
         """Reasoning tokens should be billed at the output rate."""
-        # grok-4.20 (premium): $2/M in, $6/M out
+        # grok-4.20 (flagship): $1.25/M in, $2.50/M out
         cost = calculate_cost("grok-4.20", 1_000_000, 500_000, reasoning_tokens=500_000)
-        # 1M in * $2 + (500k out + 500k reasoning) * $6
-        assert cost == 2.00 + 6.00
+        # 1M in * $1.25 + (500k out + 500k reasoning) * $2.50
+        assert cost == 1.25 + 2.50
 
     def test_calculate_cost_zero_tokens(self):
         """Zero tokens should return zero cost."""
@@ -418,16 +426,22 @@ class TestPricing:
 
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""
-        # grok-4.20 (premium): $2/M in, $0.20/M cached, $6/M out
-        # 1M input with 500k cached: 500k * $2 + 500k * $0.20 + 0 out
+        # grok-4.20 (flagship): $1.25/M in, $0.20/M cached, $2.50/M out
+        # 1M input with 500k cached: 500k * $1.25 + 500k * $0.20 + 0 out
         cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=500_000)
-        assert cost == pytest.approx(1.00 + 0.10)
+        assert cost == pytest.approx(0.625 + 0.10)
 
     def test_calculate_cost_all_cached(self):
         """If all input tokens are cached, only cached rate applies."""
-        # grok-4.20 (premium): $0.20/M cached
+        # grok-4.20 (flagship): $0.20/M cached
         cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=1_000_000)
         assert cost == pytest.approx(0.20)
+
+    def test_calculate_cost_grok_4_5_cached_rate_is_not_premium(self):
+        """grok-4.5 caches at $0.50/M, not the $0.20/M `premium` uses. Reusing `premium`
+        for it would under-bill every cached read by 2.5x and this test would catch it."""
+        cost = calculate_cost("grok-4.5", 1_000_000, 0, cached_tokens=1_000_000)
+        assert cost == pytest.approx(0.50)
 
     def test_model_pricing_has_three_values(self):
         """Each MODEL_PRICING entry should be a 3-tuple (input, cached, output)."""

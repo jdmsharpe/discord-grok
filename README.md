@@ -29,10 +29,11 @@ Shared chat model metadata lives in `src/discord_grok/cogs/grok/command_options.
 The current default chat model is `grok-4.3`.
 
 Current slash-visible chat models:
+- `grok-4.5` — Grok 4.5 (grok_4_5)
 - `grok-4.3` — Grok 4.3 (flagship)
-- `grok-4.20-multi-agent` — Grok 4.20 Multi-Agent (premium)
-- `grok-4.20` — Grok 4.20 (premium)
-- `grok-4.20-non-reasoning` — Grok 4.20 Non-Reasoning (premium)
+- `grok-4.20-multi-agent` — Grok 4.20 Multi-Agent (flagship)
+- `grok-4.20` — Grok 4.20 (flagship)
+- `grok-4.20-non-reasoning` — Grok 4.20 Non-Reasoning (flagship)
 - `grok-build-0.1` — Grok Build 0.1 (build)
 
 To regenerate the model list above from the shared metadata:

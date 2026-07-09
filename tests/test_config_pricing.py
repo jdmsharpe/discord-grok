@@ -16,6 +16,7 @@ class TestPricingLoader:
     def test_bundled_yaml_loads_pricing_classes(self):
         pricing = _reload_pricing()
         assert pricing.MODEL_PRICING_CLASSES["flagship"] == (1.25, 0.20, 2.50)
+        assert pricing.MODEL_PRICING_CLASSES["grok_4_5"] == (2.00, 0.50, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["premium"] == (2.00, 0.20, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["build"] == (1.00, 0.20, 2.00)
         assert pricing.MODEL_PRICING_CLASSES["fast"] == (0.20, 0.05, 0.50)
@@ -57,8 +58,12 @@ class TestPricingLoader:
         pricing_map = build_model_pricing_map()
         # grok-4.3 is in the 'flagship' class.
         assert pricing_map["grok-4.3"] == (1.25, 0.20, 2.50)
-        # grok-4.20 is in the 'premium' class.
-        assert pricing_map["grok-4.20"] == (2.00, 0.20, 6.00)
+        # Every grok-4.20 variant bills at flagship rates per docs.x.ai.
+        assert pricing_map["grok-4.20"] == (1.25, 0.20, 2.50)
+        assert pricing_map["grok-4.20-non-reasoning"] == (1.25, 0.20, 2.50)
+        assert pricing_map["grok-4.20-multi-agent"] == (1.25, 0.20, 2.50)
+        # grok-4.5 has its own class: it caches at 0.50, not the usual 0.20.
+        assert pricing_map["grok-4.5"] == (2.00, 0.50, 6.00)
         # grok-build-0.1 is in the 'build' class.
         assert pricing_map["grok-build-0.1"] == (1.00, 0.20, 2.00)
 

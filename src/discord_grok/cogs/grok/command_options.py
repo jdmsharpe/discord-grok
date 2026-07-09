@@ -29,6 +29,15 @@ class ChatModelCatalogEntry:
 
 CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
     ChatModelCatalogEntry(
+        model_id="grok-4.5",
+        display_name="Grok 4.5",
+        pricing_class="grok_4_5",
+        # Reasoning models reject presence/frequency penalties and `stop`, and grok-4.5's
+        # reasoning cannot be disabled — omitting "none" here is deliberate, not an oversight.
+        capabilities=frozenset(),
+        reasoning_efforts=frozenset({"low", "medium", "high"}),
+    ),
+    ChatModelCatalogEntry(
         model_id="grok-4.3",
         display_name="Grok 4.3",
         pricing_class="flagship",
@@ -38,19 +47,19 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
     ChatModelCatalogEntry(
         model_id="grok-4.20-multi-agent",
         display_name="Grok 4.20 Multi-Agent",
-        pricing_class="premium",
+        pricing_class="flagship",
         capabilities=frozenset({"supports_multi_agent"}),
     ),
     ChatModelCatalogEntry(
         model_id="grok-4.20",
         display_name="Grok 4.20",
-        pricing_class="premium",
+        pricing_class="flagship",
         capabilities=frozenset(),
     ),
     ChatModelCatalogEntry(
         model_id="grok-4.20-non-reasoning",
         display_name="Grok 4.20 Non-Reasoning",
-        pricing_class="premium",
+        pricing_class="flagship",
         capabilities=frozenset({"supports_penalties"}),
     ),
     ChatModelCatalogEntry(

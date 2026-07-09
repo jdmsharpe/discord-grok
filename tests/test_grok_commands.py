@@ -33,6 +33,17 @@ class TestGrokCommandSchema:
             assert choice.value in CHAT_MODEL_INDEX
             assert choice.value in MODEL_PRICING
 
+    def test_default_chat_model_is_grok_4_3(self):
+        """grok-4.5 is an addition, not a promotion: it has 500k context vs grok-4.3's 1M
+        and costs more per token. Flipping the default is a deliberate call, not a drift."""
+        from discord_grok.cogs.grok.command_options import (
+            CHAT_MODEL_INDEX,
+            DEFAULT_CHAT_MODEL_ID,
+        )
+
+        assert DEFAULT_CHAT_MODEL_ID == "grok-4.3"
+        assert "grok-4.5" in CHAT_MODEL_INDEX
+
     def test_model_markdown_lines_match_visible_models(self):
         """README model-list helper should reflect the visible slash-command models."""
         from discord_grok.cogs.grok.command_options import (
