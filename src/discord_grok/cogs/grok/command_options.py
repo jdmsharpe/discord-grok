@@ -74,7 +74,7 @@ CHAT_MODEL_INDEX: dict[str, ChatModelCatalogEntry] = {
     entry.model_id: entry for entry in CHAT_MODEL_CATALOG
 }
 
-DEFAULT_CHAT_MODEL_ID = "grok-4.3"
+DEFAULT_CHAT_MODEL_ID = "grok-4.5"
 DEFAULT_CHAT_MODEL_ENTRY = CHAT_MODEL_INDEX[DEFAULT_CHAT_MODEL_ID]
 
 

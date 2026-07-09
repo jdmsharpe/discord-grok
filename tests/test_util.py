@@ -401,9 +401,10 @@ class TestPricing:
         assert cost == 1.25 + 2.50
 
     def test_calculate_cost_unknown_model_uses_default(self):
-        """Unknown models should fall back to the default pricing."""
+        """Unknown models should fall back to the default model's pricing
+        (grok-4.5 since the 2026-07-09 promotion: $2.00/M in, $6.00/M out)."""
         cost = calculate_cost("unknown-model", 1_000_000, 1_000_000)
-        assert cost == 1.25 + 2.50
+        assert cost == 2.00 + 6.00
 
     def test_calculate_cost_with_reasoning_tokens(self):
         """Reasoning tokens should be billed at the output rate."""
