@@ -3,8 +3,8 @@
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -e ".[dev]"
+# Install dependencies (uv-managed: creates .venv from uv.lock; no pip inside — use `uv pip` if needed)
+uv sync --extra dev
 
 # Copy and fill in environment variables
 cp .env.example .env
@@ -13,7 +13,7 @@ cp .env.example .env
 git config core.hooksPath .githooks
 
 # Run the bot
-python src/bot.py
+uv run python src/bot.py
 
 # Or with Docker
 docker compose up --build
