@@ -396,22 +396,25 @@ class TestPricing:
 
     def test_calculate_cost_known_model(self):
         """Cost should use the model's pricing rates."""
-        # grok-4.20 (flagship): $1.25/M in, $2.50/M out
-        cost = calculate_cost("grok-4.20", 1_000_000, 1_000_000)
-        assert cost == 1.25 + 2.50
+        # grok-4.20 (flagship): $1.25/M in, $2.50/M out; a 100k prompt stays
+        # below the 200k long-context threshold.
+        cost = calculate_cost("grok-4.20", 100_000, 1_000_000)
+        assert cost == pytest.approx(0.125 + 2.50)
 
     def test_calculate_cost_unknown_model_uses_default(self):
         """Unknown models should fall back to the default model's pricing
-        (grok-4.5 since the 2026-07-09 promotion: $2.00/M in, $6.00/M out)."""
+        (grok-4.5 since the 2026-07-09 promotion: $2.00/M in, $6.00/M out).
+        The fallback is flat-only: without verified tier data no long-context
+        threshold applies, even though this 1M prompt would cross grok-4.5's."""
         cost = calculate_cost("unknown-model", 1_000_000, 1_000_000)
         assert cost == 2.00 + 6.00
 
     def test_calculate_cost_with_reasoning_tokens(self):
         """Reasoning tokens should be billed at the output rate."""
         # grok-4.20 (flagship): $1.25/M in, $2.50/M out
-        cost = calculate_cost("grok-4.20", 1_000_000, 500_000, reasoning_tokens=500_000)
-        # 1M in * $1.25 + (500k out + 500k reasoning) * $2.50
-        assert cost == 1.25 + 2.50
+        cost = calculate_cost("grok-4.20", 100_000, 500_000, reasoning_tokens=500_000)
+        # 100k in * $1.25/M + (500k out + 500k reasoning) * $2.50/M
+        assert cost == pytest.approx(0.125 + 2.50)
 
     def test_calculate_cost_zero_tokens(self):
         """Zero tokens should return zero cost."""
@@ -428,26 +431,76 @@ class TestPricing:
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""
         # grok-4.20 (flagship): $1.25/M in, $0.20/M cached, $2.50/M out
-        # 1M input with 500k cached: 500k * $1.25 + 500k * $0.20 + 0 out
-        cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=500_000)
-        assert cost == pytest.approx(0.625 + 0.10)
+        # 100k input with 50k cached: 50k * $1.25/M + 50k * $0.20/M + 0 out
+        cost = calculate_cost("grok-4.20", 100_000, 0, cached_tokens=50_000)
+        assert cost == pytest.approx(0.0625 + 0.01)
 
     def test_calculate_cost_all_cached(self):
         """If all input tokens are cached, only cached rate applies."""
         # grok-4.20 (flagship): $0.20/M cached
-        cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=1_000_000)
-        assert cost == pytest.approx(0.20)
+        cost = calculate_cost("grok-4.20", 100_000, 0, cached_tokens=100_000)
+        assert cost == pytest.approx(0.02)
 
     def test_calculate_cost_grok_4_5_cached_rate_is_not_premium(self):
         """grok-4.5 caches at $0.50/M, not the $0.20/M `premium` uses. Reusing `premium`
         for it would under-bill every cached read by 2.5x and this test would catch it."""
-        cost = calculate_cost("grok-4.5", 1_000_000, 0, cached_tokens=1_000_000)
-        assert cost == pytest.approx(0.50)
+        cost = calculate_cost("grok-4.5", 100_000, 0, cached_tokens=100_000)
+        assert cost == pytest.approx(0.05)
+
+    def test_calculate_cost_below_long_context_threshold(self):
+        """A 199,999-token prompt is one token short of the long-context tier."""
+        # grok-4.20 (flagship): standard $1.25/M in, $2.50/M out
+        cost = calculate_cost("grok-4.20", 199_999, 1_000_000)
+        assert cost == pytest.approx((199_999 / 1_000_000) * 1.25 + 2.50)
+
+    def test_calculate_cost_at_long_context_threshold(self):
+        """The tier boundary is inclusive: per docs.x.ai a prompt that *reaches*
+        200k tokens bills ALL tokens in the request at the higher rate — every
+        input token plus the output, not just the overflow past 200k."""
+        # grok-4.20 long tier: $2.50/M in, $5.00/M out
+        cost = calculate_cost("grok-4.20", 200_000, 1_000_000)
+        assert cost == pytest.approx((200_000 / 1_000_000) * 2.50 + 5.00)
+
+    def test_calculate_cost_above_long_context_threshold(self):
+        """Above the threshold every flagship rate doubles, and reasoning tokens
+        bill at the long-tier output rate."""
+        # 1M in * $2.50/M + (500k out + 500k reasoning) * $5.00/M
+        cost = calculate_cost("grok-4.20", 1_000_000, 500_000, reasoning_tokens=500_000)
+        assert cost == pytest.approx(2.50 + 5.00)
+
+    def test_calculate_cost_cached_tokens_long_tier(self):
+        """Cached input doubles in the long tier too: $0.20/M → $0.40/M flagship."""
+        cost = calculate_cost("grok-4.20", 1_000_000, 0, cached_tokens=1_000_000)
+        assert cost == pytest.approx(0.40)
+
+    def test_calculate_cost_grok_4_5_long_tier(self):
+        """grok-4.5's long tier: $4.00/M in, $1.00/M cached, $12.00/M out."""
+        # 200k non-cached * $4.00/M + 200k cached * $1.00/M + 100k out * $12.00/M
+        cost = calculate_cost("grok-4.5", 400_000, 100_000, cached_tokens=200_000)
+        assert cost == pytest.approx(0.80 + 0.20 + 1.20)
+
+    def test_calculate_cost_model_without_tier_stays_flat(self, monkeypatch):
+        """Models whose pricing class has no long_context block bill flat at any
+        prompt size. Every catalog model is tiered today, so simulate a future
+        flat-class model by dropping the tier entry."""
+        from discord_grok.cogs.grok import tooling
+
+        monkeypatch.delitem(tooling.MODEL_LONG_CONTEXT_PRICING, "grok-4.20")
+        cost = calculate_cost("grok-4.20", 1_000_000, 1_000_000)
+        assert cost == 1.25 + 2.50
 
     def test_model_pricing_has_three_values(self):
         """Each MODEL_PRICING entry should be a 3-tuple (input, cached, output)."""
         for model, prices in MODEL_PRICING.items():
             assert len(prices) == 3, f"{model} pricing should have 3 values"
+
+    def test_model_long_context_pricing_has_four_values(self):
+        """Each MODEL_LONG_CONTEXT_PRICING entry should be a 4-tuple
+        (threshold, input, cached, output)."""
+        from discord_grok.cogs.grok.tooling import MODEL_LONG_CONTEXT_PRICING
+
+        for model, tier in MODEL_LONG_CONTEXT_PRICING.items():
+            assert len(tier) == 4, f"{model} long-context tier should have 4 values"
 
     def test_calculate_tool_cost_known_tools(self):
         """Tool invocations should be billed at per-1k rates."""

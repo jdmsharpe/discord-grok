@@ -14,6 +14,7 @@ from ...config.pricing import (
 )
 from .command_options import (
     DEFAULT_CHAT_MODEL_ID,
+    build_model_long_context_map,
     build_model_pricing_map,
     iter_slash_command_models,
 )
@@ -27,6 +28,13 @@ CHUNK_TEXT_SIZE = 3500  # Maximum number of characters in each text chunk.
 MODEL_PRICING: dict[str, tuple[float, float, float]] = build_model_pricing_map()
 DEFAULT_MODEL_PRICING = MODEL_PRICING[DEFAULT_CHAT_MODEL_ID]
 
+# Long-context pricing tiers: (threshold_tokens, input_cost, cached_input_cost,
+# output_cost). Only models whose pricing class defines a long_context block
+# appear here; everything else bills at its flat MODEL_PRICING rates.
+MODEL_LONG_CONTEXT_PRICING: dict[str, tuple[int, float, float, float]] = (
+    build_model_long_context_map()
+)
+
 
 def calculate_cost(
     model: str,
@@ -38,8 +46,20 @@ def calculate_cost(
     """Calculate the cost in dollars for a given model and token usage.
 
     Cached tokens are a subset of input_tokens billed at a discounted rate.
+    ``input_tokens`` is the request's prompt token count: per docs.x.ai,
+    "Requests whose prompt reaches 200k tokens are billed at the higher rate
+    for all tokens in the request", so once it reaches a tiered model's
+    threshold, ALL tokens — input, cached, output, and reasoning — bill at
+    the long-context rates, not just the overflow.
     """
     input_price, cached_price, output_price = MODEL_PRICING.get(model, DEFAULT_MODEL_PRICING)
+    # Unknown models keep the flat default-model fallback above: without
+    # verified tier data we do not guess a threshold for them.
+    long_context = MODEL_LONG_CONTEXT_PRICING.get(model)
+    if long_context is not None:
+        threshold_tokens, long_input, long_cached, long_output = long_context
+        if input_tokens >= threshold_tokens:
+            input_price, cached_price, output_price = long_input, long_cached, long_output
     non_cached = input_tokens - cached_tokens
     return (
         (non_cached / 1_000_000) * input_price
@@ -470,6 +490,7 @@ __all__ = [
     "MAX_MCP_LABEL_LENGTH",
     "MAX_MCP_TOOL_NAME_LENGTH",
     "MAX_MCP_URL_LENGTH",
+    "MODEL_LONG_CONTEXT_PRICING",
     "MODEL_PRICING",
     "MODEL_REASONING_EFFORTS",
     "MULTI_AGENT_MODELS",

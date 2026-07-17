@@ -22,6 +22,16 @@ class TestPricingLoader:
         assert pricing.MODEL_PRICING_CLASSES["fast"] == (0.20, 0.05, 0.50)
         assert pricing.MODEL_PRICING_CLASSES["mini"] == (0.30, 0.075, 0.50)
 
+    def test_bundled_yaml_loads_long_context_tiers(self):
+        """Tiered classes double every rate once a prompt reaches 200k tokens."""
+        pricing = _reload_pricing()
+        assert pricing.LONG_CONTEXT_PRICING_CLASSES["flagship"] == (200_000, 2.50, 0.40, 5.00)
+        assert pricing.LONG_CONTEXT_PRICING_CLASSES["grok_4_5"] == (200_000, 4.00, 1.00, 12.00)
+        assert pricing.LONG_CONTEXT_PRICING_CLASSES["build"] == (200_000, 2.00, 0.40, 4.00)
+        # Classes without a long_context block bill flat at any prompt size.
+        assert "premium" not in pricing.LONG_CONTEXT_PRICING_CLASSES
+        assert "fast" not in pricing.LONG_CONTEXT_PRICING_CLASSES
+
     def test_bundled_yaml_loads_image_pricing(self):
         pricing = _reload_pricing()
         assert pricing.IMAGE_PRICING["grok-imagine-image-pro"] == 0.05
@@ -67,6 +77,22 @@ class TestPricingLoader:
         # grok-build-0.1 is in the 'build' class.
         assert pricing_map["grok-build-0.1"] == (1.00, 0.20, 2.00)
 
+    def test_build_model_long_context_map_joins_catalog(self):
+        """End-to-end: every catalog chat model picks up its class's long tier."""
+        _reload_pricing()
+        for mod in ("discord_grok.cogs.grok.command_options",):
+            sys.modules.pop(mod, None)
+        from discord_grok.cogs.grok.command_options import build_model_long_context_map
+
+        tier_map = build_model_long_context_map()
+        # flagship: grok-4.3 and every grok-4.20 variant double past 200k prompt tokens.
+        assert tier_map["grok-4.3"] == (200_000, 2.50, 0.40, 5.00)
+        assert tier_map["grok-4.20"] == (200_000, 2.50, 0.40, 5.00)
+        assert tier_map["grok-4.20-non-reasoning"] == (200_000, 2.50, 0.40, 5.00)
+        assert tier_map["grok-4.20-multi-agent"] == (200_000, 2.50, 0.40, 5.00)
+        assert tier_map["grok-4.5"] == (200_000, 4.00, 1.00, 12.00)
+        assert tier_map["grok-build-0.1"] == (200_000, 2.00, 0.40, 4.00)
+
     def test_env_var_override_path(self, monkeypatch, tmp_path: Path):
         custom_yaml = tmp_path / "custom-pricing.yaml"
         custom_yaml.write_text(
@@ -92,6 +118,8 @@ class TestPricingLoader:
         pricing = _reload_pricing()
 
         assert pricing.MODEL_PRICING_CLASSES == {"premium": (10.0, 1.0, 30.0)}
+        # Overrides written before the long-context split simply have no tiers.
+        assert pricing.LONG_CONTEXT_PRICING_CLASSES == {}
         assert pricing.IMAGE_PRICING == {"custom-img": 0.50}
         # Legacy flat video shape: no per-model rows; the flat rate becomes
         # the unknown-model fallback.

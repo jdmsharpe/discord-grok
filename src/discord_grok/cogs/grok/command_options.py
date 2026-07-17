@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from ...config.pricing import MODEL_PRICING_CLASSES
+from ...config.pricing import LONG_CONTEXT_PRICING_CLASSES, MODEL_PRICING_CLASSES
 
 
 @dataclass(frozen=True)
@@ -85,6 +85,19 @@ def build_model_pricing_map() -> dict[str, tuple[float, float, float]]:
     }
 
 
+def build_model_long_context_map() -> dict[str, tuple[int, float, float, float]]:
+    """Build per-model long-context tier pricing from pricing classes.
+
+    Models whose class defines no ``long_context`` block are absent from the
+    returned map and bill at their flat rates regardless of prompt size.
+    """
+    return {
+        entry.model_id: LONG_CONTEXT_PRICING_CLASSES[entry.pricing_class]
+        for entry in CHAT_MODEL_CATALOG
+        if entry.pricing_class in LONG_CONTEXT_PRICING_CLASSES
+    }
+
+
 def iter_slash_command_models() -> tuple[ChatModelCatalogEntry, ...]:
     """Return models that should be exposed as slash-command choices."""
     return tuple(entry for entry in CHAT_MODEL_CATALOG if entry.slash_command_visible)
@@ -103,8 +116,10 @@ __all__ = [
     "CHAT_MODEL_INDEX",
     "DEFAULT_CHAT_MODEL_ENTRY",
     "DEFAULT_CHAT_MODEL_ID",
+    "LONG_CONTEXT_PRICING_CLASSES",
     "MODEL_PRICING_CLASSES",
     "ChatModelCatalogEntry",
+    "build_model_long_context_map",
     "build_model_pricing_map",
     "generate_model_markdown_lines",
     "iter_slash_command_models",

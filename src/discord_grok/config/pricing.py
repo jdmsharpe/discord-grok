@@ -51,6 +51,21 @@ MODEL_PRICING_CLASSES: dict[str, tuple[float, float, float]] = {
     for class_id, cfg in _CLASSES.items()
 }
 
+# Optional long-context tier per class: (threshold_tokens, input, cached_input,
+# output). Once a request's prompt reaches threshold_tokens, ALL tokens in the
+# request — input, cached, and output — bill at these higher rates. Classes
+# without a long_context block are absent here and bill flat at any prompt size.
+LONG_CONTEXT_PRICING_CLASSES: dict[str, tuple[int, float, float, float]] = {
+    class_id: (
+        int(cfg["long_context"]["threshold_tokens"]),
+        float(cfg["long_context"]["input_per_million"]),
+        float(cfg["long_context"]["cached_input_per_million"]),
+        float(cfg["long_context"]["output_per_million"]),
+    )
+    for class_id, cfg in _CLASSES.items()
+    if cfg.get("long_context")
+}
+
 IMAGE_PRICING: dict[str, float] = {
     model_id: float(cfg["per_image"]) for model_id, cfg in _IMAGE.items()
 }
@@ -84,6 +99,7 @@ UNKNOWN_IMAGE_MODEL_PRICING: float = float(
 
 __all__ = [
     "IMAGE_PRICING",
+    "LONG_CONTEXT_PRICING_CLASSES",
     "MODEL_PRICING_CLASSES",
     "TOOL_INVOCATION_PRICING",
     "TTS_PRICING_PER_MILLION_CHARS",
