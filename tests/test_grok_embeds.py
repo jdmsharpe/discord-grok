@@ -168,7 +168,26 @@ class TestAppendSourcesEmbed:
         append_sources_embed(embeds, citations)
         assert len(embeds) == 1
         assert embeds[0].title == "Sources"
-        assert "example.com" in embeds[0].description
+        assert "[example.com](https://example.com/a)" in embeds[0].description
+        assert "[example.com](https://example.com/b)" in embeds[0].description
+
+    def test_long_web_links_are_kept_complete_or_omitted(self):
+        from discord_grok.cogs.grok.embeds import append_sources_embed
+
+        first_url = "https://example.com/" + "a" * 3500
+        second_url = "https://example.org/" + "b" * 1000
+        embeds = []
+        append_sources_embed(
+            embeds,
+            [
+                {"url": first_url, "source": "web"},
+                {"url": second_url, "source": "web"},
+            ],
+        )
+
+        assert f"[example.com]({first_url})" in embeds[0].description
+        assert second_url not in embeds[0].description
+        assert len(embeds[0].description) <= 4000
 
     def test_mixed_sources_have_headings(self):
         from discord_grok.cogs.grok.embeds import append_sources_embed

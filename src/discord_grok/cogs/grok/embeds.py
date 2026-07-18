@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from discord import Colour, Embed
 
 from .models import CitationInfo
@@ -11,6 +13,33 @@ from .tooling import (
 
 GROK_BLACK = Colour(0x000000)
 REASONING_TRUNCATION_SUFFIX = "\n\n... [reasoning truncated]"
+
+
+def _fit_markdown_sections(
+    sections: list[tuple[str | None, list[str]]],
+    max_length: int = 4000,
+) -> str:
+    """Fit complete Markdown entries without slicing through links."""
+
+    rendered_sections: list[str] = []
+    for heading, entries in sections:
+        accepted: list[str] = []
+        for entry in entries:
+            body = "\n".join([*accepted, entry])
+            rendered = f"{heading}\n{body}" if heading else body
+            candidate = "\n\n".join([*rendered_sections, rendered])
+            if len(candidate) > max_length:
+                break
+            accepted.append(entry)
+        if accepted:
+            body = "\n".join(accepted)
+            rendered_sections.append(f"{heading}\n{body}" if heading else body)
+    return "\n\n".join(rendered_sections)
+
+
+def _source_hostname(url: str) -> str | None:
+    host = urlparse(url).hostname
+    return host.removeprefix("www.") if host else None
 
 
 def append_reasoning_embeds(embeds: list[Embed], reasoning_text: str) -> None:
@@ -59,31 +88,29 @@ def append_sources_embed(embeds: list[Embed], citations: list[CitationInfo]) -> 
         else:
             web.append(cit)
 
-    parts: list[str] = []
+    sections: list[tuple[str | None, list[str]]] = []
 
     def _format_link_group(heading: str | None, items: list[CitationInfo], limit: int = 8) -> None:
         if not items:
             return
         lines: list[str] = []
-        if heading:
-            lines.append(f"**{heading}**")
         for index, cit in enumerate(items[:limit], start=1):
             url = cit["url"]
             if url.startswith("http://") or url.startswith("https://"):
-                title = truncate_text(url.removeprefix("https://").removeprefix("http://"), 120)
+                title = _source_hostname(url) or f"Source {index}"
                 lines.append(f"{index}. [{title}]({url})")
             else:
                 lines.append(f"{index}. `{truncate_text(url, 300)}`")
-        parts.append("\n".join(lines))
+        sections.append((f"**{heading}**" if heading else None, lines))
 
     has_multiple_types = sum(bool(g) for g in (web, x, collections)) > 1
     _format_link_group("Web" if has_multiple_types else None, web)
     _format_link_group("X Posts" if has_multiple_types else None, x)
     _format_link_group("Collections" if has_multiple_types else None, collections)
 
-    description = "\n\n".join(parts)
-    if len(description) > 4000:
-        description = truncate_text(description, 3990)
+    description = _fit_markdown_sections(sections)
+    if not description:
+        return
 
     embeds.append(Embed(title="Sources", description=description, color=GROK_BLACK))
 
