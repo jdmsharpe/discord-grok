@@ -134,6 +134,56 @@ class TestGrokCommandSchema:
         assert att_option is not None
         assert att_option.required is False
 
+    def test_media_resolution_choices_are_all_priced(self, cog):
+        """Grok Imagine bills per output resolution, so every resolution the media
+        commands offer needs a rate for every model they offer. A missing rate makes
+        the cost embed silently fall back to an unrelated tier's price."""
+        # Read the maps through tooling: tests that reload config.pricing under an
+        # XAI_PRICING_PATH override leave a custom module in sys.modules.
+        from discord_grok.cogs.grok.tooling import (
+            GROK_IMAGE_MODELS,
+            GROK_VIDEO_MODELS,
+            IMAGE_PRICING,
+            VIDEO_PRICING,
+        )
+
+        for command_name, models, pricing in (
+            ("image", GROK_IMAGE_MODELS, IMAGE_PRICING),
+            ("video", GROK_VIDEO_MODELS, VIDEO_PRICING),
+        ):
+            cmd = next(c for c in cog.grok_media.walk_commands() if c.name == command_name)
+            res_option = next(opt for opt in cmd.options if opt.name == "resolution")
+            for model in models:
+                for choice in res_option.choices:
+                    assert choice.value in pricing[model], (
+                        f"{command_name}: {model} has no {choice.value} rate"
+                    )
+
+    def test_media_resolution_defaults_match_the_assumed_pricing_tier(self, cog):
+        """``calculate_image_cost``/``calculate_video_cost`` assume these resolutions
+        when a caller passes none, so a command default that drifts away from them
+        would bill the wrong tier — exactly how the 720p default came to be estimated
+        at the 480p rate."""
+        import inspect
+
+        from discord_grok.cogs.grok.tooling import (
+            DEFAULT_IMAGE_RESOLUTION,
+            DEFAULT_VIDEO_RESOLUTION,
+        )
+
+        video_cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "video")
+        video_res = next(opt for opt in video_cmd.options if opt.name == "resolution")
+        video_default = inspect.signature(cog.video.callback).parameters["resolution"].default
+        assert video_default == DEFAULT_VIDEO_RESOLUTION
+        assert f"default: {DEFAULT_VIDEO_RESOLUTION}" in video_res.description
+
+        # The image command leaves resolution unset so the API applies its own
+        # default; the option documents which tier that is.
+        image_cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "image")
+        image_res = next(opt for opt in image_cmd.options if opt.name == "resolution")
+        assert inspect.signature(cog.image.callback).parameters["resolution"].default is None
+        assert f"default: {DEFAULT_IMAGE_RESOLUTION}" in image_res.description
+
     def test_tts_voice_choices_match_tts_voices(self, cog):
         """TTS command voice choices should match TTS_VOICES."""
         from discord_grok.cogs.grok.tooling import TTS_VOICES
@@ -421,6 +471,35 @@ class TestImageBatchGeneration:
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
 
+    async def test_image_yaml_fallback_cost_uses_requested_resolution(
+        self, cog, mock_discord_context
+    ):
+        """2k output costs more than 1k on the quality tier, and an unset resolution
+        bills at the 1k rate the command documents as the default."""
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        for resolution, expected in ((None, 0.05), ("1k", 0.05), ("2k", 0.07)):
+            cog.daily_costs.clear()
+            with patch.object(
+                cog,
+                "_get_http_session",
+                new_callable=AsyncMock,
+                return_value=self._mock_http_session(),
+            ):
+                await cog.image.callback(
+                    cog,
+                    ctx=mock_discord_context,
+                    prompt="A cat",
+                    model="grok-imagine-image-quality",
+                    resolution=resolution,
+                    count=1,
+                )
+
+            assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
+
     async def test_image_batch_rejects_editing_mode(
         self, cog, mock_discord_context, mock_attachment
     ):
@@ -534,6 +613,34 @@ class TestVideoCommand:
 
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - 0.42) < 1e-9
+
+    async def test_video_yaml_fallback_cost_uses_requested_resolution(
+        self, cog, mock_discord_context
+    ):
+        """The YAML fallback must bill the resolution actually requested: on
+        grok-imagine-video-1.5-preview the 720p default costs 1.75x what 480p does."""
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        for resolution, expected in (("720p", 5 * 0.14), ("480p", 5 * 0.08)):
+            cog.daily_costs.clear()
+            with patch.object(
+                cog,
+                "_get_http_session",
+                new_callable=AsyncMock,
+                return_value=self._mock_http_session(),
+            ):
+                await cog.video.callback(
+                    cog,
+                    ctx=mock_discord_context,
+                    prompt="A sunset",
+                    duration=5,
+                    resolution=resolution,
+                )
+
+            assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
 
     async def test_video_no_url_returns_error(self, cog, mock_discord_context):
         """No video URL from API should display an error."""

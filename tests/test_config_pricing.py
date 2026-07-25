@@ -16,7 +16,7 @@ class TestPricingLoader:
     def test_bundled_yaml_loads_pricing_classes(self):
         pricing = _reload_pricing()
         assert pricing.MODEL_PRICING_CLASSES["flagship"] == (1.25, 0.20, 2.50)
-        assert pricing.MODEL_PRICING_CLASSES["grok_4_5"] == (2.00, 0.50, 6.00)
+        assert pricing.MODEL_PRICING_CLASSES["grok_4_5"] == (2.00, 0.30, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["premium"] == (2.00, 0.20, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["build"] == (1.00, 0.20, 2.00)
         assert pricing.MODEL_PRICING_CLASSES["fast"] == (0.20, 0.05, 0.50)
@@ -26,23 +26,57 @@ class TestPricingLoader:
         """Tiered classes double every rate once a prompt reaches 200k tokens."""
         pricing = _reload_pricing()
         assert pricing.LONG_CONTEXT_PRICING_CLASSES["flagship"] == (200_000, 2.50, 0.40, 5.00)
-        assert pricing.LONG_CONTEXT_PRICING_CLASSES["grok_4_5"] == (200_000, 4.00, 1.00, 12.00)
+        assert pricing.LONG_CONTEXT_PRICING_CLASSES["grok_4_5"] == (200_000, 4.00, 0.60, 12.00)
         assert pricing.LONG_CONTEXT_PRICING_CLASSES["build"] == (200_000, 2.00, 0.40, 4.00)
         # Classes without a long_context block bill flat at any prompt size.
         assert "premium" not in pricing.LONG_CONTEXT_PRICING_CLASSES
         assert "fast" not in pricing.LONG_CONTEXT_PRICING_CLASSES
 
     def test_bundled_yaml_loads_image_pricing(self):
+        """Imagine image output is priced per resolution, not per model."""
         pricing = _reload_pricing()
-        assert pricing.IMAGE_PRICING["grok-imagine-image-pro"] == 0.05
-        assert pricing.IMAGE_PRICING["grok-imagine-image-quality"] == 0.05
-        assert pricing.IMAGE_PRICING["grok-imagine-image"] == 0.02
+        assert pricing.IMAGE_PRICING["grok-imagine-image-pro"] == {"1k": 0.05, "2k": 0.07}
+        assert pricing.IMAGE_PRICING["grok-imagine-image-quality"] == {"1k": 0.05, "2k": 0.07}
+        # grok-imagine-image is flat across resolutions but keeps the same shape.
+        assert pricing.IMAGE_PRICING["grok-imagine-image"] == {"1k": 0.02, "2k": 0.02}
 
     def test_bundled_yaml_loads_video_pricing(self):
+        """Imagine video output is priced per resolution, per second."""
         pricing = _reload_pricing()
-        assert pricing.VIDEO_PRICING["grok-imagine-video"] == 0.05
-        assert pricing.VIDEO_PRICING["grok-imagine-video-1.5-preview"] == 0.08
-        assert pricing.UNKNOWN_VIDEO_MODEL_PRICING == 0.08
+        assert pricing.VIDEO_PRICING["grok-imagine-video"] == {"480p": 0.05, "720p": 0.07}
+        assert pricing.VIDEO_PRICING["grok-imagine-video-1.5-preview"] == {
+            "480p": 0.08,
+            "720p": 0.14,
+            "1080p": 0.25,
+        }
+        assert pricing.UNKNOWN_VIDEO_MODEL_PRICING == 0.25
+
+    def test_scalar_media_rate_normalizes_to_flat_resolution(self, monkeypatch, tmp_path: Path):
+        """A scalar per_image/per_second — the pre-resolution shape — bills flat."""
+        custom_yaml = tmp_path / "flat-pricing.yaml"
+        custom_yaml.write_text(
+            textwrap.dedent(
+                """
+                image_generation:
+                  flat-img: { per_image: 0.11 }
+                video_generation:
+                  flat-vid: { per_second: 0.22 }
+                """
+            ).strip()
+        )
+        monkeypatch.setenv("XAI_PRICING_PATH", str(custom_yaml))
+
+        pricing = _reload_pricing()
+
+        assert pricing.IMAGE_PRICING == {"flat-img": {pricing.FLAT_RATE_RESOLUTION: 0.11}}
+        assert pricing.VIDEO_PRICING == {"flat-vid": {pricing.FLAT_RATE_RESOLUTION: 0.22}}
+
+    def test_removed_pricing_classes_are_absent(self):
+        """code_fast and legacy_premium were dead config: stale rates no catalog
+        model referenced. Re-adding one without a model to use it is a mistake."""
+        pricing = _reload_pricing()
+        assert "code_fast" not in pricing.MODEL_PRICING_CLASSES
+        assert "legacy_premium" not in pricing.MODEL_PRICING_CLASSES
 
     def test_bundled_yaml_loads_flat_rates(self):
         pricing = _reload_pricing()
@@ -55,7 +89,7 @@ class TestPricingLoader:
 
     def test_unknown_image_fallback(self):
         pricing = _reload_pricing()
-        assert pricing.UNKNOWN_IMAGE_MODEL_PRICING == 0.05
+        assert pricing.UNKNOWN_IMAGE_MODEL_PRICING == 0.07
 
     def test_build_model_pricing_map_still_works(self):
         """End-to-end: command_options builds per-model pricing from catalog + classes."""
@@ -72,8 +106,8 @@ class TestPricingLoader:
         assert pricing_map["grok-4.20"] == (1.25, 0.20, 2.50)
         assert pricing_map["grok-4.20-non-reasoning"] == (1.25, 0.20, 2.50)
         assert pricing_map["grok-4.20-multi-agent"] == (1.25, 0.20, 2.50)
-        # grok-4.5 has its own class: it caches at 0.50, not the usual 0.20.
-        assert pricing_map["grok-4.5"] == (2.00, 0.50, 6.00)
+        # grok-4.5 has its own class: it caches at 0.30, not the usual 0.20.
+        assert pricing_map["grok-4.5"] == (2.00, 0.30, 6.00)
         # grok-build-0.1 is in the 'build' class.
         assert pricing_map["grok-build-0.1"] == (1.00, 0.20, 2.00)
 
@@ -90,7 +124,7 @@ class TestPricingLoader:
         assert tier_map["grok-4.20"] == (200_000, 2.50, 0.40, 5.00)
         assert tier_map["grok-4.20-non-reasoning"] == (200_000, 2.50, 0.40, 5.00)
         assert tier_map["grok-4.20-multi-agent"] == (200_000, 2.50, 0.40, 5.00)
-        assert tier_map["grok-4.5"] == (200_000, 4.00, 1.00, 12.00)
+        assert tier_map["grok-4.5"] == (200_000, 4.00, 0.60, 12.00)
         assert tier_map["grok-build-0.1"] == (200_000, 2.00, 0.40, 4.00)
 
     def test_env_var_override_path(self, monkeypatch, tmp_path: Path):
@@ -120,7 +154,8 @@ class TestPricingLoader:
         assert pricing.MODEL_PRICING_CLASSES == {"premium": (10.0, 1.0, 30.0)}
         # Overrides written before the long-context split simply have no tiers.
         assert pricing.LONG_CONTEXT_PRICING_CLASSES == {}
-        assert pricing.IMAGE_PRICING == {"custom-img": 0.50}
+        # Scalar rows predate the per-resolution split and bill flat.
+        assert pricing.IMAGE_PRICING == {"custom-img": {pricing.FLAT_RATE_RESOLUTION: 0.50}}
         # Legacy flat video shape: no per-model rows; the flat rate becomes
         # the unknown-model fallback.
         assert pricing.VIDEO_PRICING == {}

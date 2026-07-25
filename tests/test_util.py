@@ -3,6 +3,7 @@ import pytest
 from discord_grok.cogs.grok.tooling import (
     CHUNK_TEXT_SIZE,
     IMAGE_PRICING,
+    MODEL_LONG_CONTEXT_PRICING,
     MODEL_PRICING,
     TOOL_BUILDERS,
     TOOL_CODE_EXECUTION,
@@ -421,12 +422,27 @@ class TestPricing:
         assert calculate_cost("grok-4.20", 0, 0) == 0.0
 
     def test_calculate_image_cost_known_model(self):
+        """An unspecified resolution bills at the 1k rate the command defaults to."""
         assert calculate_image_cost("grok-imagine-image") == 0.02
         assert calculate_image_cost("grok-imagine-image-pro") == 0.05
         assert calculate_image_cost("grok-imagine-image-quality") == 0.05
 
+    def test_calculate_image_cost_per_resolution(self):
+        """2k costs more than 1k on the quality tier; grok-imagine-image is flat."""
+        assert calculate_image_cost("grok-imagine-image-quality", "1k") == 0.05
+        assert calculate_image_cost("grok-imagine-image-quality", "2k") == 0.07
+        assert calculate_image_cost("grok-imagine-image-pro", "1k") == 0.05
+        assert calculate_image_cost("grok-imagine-image-pro", "2k") == 0.07
+        assert calculate_image_cost("grok-imagine-image", "1k") == 0.02
+        assert calculate_image_cost("grok-imagine-image", "2k") == 0.02
+
     def test_calculate_image_cost_unknown_model(self):
-        assert calculate_image_cost("unknown") == 0.05
+        assert calculate_image_cost("unknown") == 0.07
+        assert calculate_image_cost("unknown", "2k") == 0.07
+
+    def test_calculate_image_cost_unpriced_resolution_uses_fallback(self):
+        """A resolution the catalog does not price falls back rather than free-riding."""
+        assert calculate_image_cost("grok-imagine-image", "4k") == 0.07
 
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""
@@ -442,10 +458,21 @@ class TestPricing:
         assert cost == pytest.approx(0.02)
 
     def test_calculate_cost_grok_4_5_cached_rate_is_not_premium(self):
-        """grok-4.5 caches at $0.50/M, not the $0.20/M `premium` uses. Reusing `premium`
-        for it would under-bill every cached read by 2.5x and this test would catch it."""
+        """grok-4.5 caches at $0.30/M, not the $0.20/M `premium` uses. Reusing `premium`
+        for it would under-bill every cached read by 1.5x and this test would catch it."""
         cost = calculate_cost("grok-4.5", 100_000, 0, cached_tokens=100_000)
-        assert cost == pytest.approx(0.05)
+        assert cost == pytest.approx(0.03)
+
+    def test_calculate_cost_grok_4_5_cached_rate_dropped_to_published_rate(self):
+        """docs.x.ai dropped grok-4.5 cached input to $0.30/M ($0.60/M long-context)
+        between the 2026-07-16 and 2026-07-24 verifications. grok-4.5 is the default
+        chat model, so the retired $0.50/$1.00 pair overstated the cached component of
+        every default-path cost embed by 67%."""
+        assert MODEL_PRICING["grok-4.5"] == (2.00, 0.30, 6.00)
+        assert MODEL_LONG_CONTEXT_PRICING["grok-4.5"] == (200_000, 4.00, 0.60, 12.00)
+        # A 200k prompt that is entirely cached bills at the long-context cached rate.
+        cost = calculate_cost("grok-4.5", 200_000, 0, cached_tokens=200_000)
+        assert cost == pytest.approx(0.12)
 
     def test_calculate_cost_below_long_context_threshold(self):
         """A 199,999-token prompt is one token short of the long-context tier."""
@@ -474,10 +501,10 @@ class TestPricing:
         assert cost == pytest.approx(0.40)
 
     def test_calculate_cost_grok_4_5_long_tier(self):
-        """grok-4.5's long tier: $4.00/M in, $1.00/M cached, $12.00/M out."""
-        # 200k non-cached * $4.00/M + 200k cached * $1.00/M + 100k out * $12.00/M
+        """grok-4.5's long tier: $4.00/M in, $0.60/M cached, $12.00/M out."""
+        # 200k non-cached * $4.00/M + 200k cached * $0.60/M + 100k out * $12.00/M
         cost = calculate_cost("grok-4.5", 400_000, 100_000, cached_tokens=200_000)
-        assert cost == pytest.approx(0.80 + 0.20 + 1.20)
+        assert cost == pytest.approx(0.80 + 0.12 + 1.20)
 
     def test_calculate_cost_model_without_tier_stays_flat(self, monkeypatch):
         """Models whose pricing class has no long_context block bill flat at any
@@ -558,12 +585,34 @@ class TestPricing:
         assert calculate_tts_cost(0) == 0.0
 
     def test_calculate_video_cost(self):
-        # Bare call uses the default video model (grok-imagine-video-1.5-preview).
-        assert calculate_video_cost(5) == 5 * VIDEO_PRICING["grok-imagine-video-1.5-preview"]
-        assert calculate_video_cost(5, "grok-imagine-video") == (
-            5 * VIDEO_PRICING["grok-imagine-video"]
+        # Bare call uses the default video model (grok-imagine-video-1.5-preview)
+        # at the 720p resolution the command defaults to.
+        assert calculate_video_cost(5) == pytest.approx(
+            5 * VIDEO_PRICING["grok-imagine-video-1.5-preview"]["720p"]
+        )
+        assert calculate_video_cost(5, "grok-imagine-video") == pytest.approx(
+            5 * VIDEO_PRICING["grok-imagine-video"]["720p"]
         )
         assert calculate_video_cost(0) == 0.0
+
+    def test_calculate_video_cost_per_resolution(self):
+        """Every published resolution tier bills at its own per-second rate."""
+        assert calculate_video_cost(1, "grok-imagine-video-1.5-preview", "480p") == 0.08
+        assert calculate_video_cost(1, "grok-imagine-video-1.5-preview", "720p") == 0.14
+        assert calculate_video_cost(1, "grok-imagine-video-1.5-preview", "1080p") == 0.25
+        assert calculate_video_cost(1, "grok-imagine-video", "480p") == 0.05
+        assert calculate_video_cost(1, "grok-imagine-video", "720p") == 0.07
+
+    def test_calculate_video_cost_default_resolution_is_720p(self):
+        """The command defaults to 720p, so an unspecified resolution must bill 720p.
+        Billing the 480p rate here under-estimated the default invocation by 1.75x."""
+        assert calculate_video_cost(5, "grok-imagine-video-1.5-preview") == pytest.approx(
+            calculate_video_cost(5, "grok-imagine-video-1.5-preview", "720p")
+        )
+        assert calculate_video_cost(5) == pytest.approx(0.70)
+
+    def test_calculate_video_cost_unknown_model_uses_fallback(self):
+        assert calculate_video_cost(5, "unknown-video-model", "720p") == pytest.approx(5 * 0.25)
 
 
 class TestConversation:

@@ -56,7 +56,7 @@ async def run_video_command(
         video_cost = (
             result.cost_usd
             if result.cost_usd is not None
-            else calculate_video_cost(duration, model)
+            else calculate_video_cost(duration, model, resolution)
         )
         daily_cost = cog._track_daily_cost(ctx.author.id, video_cost)
 

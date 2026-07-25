@@ -2,8 +2,8 @@
 
 Chat pricing is organized by pricing class (premium / fast / mini / etc.); the
 model → class mapping lives in ``command_options.py`` alongside the catalog.
-This loader owns only the class → price mapping plus the flat pricing for
-image / video / TTS and per-tool server-side invocation rates.
+This loader owns only the class → price mapping plus the per-resolution pricing
+for image / video, the flat TTS rate, and per-tool server-side invocation rates.
 
 Override the bundled file at runtime by setting ``XAI_PRICING_PATH`` to a
 different YAML path.
@@ -66,16 +66,38 @@ LONG_CONTEXT_PRICING_CLASSES: dict[str, tuple[int, float, float, float]] = {
     if cfg.get("long_context")
 }
 
-IMAGE_PRICING: dict[str, float] = {
-    model_id: float(cfg["per_image"]) for model_id, cfg in _IMAGE.items()
+# Resolution key for a rate that applies at every resolution. Rows written as a
+# scalar (per_image: 0.05) — the shape used before docs.x.ai split Imagine
+# pricing by output resolution — normalize onto this single key so
+# XAI_PRICING_PATH overrides predating the split keep billing flat.
+FLAT_RATE_RESOLUTION = "flat"
+
+
+def _resolution_rates(cfg: Any, rate_key: str) -> dict[str, float]:
+    """Normalize one media pricing row into a resolution → rate map."""
+    raw = cfg.get(rate_key) if isinstance(cfg, dict) else None
+    if isinstance(raw, dict):
+        return {str(resolution).lower(): float(rate) for resolution, rate in raw.items()}
+    if isinstance(raw, int | float):
+        return {FLAT_RATE_RESOLUTION: float(raw)}
+    return {}
+
+
+# Per-model, per-resolution image pricing: {model_id: {resolution: per_image}}.
+# docs.x.ai bills Imagine output by output resolution, so a model's rate is only
+# meaningful alongside the resolution the request asked for.
+IMAGE_PRICING: dict[str, dict[str, float]] = {
+    model_id: _resolution_rates(cfg, "per_image") for model_id, cfg in _IMAGE.items()
 }
 
-# Per-model per-second video pricing. A legacy flat shape
-# (video_generation: {per_second: X}) yields an empty map with X as the
+# Per-model, per-resolution video pricing, in dollars per second. A legacy flat
+# shape (video_generation: {per_second: X}) yields an empty map with X as the
 # fallback rate, so XAI_PRICING_PATH overrides written before the
 # per-model split keep working.
-VIDEO_PRICING: dict[str, float] = {
-    model_id: float(cfg["per_second"]) for model_id, cfg in _VIDEO.items() if isinstance(cfg, dict)
+VIDEO_PRICING: dict[str, dict[str, float]] = {
+    model_id: _resolution_rates(cfg, "per_second")
+    for model_id, cfg in _VIDEO.items()
+    if isinstance(cfg, dict)
 }
 
 _LEGACY_VIDEO_RATE = _VIDEO.get("per_second")
@@ -98,6 +120,7 @@ UNKNOWN_IMAGE_MODEL_PRICING: float = float(
 
 
 __all__ = [
+    "FLAT_RATE_RESOLUTION",
     "IMAGE_PRICING",
     "LONG_CONTEXT_PRICING_CLASSES",
     "MODEL_PRICING_CLASSES",

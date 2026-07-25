@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from ...config.auth import XAI_COLLECTION_IDS
 from ...config.pricing import (
+    FLAT_RATE_RESOLUTION,
     IMAGE_PRICING,
     TOOL_INVOCATION_PRICING,
     TTS_PRICING_PER_MILLION_CHARS,
@@ -82,14 +83,47 @@ def calculate_tts_cost(character_count: int) -> float:
     return (character_count / 1_000_000) * TTS_PRICING_PER_MILLION_CHARS
 
 
-def calculate_image_cost(model: str) -> float:
+# Resolution assumed when a caller passes none. Grok Imagine bills per output
+# resolution, so a cost is only correct alongside one; these mirror the defaults
+# the /grok-media options document (cog.py), and `/grok-media image` in
+# particular leaves `resolution` unset so the API applies its own 1k default.
+DEFAULT_IMAGE_RESOLUTION = "1k"
+DEFAULT_VIDEO_RESOLUTION = "720p"
+
+
+def _resolution_rate(rates: dict[str, float], resolution: str, fallback: float) -> float:
+    """Pick a media rate for the requested resolution.
+
+    Falls back to a flat row (rows written as a scalar rate) and then to the
+    unknown-model rate, so pricing overrides predating the per-resolution split
+    and resolutions the catalog does not price still bill something.
+    """
+    rate = rates.get(resolution.lower())
+    if rate is None:
+        rate = rates.get(FLAT_RATE_RESOLUTION)
+    return fallback if rate is None else rate
+
+
+def calculate_image_cost(model: str, resolution: str | None = None) -> float:
     """Calculate the cost in dollars for an image generation."""
-    return IMAGE_PRICING.get(model, UNKNOWN_IMAGE_MODEL_PRICING)
+    return _resolution_rate(
+        IMAGE_PRICING.get(model, {}),
+        resolution or DEFAULT_IMAGE_RESOLUTION,
+        UNKNOWN_IMAGE_MODEL_PRICING,
+    )
 
 
-def calculate_video_cost(duration: int, model: str = "grok-imagine-video-1.5-preview") -> float:
+def calculate_video_cost(
+    duration: int,
+    model: str = "grok-imagine-video-1.5-preview",
+    resolution: str | None = None,
+) -> float:
     """Calculate the cost in dollars for a video generation."""
-    return duration * VIDEO_PRICING.get(model, UNKNOWN_VIDEO_MODEL_PRICING)
+    return duration * _resolution_rate(
+        VIDEO_PRICING.get(model, {}),
+        resolution or DEFAULT_VIDEO_RESOLUTION,
+        UNKNOWN_VIDEO_MODEL_PRICING,
+    )
 
 
 # All available Grok language models
@@ -483,6 +517,8 @@ def resolve_selected_tools(
 __all__ = [
     "AVAILABLE_TOOLS",
     "CHUNK_TEXT_SIZE",
+    "DEFAULT_IMAGE_RESOLUTION",
+    "DEFAULT_VIDEO_RESOLUTION",
     "GROK_IMAGE_MODELS",
     "GROK_MODELS",
     "GROK_VIDEO_MODELS",

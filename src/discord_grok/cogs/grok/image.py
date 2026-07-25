@@ -64,7 +64,8 @@ async def run_image_command(
         # Prefer SDK-reported cost (xai-sdk 1.12+) per result; fall back to YAML
         # pricing per missing result so mixed Some/None batches still total sensibly.
         image_cost = sum(
-            r.cost_usd if r.cost_usd is not None else calculate_image_cost(model) for r in results
+            r.cost_usd if r.cost_usd is not None else calculate_image_cost(model, resolution)
+            for r in results
         )
         daily_cost = cog._track_daily_cost(ctx.author.id, image_cost)
 
