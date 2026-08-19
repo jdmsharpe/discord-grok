@@ -113,6 +113,7 @@ REASONING_EFFORT_CHOICES = [
     OptionChoice(name="Low", value="low"),
     OptionChoice(name="Medium", value="medium"),
     OptionChoice(name="High", value="high"),
+    OptionChoice(name="Xhigh", value="xhigh"),
 ]
 
 AGENT_COUNT_CHOICES = [
@@ -578,10 +579,11 @@ class GrokCog(commands.Cog):
     @option("prompt", description="Prompt", required=True, type=str)
     @option(
         "model",
-        description="Choose from the following image generation models. (default: Grok Imagine Image Quality)",
+        description="Choose from the following image generation models. (default: Grok Imagine Image 2.0)",
         required=False,
         type=str,
         choices=[
+            OptionChoice(name="Grok Imagine Image 2.0", value="grok-imagine-image-2.0"),
             OptionChoice(name="Grok Imagine Image Quality", value="grok-imagine-image-quality"),
             OptionChoice(name="Grok Imagine Image", value="grok-imagine-image"),
         ],
@@ -618,6 +620,16 @@ class GrokCog(commands.Cog):
         ],
     )
     @option(
+        "quality",
+        description="Generation quality. Only grok-imagine-image-2.0 is priced by quality. (default: not set)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="Low", value="low"),
+            OptionChoice(name="Medium", value="medium"),
+        ],
+    )
+    @option(
         "count",
         description="Number of images to generate (1-10). Not supported for editing. (default: 1)",
         required=False,
@@ -635,9 +647,10 @@ class GrokCog(commands.Cog):
         self,
         ctx: ApplicationContext,
         prompt: str,
-        model: str = "grok-imagine-image-quality",
+        model: str = "grok-imagine-image-2.0",
         aspect_ratio: str = "1:1",
         resolution: str | None = None,
+        quality: str | None = None,
         count: int = 1,
         attachment: Attachment | None = None,
     ) -> None:
@@ -648,6 +661,7 @@ class GrokCog(commands.Cog):
             model=model,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
+            quality=quality,
             count=count,
             attachment=attachment,
         )
@@ -692,10 +706,11 @@ class GrokCog(commands.Cog):
     )
     @option(
         "resolution",
-        description="Resolution of the video. (default: 720p)",
+        description="Resolution of the video. 1080p is Video 1.5 only. (default: 720p)",
         required=False,
         type=str,
         choices=[
+            OptionChoice(name="1080p", value="1080p"),
             OptionChoice(name="720p", value="720p"),
             OptionChoice(name="480p", value="480p"),
         ],

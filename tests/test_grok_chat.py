@@ -348,7 +348,7 @@ class TestGrokChat:
         assert payload["reasoning_effort"] == "none"
 
     async def test_chat_rejects_none_effort_on_default_model(self, cog, mock_discord_context):
-        """`none` is a selectable menu choice but the default model (grok-4.5) cannot
+        """`none` is a selectable menu choice but the default model (grok-4.6) cannot
         disable reasoning — the per-model effort check must reject it BEFORE the API
         call, else every `/grok chat reasoning_effort:None` with no model is a live 400."""
         mock_discord_context.channel.typing = MagicMock()
@@ -366,8 +366,10 @@ class TestGrokChat:
         call_kwargs = mock_discord_context.send_followup.call_args[1]
         description = call_kwargs["embed"].description
         assert "reasoning_effort=none" in description
-        assert "grok-4.5" in description
+        assert "grok-4.6" in description
         assert "`low`" in description
+        # grok-4.6 is the only model accepting xhigh; the error lists what it does take.
+        assert "`xhigh`" in description
 
     async def test_chat_rejects_max_tokens_on_multi_agent(self, cog, mock_discord_context):
         """max_tokens should be rejected for multi-agent models."""

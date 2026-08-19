@@ -290,13 +290,30 @@ class TestReasoningConstants:
     def test_reasoning_effort_models(self):
         from discord_grok.cogs.grok.tooling import REASONING_EFFORT_MODELS
 
-        assert {"grok-4.3", "grok-4.5"} == REASONING_EFFORT_MODELS
+        assert {"grok-4.3", "grok-4.5", "grok-4.6"} == REASONING_EFFORT_MODELS
 
     def test_model_reasoning_efforts_per_model(self):
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
         assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset({"none", "low", "medium", "high"})
         assert "grok-4.20" not in MODEL_REASONING_EFFORTS
+
+    def test_xhigh_is_confined_to_grok_4_6(self):
+        """xAI silently treats `xhigh` as `high` on models that lack it, rather than
+        erroring — so this per-model set is the only thing that tells a user their
+        chosen effort was not honored."""
+        from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
+
+        assert "xhigh" in MODEL_REASONING_EFFORTS["grok-4.6"]
+        for model, efforts in MODEL_REASONING_EFFORTS.items():
+            if model != "grok-4.6":
+                assert "xhigh" not in efforts, f"{model} must not advertise xhigh"
+
+    def test_grok_4_6_is_reasoning_only(self):
+        """Reasoning cannot be disabled on grok-4.6, so `none` must stay out."""
+        from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
+
+        assert "none" not in MODEL_REASONING_EFFORTS["grok-4.6"]
 
     def test_grok_4_5_reasoning_cannot_be_disabled(self):
         """xAI rejects reasoning_effort="none" on grok-4.5; exposing it would 400 live."""
@@ -436,9 +453,29 @@ class TestPricing:
         assert calculate_image_cost("grok-imagine-image", "1k") == 0.02
         assert calculate_image_cost("grok-imagine-image", "2k") == 0.02
 
+    def test_calculate_image_cost_by_resolution_and_quality(self):
+        """grok-imagine-image-2.0 is the only model priced on two axes."""
+        assert calculate_image_cost("grok-imagine-image-2.0", "1k", "low") == 0.04
+        assert calculate_image_cost("grok-imagine-image-2.0", "2k", "low") == 0.06
+        assert calculate_image_cost("grok-imagine-image-2.0", "1k", "medium") == 0.06
+        assert calculate_image_cost("grok-imagine-image-2.0", "2k", "medium") == 0.08
+
+    def test_calculate_image_cost_missing_quality_fails_high(self):
+        """With no quality to key on, bill the dearest tier for that resolution rather
+        than under-reporting or dropping to the unknown-model rate."""
+        assert calculate_image_cost("grok-imagine-image-2.0", "1k") == 0.06
+        assert calculate_image_cost("grok-imagine-image-2.0", "2k") == 0.08
+
+    def test_quality_is_ignored_by_single_axis_models(self):
+        """Passing a quality to a model that does not price on it must not fall through
+        to the unknown-model rate."""
+        assert calculate_image_cost("grok-imagine-image-quality", "2k", "medium") == 0.07
+        assert calculate_image_cost("grok-imagine-image", "1k", "low") == 0.02
+
     def test_calculate_image_cost_unknown_model(self):
         assert calculate_image_cost("unknown") == 0.07
         assert calculate_image_cost("unknown", "2k") == 0.07
+        assert calculate_image_cost("unknown", "2k", "medium") == 0.07
 
     def test_calculate_image_cost_unpriced_resolution_uses_fallback(self):
         """A resolution the catalog does not price falls back rather than free-riding."""

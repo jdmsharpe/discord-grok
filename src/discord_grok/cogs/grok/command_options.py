@@ -29,6 +29,16 @@ class ChatModelCatalogEntry:
 
 CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
     ChatModelCatalogEntry(
+        model_id="grok-4.6",
+        display_name="Grok 4.6",
+        pricing_class="grok_4_6",
+        # Reasoning-only like grok-4.5, so no "none". `xhigh` is supported here and
+        # nowhere else in this catalog — models without it silently treat it as
+        # "high" rather than erroring, so the per-model set is the only real gate.
+        capabilities=frozenset(),
+        reasoning_efforts=frozenset({"low", "medium", "high", "xhigh"}),
+    ),
+    ChatModelCatalogEntry(
         model_id="grok-4.5",
         display_name="Grok 4.5",
         pricing_class="grok_4_5",
@@ -74,7 +84,7 @@ CHAT_MODEL_INDEX: dict[str, ChatModelCatalogEntry] = {
     entry.model_id: entry for entry in CHAT_MODEL_CATALOG
 }
 
-DEFAULT_CHAT_MODEL_ID = "grok-4.5"
+DEFAULT_CHAT_MODEL_ID = "grok-4.6"
 DEFAULT_CHAT_MODEL_ENTRY = CHAT_MODEL_INDEX[DEFAULT_CHAT_MODEL_ID]
 
 

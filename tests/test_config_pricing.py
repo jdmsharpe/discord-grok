@@ -16,6 +16,7 @@ class TestPricingLoader:
     def test_bundled_yaml_loads_pricing_classes(self):
         pricing = _reload_pricing()
         assert pricing.MODEL_PRICING_CLASSES["flagship"] == (1.25, 0.20, 2.50)
+        assert pricing.MODEL_PRICING_CLASSES["grok_4_6"] == (2.00, 0.50, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["grok_4_5"] == (2.00, 0.30, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["premium"] == (2.00, 0.20, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["build"] == (1.00, 0.20, 2.00)
@@ -26,6 +27,7 @@ class TestPricingLoader:
         """Tiered classes double every rate once a prompt reaches 200k tokens."""
         pricing = _reload_pricing()
         assert pricing.LONG_CONTEXT_PRICING_CLASSES["flagship"] == (200_000, 2.50, 0.40, 5.00)
+        assert pricing.LONG_CONTEXT_PRICING_CLASSES["grok_4_6"] == (200_000, 4.00, 1.00, 12.00)
         assert pricing.LONG_CONTEXT_PRICING_CLASSES["grok_4_5"] == (200_000, 4.00, 0.60, 12.00)
         assert pricing.LONG_CONTEXT_PRICING_CLASSES["build"] == (200_000, 2.00, 0.40, 4.00)
         # Classes without a long_context block bill flat at any prompt size.
@@ -106,8 +108,11 @@ class TestPricingLoader:
         assert pricing_map["grok-4.20"] == (1.25, 0.20, 2.50)
         assert pricing_map["grok-4.20-non-reasoning"] == (1.25, 0.20, 2.50)
         assert pricing_map["grok-4.20-multi-agent"] == (1.25, 0.20, 2.50)
-        # grok-4.5 has its own class: it caches at 0.30, not the usual 0.20.
+        # grok-4.6 and grok-4.5 share $2.00/$6.00 but differ on cached reads, so
+        # neither may collapse into the other or into `premium` ($0.20 cached).
+        assert pricing_map["grok-4.6"] == (2.00, 0.50, 6.00)
         assert pricing_map["grok-4.5"] == (2.00, 0.30, 6.00)
+        assert pricing_map["grok-4.6"] != pricing_map["grok-4.5"]
         # grok-build-0.1 is in the 'build' class.
         assert pricing_map["grok-build-0.1"] == (1.00, 0.20, 2.00)
 

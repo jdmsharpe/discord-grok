@@ -5,7 +5,7 @@ import io
 from typing import Any, cast
 
 from discord import ApplicationContext, Attachment, Colour, Embed, File
-from xai_sdk.image import ImageAspectRatio, ImageResolution
+from xai_sdk.image import ImageAspectRatio, ImageQuality, ImageResolution
 
 from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
@@ -20,6 +20,7 @@ async def run_image_command(
     model: str,
     aspect_ratio: str,
     resolution: str | None,
+    quality: str | None,
     count: int,
     attachment: Attachment | None,
 ) -> None:
@@ -51,6 +52,8 @@ async def run_image_command(
         }
         if resolution is not None:
             sample_kwargs["resolution"] = cast(ImageResolution, resolution)
+        if quality is not None:
+            sample_kwargs["quality"] = cast(ImageQuality, quality)
         if is_editing:
             sample_kwargs["image_url"] = str(attachment.url)
 
@@ -64,7 +67,9 @@ async def run_image_command(
         # Prefer SDK-reported cost (xai-sdk 1.12+) per result; fall back to YAML
         # pricing per missing result so mixed Some/None batches still total sensibly.
         image_cost = sum(
-            r.cost_usd if r.cost_usd is not None else calculate_image_cost(model, resolution)
+            r.cost_usd
+            if r.cost_usd is not None
+            else calculate_image_cost(model, resolution, quality)
             for r in results
         )
         daily_cost = cog._track_daily_cost(ctx.author.id, image_cost)
@@ -103,6 +108,8 @@ async def run_image_command(
         description += f"**Aspect Ratio:** {aspect_ratio}\n"
         if resolution is not None:
             description += f"**Resolution:** {resolution}\n"
+        if quality is not None:
+            description += f"**Quality:** {quality.capitalize()}\n"
 
         embed = Embed(
             title=mode,

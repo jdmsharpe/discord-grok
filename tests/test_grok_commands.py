@@ -33,15 +33,16 @@ class TestGrokCommandSchema:
             assert choice.value in CHAT_MODEL_INDEX
             assert choice.value in MODEL_PRICING
 
-    def test_default_chat_model_is_grok_4_5(self):
-        """grok-4.5 was promoted to default. grok-4.3 stays selectable for
-        long-context or cheaper runs."""
+    def test_default_chat_model_is_grok_4_6(self):
+        """grok-4.6 was promoted to default. grok-4.5 and grok-4.3 stay selectable
+        for cheaper cached reads and long-context runs respectively."""
         from discord_grok.cogs.grok.command_options import (
             CHAT_MODEL_INDEX,
             DEFAULT_CHAT_MODEL_ID,
         )
 
-        assert DEFAULT_CHAT_MODEL_ID == "grok-4.5"
+        assert DEFAULT_CHAT_MODEL_ID == "grok-4.6"
+        assert "grok-4.5" in CHAT_MODEL_INDEX
         assert "grok-4.3" in CHAT_MODEL_INDEX
 
     def test_model_markdown_lines_match_visible_models(self):
@@ -134,30 +135,69 @@ class TestGrokCommandSchema:
         assert att_option is not None
         assert att_option.required is False
 
-    def test_media_resolution_choices_are_all_priced(self, cog):
-        """Grok Imagine bills per output resolution, so every resolution the media
-        commands offer needs a rate for every model they offer. A missing rate makes
-        the cost embed silently fall back to an unrelated tier's price."""
+    def test_image_resolution_choices_are_all_priced(self, cog):
+        """Grok Imagine bills per output resolution, so every resolution the image
+        command offers needs a rate for every image model. A missing rate makes the
+        cost embed silently fall back to an unrelated tier's price.
+
+        grok-imagine-image-2.0 prices on resolution AND quality, so its rates are
+        keyed ``"<resolution>/<quality>"`` — a bare resolution counts as priced when
+        any quality tier for it exists.
+        """
         # Read the maps through tooling: tests that reload config.pricing under an
         # XAI_PRICING_PATH override leave a custom module in sys.modules.
-        from discord_grok.cogs.grok.tooling import (
-            GROK_IMAGE_MODELS,
-            GROK_VIDEO_MODELS,
-            IMAGE_PRICING,
-            VIDEO_PRICING,
-        )
+        from discord_grok.cogs.grok.tooling import GROK_IMAGE_MODELS, IMAGE_PRICING
 
-        for command_name, models, pricing in (
-            ("image", GROK_IMAGE_MODELS, IMAGE_PRICING),
-            ("video", GROK_VIDEO_MODELS, VIDEO_PRICING),
-        ):
-            cmd = next(c for c in cog.grok_media.walk_commands() if c.name == command_name)
-            res_option = next(opt for opt in cmd.options if opt.name == "resolution")
-            for model in models:
-                for choice in res_option.choices:
-                    assert choice.value in pricing[model], (
-                        f"{command_name}: {model} has no {choice.value} rate"
+        cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "image")
+        res_option = next(opt for opt in cmd.options if opt.name == "resolution")
+        for model in GROK_IMAGE_MODELS:
+            rates = IMAGE_PRICING[model]
+            for choice in res_option.choices:
+                priced = choice.value in rates or any(
+                    key.startswith(f"{choice.value}/") for key in rates
+                )
+                assert priced, f"image: {model} has no {choice.value} rate"
+
+    def test_every_image_quality_tier_is_priced(self, cog):
+        """Both quality choices must be priced at both resolutions for the two-axis
+        model, or a request bills at the fail-high tier instead of its own rate."""
+        from discord_grok.cogs.grok.tooling import IMAGE_PRICING
+
+        cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "image")
+        res_option = next(opt for opt in cmd.options if opt.name == "resolution")
+        quality_option = next(opt for opt in cmd.options if opt.name == "quality")
+        rates = IMAGE_PRICING["grok-imagine-image-2.0"]
+        for res in (c.value for c in res_option.choices):
+            for quality in (c.value for c in quality_option.choices):
+                assert f"{res}/{quality}" in rates, f"unpriced tier {res}/{quality}"
+
+    def test_video_resolution_choices_are_priced_or_rejected(self, cog):
+        """1080p exists only on Video 1.5. Every offered (model, resolution) pair must
+        therefore be either priced or refused before the request, never billed at the
+        unknown-model fallback."""
+        from discord_grok.cogs.grok.tooling import GROK_VIDEO_MODELS, VIDEO_PRICING
+        from discord_grok.cogs.grok.video import _validate_video_resolution
+
+        cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "video")
+        res_option = next(opt for opt in cmd.options if opt.name == "resolution")
+        for model in GROK_VIDEO_MODELS:
+            for choice in res_option.choices:
+                if choice.value in VIDEO_PRICING[model]:
+                    assert _validate_video_resolution(model, choice.value) is None
+                else:
+                    assert _validate_video_resolution(model, choice.value) is not None, (
+                        f"video: {model} offers unpriced {choice.value} without rejecting it"
                     )
+
+    def test_1080p_is_offered_and_priced_on_video_1_5(self, cog):
+        """The 1080p rate existed in pricing.yaml while the menu offered only 720p/480p,
+        so the tier was unreachable."""
+        from discord_grok.cogs.grok.tooling import VIDEO_PRICING
+
+        cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "video")
+        res_option = next(opt for opt in cmd.options if opt.name == "resolution")
+        assert any(choice.value == "1080p" for choice in res_option.choices)
+        assert VIDEO_PRICING["grok-imagine-video-1.5-preview"]["1080p"] == 0.25
 
     def test_media_resolution_defaults_match_the_assumed_pricing_tier(self, cog):
         """``calculate_image_cost``/``calculate_video_cost`` assume these resolutions

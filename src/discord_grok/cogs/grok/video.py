@@ -6,9 +6,23 @@ from typing import cast
 from discord import ApplicationContext, Attachment, Colour, Embed, File
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
+from ...config.pricing import VIDEO_PRICING
 from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import GROK_VIDEO_MODELS, calculate_video_cost, format_xai_error, truncate_text
+
+
+def _validate_video_resolution(model: str, resolution: str) -> str | None:
+    """Reject resolutions a model has no published rate for.
+
+    The resolution menu is shared across models but 1080p exists only on Video 1.5;
+    an unpriced tier would otherwise bill at the unknown-model fallback.
+    """
+
+    supported = VIDEO_PRICING.get(model, {})
+    if not supported or resolution.lower() in supported:
+        return None
+    return f"`{model}` does not support {resolution}. Supported: {', '.join(sorted(supported))}."
 
 
 async def run_video_command(
@@ -24,6 +38,15 @@ async def run_video_command(
 ) -> None:
     """Generate a video from text or an image using Grok Imagine Video."""
     await ctx.defer()
+
+    resolution_error = _validate_video_resolution(model, resolution)
+    if resolution_error:
+        await send_embed_batches(
+            ctx.send_followup,
+            embed=Embed(title="Error", description=resolution_error, color=Colour.red()),
+            logger=cog.logger,
+        )
+        return
 
     try:
         is_image_to_video = attachment is not None

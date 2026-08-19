@@ -6,7 +6,7 @@
 #   https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
 #   It still carried grok-4.5's retired $0.50/M cached rate on 2026-07-24 and would
 #   have masked that drift, so verify against docs.x.ai first and treat it as a hint.
-# Last-verified: 2026-07-24
+# Last-verified: 2026-08-18
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;
@@ -30,6 +30,13 @@ pricing_classes:
     cached_input_per_million: 0.20
     output_per_million: 2.50
     long_context: { threshold_tokens: 200000, input_per_million: 2.50, cached_input_per_million: 0.40, output_per_million: 5.00 }
+  # grok-4.6 matches grok-4.5's $2.00/$6.00 input/output but cannot share its class:
+  # it caches at $0.50/M, not $0.30/M (and $1.00 vs $0.60 long-context).
+  grok_4_6:
+    input_per_million: 2.00
+    cached_input_per_million: 0.50
+    output_per_million: 6.00
+    long_context: { threshold_tokens: 200000, input_per_million: 4.00, cached_input_per_million: 1.00, output_per_million: 12.00 }
   # grok-4.5 matches `premium`'s $2.00/$6.00 input/output but still cannot share it:
   # it caches at $0.30/M — 1.5x `premium`'s $0.20 — and, unlike `premium`, it
   # doubles every rate once a prompt reaches 200k tokens.
@@ -55,6 +62,12 @@ pricing_classes:
 # grok-imagine-image-pro is an alias of grok-imagine-image-quality (canonical);
 # the row is kept for cost continuity of past requests, at the corrected price.
 image_generation:
+  # grok-imagine-image-2.0 prices on TWO axes — resolution and quality — unlike every
+  # other Imagine row. The axes are folded into one "<resolution>/<quality>" key so the
+  # normalized shape stays a flat resolution -> rate map; lookup falls back to the bare
+  # resolution, then to the flat rate, so single-axis rows are unaffected.
+  grok-imagine-image-2.0:
+    per_image: { "1k/low": 0.04, "2k/low": 0.06, "1k/medium": 0.06, "2k/medium": 0.08 }
   grok-imagine-image-quality: { per_image: { 1k: 0.05, 2k: 0.07 } }
   grok-imagine-image-pro:     { per_image: { 1k: 0.05, 2k: 0.07 } }
   grok-imagine-image:         { per_image: { 1k: 0.02, 2k: 0.02 } }

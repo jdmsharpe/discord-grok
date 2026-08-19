@@ -104,13 +104,25 @@ def _resolution_rate(rates: dict[str, float], resolution: str, fallback: float) 
     return fallback if rate is None else rate
 
 
-def calculate_image_cost(model: str, resolution: str | None = None) -> float:
-    """Calculate the cost in dollars for an image generation."""
-    return _resolution_rate(
-        IMAGE_PRICING.get(model, {}),
-        resolution or DEFAULT_IMAGE_RESOLUTION,
-        UNKNOWN_IMAGE_MODEL_PRICING,
-    )
+def calculate_image_cost(
+    model: str, resolution: str | None = None, quality: str | None = None
+) -> float:
+    """Calculate the cost in dollars for an image generation.
+
+    Models priced on both resolution and quality (grok-imagine-image-2.0) are keyed
+    ``"<resolution>/<quality>"``; `_resolution_rate` falls back to the bare
+    resolution for every single-axis model.
+    """
+    rates = IMAGE_PRICING.get(model, {})
+    resolution = (resolution or DEFAULT_IMAGE_RESOLUTION).lower()
+    if quality is not None and (composite := f"{resolution}/{quality.lower()}") in rates:
+        return rates[composite]
+    tiers = [rate for key, rate in rates.items() if key.startswith(f"{resolution}/")]
+    if tiers:
+        # Two-axis model with no quality to key on — bill the dearest tier for this
+        # resolution rather than under-reporting.
+        return max(tiers)
+    return _resolution_rate(rates, resolution, UNKNOWN_IMAGE_MODEL_PRICING)
 
 
 def calculate_video_cost(
@@ -133,6 +145,7 @@ GROK_MODELS = [entry.model_id for entry in iter_slash_command_models()]
 # grok-imagine-image-pro is now an alias of grok-imagine-image-quality
 # (the canonical id), so only the canonical id is exposed in the menu.
 GROK_IMAGE_MODELS = [
+    "grok-imagine-image-2.0",
     "grok-imagine-image-quality",
     "grok-imagine-image",
 ]
