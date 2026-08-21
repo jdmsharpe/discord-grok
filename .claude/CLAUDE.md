@@ -22,7 +22,7 @@ docker compose up --build
 ## Gotchas
 
 - Uses **`py-cord`** (not `discord.py`). The slash-command API differs; don't mix docs between the two.
-- `GUILD_IDS` empty → commands register globally (up to 1-hour propagation delay). Set it to a test guild ID during development for instant updates.
+- `GUILD_IDS` must list at least one guild ID. Empty or unset parses to `[]`, never `None`, and py-cord only treats `guild_ids is None` as global — so the commands register **nowhere**: not globally, not per-guild. Nothing fails at startup; the commands simply never appear.
 
 ## Environment Variables
 
@@ -30,7 +30,7 @@ docker compose up --build
 | --- | --- | --- |
 | `BOT_TOKEN` | Yes | Discord bot token |
 | `XAI_API_KEY` | Yes | xAI API key for Grok requests |
-| `GUILD_IDS` | Yes | Comma-separated Discord guild IDs for slash command registration |
+| `GUILD_IDS` | Yes | Comma-separated Discord guild IDs for slash command registration; empty or unset registers no commands at all (not enforced by `validate_required_config()`) |
 | `XAI_COLLECTION_IDS` | No | Comma-separated collection IDs; enables `collections_search` tool |
 | `XAI_MCP_PRESETS_JSON` | No | Inline JSON object of named HTTPS MCP presets for `/grok chat` |
 | `XAI_MCP_PRESETS_PATH` | No | Path to a JSON file containing named HTTPS MCP presets |
@@ -118,7 +118,7 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
 
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
-- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_embed_delivery`, `test_button_view`, `test_config_auth`, `test_config_pricing`, `test_logging_setup`, `test_lazy_imports`, and `test_util`.
+- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_choice_caps`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_embed_delivery`, `test_button_view`, `test_config_auth`, `test_config_pricing`, `test_logging_setup`, `test_lazy_imports`, and `test_util`.
 - MCP preset coverage lives in `tests/test_config_mcp.py`.
 - `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
@@ -147,7 +147,7 @@ pytest -q
 
 - Conversation state still preserves `previous_response_id`, `response_id_history`, `prompt_cache_key`, and `grok_conv_id`.
 - `collections_search` requires `XAI_COLLECTION_IDS`.
-- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`. Chat uses raw HTTP rather than the SDK because xai-sdk does not yet expose a Responses API surface or `prompt_cache_key`; once both land, migrate `chat.py`/`client.py` onto the SDK like image/video/TTS already are. (Last checked xai-sdk 1.19.0: `Client` still has no `responses` attribute, so the cache-key blocker remains. 1.18.0 added the `xhigh` reasoning effort and grok-4.6; 1.19.0 added `quality` to `image.sample` (both wired). Still unwired and available: `video.generate`'s `reference_audios`/`generate_audio` (1.19.0), Imagine file storage (`storage_options` + `public_url` on image/video results — could post the public URL to Discord instead of downloading and re-uploading bytes) and Files-API `file_id` inputs (1.16.0), and `compact_context()` for long-conversation compaction (1.15.0). Recheck on next minor bump.)
+- Raw Responses API behavior, retry/backoff handling, and file upload lifecycle now live primarily in `discord_grok.cogs.grok.client`. Chat uses raw HTTP rather than the SDK because xai-sdk does not yet expose a Responses API surface or `prompt_cache_key`; once both land, migrate `chat.py`/`client.py` onto the SDK like image/video already are (TTS is raw HTTP too). (Last checked xai-sdk 1.19.0: `Client` still has no `responses` attribute, so the cache-key blocker remains. 1.18.0 added the `xhigh` reasoning effort and grok-4.6; 1.19.0 added `quality` to `image.sample` (both wired). Still unwired and available: `video.generate`'s `reference_audios`/`generate_audio` (1.19.0), Imagine file storage (`storage_options` + `public_url` on image/video results — could post the public URL to Discord instead of downloading and re-uploading bytes) and Files-API `file_id` inputs (1.16.0), and `compact_context()` for long-conversation compaction (1.15.0). Recheck on next minor bump.)
 - Chat, image, video, and TTS command bodies are delegated from `discord_grok.cogs.grok.cog` into feature modules.
 - Remote MCP is configured per `/grok chat` invocation with comma-separated preset names. Presets are loaded from `XAI_MCP_PRESETS_JSON` and `XAI_MCP_PRESETS_PATH`, validated at config-load time, and then persisted as `mcp_servers` on `ChatCompletionParameters`.
 - Each MCP preset supports `url` (required HTTPS), `authorization_env_var` (optional), and `allowed_tools` (optional).
@@ -155,7 +155,7 @@ pytest -q
 - MCP is intentionally excluded from the built-in tool dropdown so dropdown changes only affect built-in tools.
 - The slash-command surface no longer accepts X handle filters or web domain allow/block lists; only media toggles and `x_search_date_range` remain pre-start search refinements.
 - Attachment size limits (from `discord_grok.cogs.grok.attachments`): images are capped at 20 MB (`MAX_IMAGE_SIZE`), other files at 48 MB (`MAX_FILE_SIZE`). Patch these constants when writing upload tests.
-- Image/video/TTS cost: prefer `result.cost_usd` reported by xai-sdk 1.12+; fall back to bundled YAML pricing only when the SDK does not return a cost. Mock `cost_usd=None` in tests to exercise the YAML fallback path.
+- Image/video cost: prefer `result.cost_usd` reported by xai-sdk 1.12+; fall back to bundled YAML pricing only when the SDK does not return a cost. Mock `cost_usd=None` in tests to exercise the YAML fallback path. TTS has no SDK cost surface — `calculate_tts_cost` always bills from the bundled YAML.
 - Grok Imagine bills per **output resolution**, so `image_generation` / `video_generation` rows in `pricing.yaml` map resolution → rate and `calculate_image_cost` / `calculate_video_cost` take the requested resolution. `grok-imagine-image-2.0` bills on resolution AND quality; its rows are keyed `"<resolution>/<quality>"` so the normalized map stays flat, and `calculate_image_cost` bills the dearest tier for a resolution when no quality is supplied. 1080p is priced only for `grok-imagine-video-1.5-preview`, so `_validate_video_resolution` (`video.py`) rejects it on other models rather than letting it reach the unknown-model fallback. A scalar rate is still accepted and bills flat. When a caller passes no resolution, the tier assumed is `DEFAULT_IMAGE_RESOLUTION` / `DEFAULT_VIDEO_RESOLUTION` in `tooling.py`, which must track the `/grok-media` option defaults.
 
 ## Runtime Conventions (Cross-Project)

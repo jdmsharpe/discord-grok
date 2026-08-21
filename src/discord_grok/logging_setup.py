@@ -1,9 +1,9 @@
 """Structured logging with contextvars-backed request IDs.
 
-Each user-initiated action (slash command, message event, button callback)
-binds a short random request ID via :func:`bind_request_id`. Every
-``logger.info``/``warning``/``error`` call inside that async task then emits
-the id alongside its message, so a multi-step flow can be traced end-to-end.
+Each user-initiated action (slash command, message event) binds a short random
+request ID via :func:`bind_request_id`. Every ``logger.info``/``warning``/``error``
+call inside that async task then emits the id alongside its message, so a
+multi-step flow can be traced end-to-end.
 
 Set ``LOG_FORMAT=json`` for JSON-lines output (suitable for log aggregators)
 or leave it unset for plain-text dev output.

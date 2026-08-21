@@ -73,9 +73,9 @@ image_generation:
   grok-imagine-image:         { per_image: { 1k: 0.02, 2k: 0.02 } }
 
 # Per-second pricing for Grok Imagine video models, keyed by resolution the same way.
-# 1080p is published by docs.x.ai for the 1.5 model but is not offered by
-# /grok-media video (720p/480p only); it is priced here so adding the option later
-# needs no pricing change. grok-imagine-video has no published 1080p rate.
+# 1080p is published by docs.x.ai for the 1.5 model only, and /grok-media video
+# offers it alongside 720p/480p; `_validate_video_resolution` rejects it on other
+# models. grok-imagine-video has no published 1080p rate.
 video_generation:
   grok-imagine-video:             { per_second: { 480p: 0.05, 720p: 0.07 } }
   grok-imagine-video-1.5-preview: { per_second: { 480p: 0.08, 720p: 0.14, 1080p: 0.25 } }
