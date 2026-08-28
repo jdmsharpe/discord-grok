@@ -1,11 +1,16 @@
-# Discord Grok Bot
+<h1 align="center">Discord Grok Bot</h1>
+
+<div align="center">
 
 ![Hits](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fjdmsharpe%2Fdiscord-grok%2F&label=discord-grok&icon=github&color=%23198754&message=&style=flat&tz=UTC)
 [![Version](https://img.shields.io/github/v/tag/jdmsharpe/discord-grok?sort=semver&label=version)](https://github.com/jdmsharpe/discord-grok/tags)
 [![License](https://img.shields.io/github/license/jdmsharpe/discord-grok?label=license)](./LICENSE)
 [![CI](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml/badge.svg)](https://github.com/jdmsharpe/discord-grok/actions/workflows/main.yml)
+[![Codecov](https://codecov.io/gh/jdmsharpe/discord-grok/branch/main/graph/badge.svg)](https://app.codecov.io/gh/jdmsharpe/discord-grok)
 [![Docker Pulls](https://img.shields.io/docker/pulls/jsgreen152/discord-grok?logo=docker&logoColor=white)](https://hub.docker.com/r/jsgreen152/discord-grok)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+
+</div>
 
 ## Overview
 A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides stateful multi-turn conversations, image generation, video generation, and text-to-speech accessible through Discord slash commands. Chat uses the xAI Responses API directly via `aiohttp` for automatic billing optimization, while image, video, and file operations use the official xAI Python SDK.
