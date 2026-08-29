@@ -118,7 +118,7 @@ Only `src/bot.py` remains at the repo root; code imports should target `discord_
 
 - `pytest` runs with `pythonpath = ["src"]`.
 - Shared response payloads now live in `tests/fixtures.py`; do not rely on bare `conftest` imports for data fixtures.
-- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_choice_caps`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_embed_delivery`, `test_button_view`, `test_config_auth`, `test_config_pricing`, `test_logging_setup`, `test_lazy_imports`, and `test_util`.
+- The test suite is organized into module-aligned files: `test_grok_cog`, `test_grok_chat`, `test_grok_client`, `test_grok_commands`, `test_choice_caps`, `test_grok_tooling`, `test_grok_embeds`, `test_grok_responses`, `test_grok_state`, `test_embed_delivery`, `test_button_view`, `test_config_auth`, `test_config_pricing`, `test_logging_setup`, `test_lazy_imports`, `test_config_mcp`, `test_option_defaults`, `test_package_import`, and `test_util`.
 - MCP preset coverage lives in `tests/test_config_mcp.py`.
 - `tests/test_package_import.py` is the package import smoke test, and `tests/support.py` holds shared Grok test helpers.
 - New tests and patches should target real owners under `discord_grok...`.
