@@ -48,10 +48,11 @@ def calculate_cost(
 
     Cached tokens are a subset of input_tokens billed at a discounted rate.
     ``input_tokens`` is the request's prompt token count: per docs.x.ai,
-    "Requests whose prompt reaches 200k tokens are billed at the higher rate
-    for all tokens in the request", so once it reaches a tiered model's
-    threshold, ALL tokens — input, cached, output, and reasoning — bill at
-    the long-context rates, not just the overflow.
+    "Models with long context pricing bill the long context rates for all
+    tokens in a request once its prompt reaches the model's long context
+    threshold", so once it reaches a tiered model's threshold, ALL tokens —
+    input, cached, output, and reasoning — bill at the long-context rates,
+    not just the overflow.
     """
     input_price, cached_price, output_price = MODEL_PRICING.get(model, DEFAULT_MODEL_PRICING)
     # Unknown models keep the flat default-model fallback above: without

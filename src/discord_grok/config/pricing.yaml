@@ -6,7 +6,7 @@
 #   https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
 #   It still carried grok-4.5's retired $0.50/M cached rate on 2026-07-24 and would
 #   have masked that drift, so verify against docs.x.ai first and treat it as a hint.
-# Last-verified: 2026-08-18
+# Last-verified: 2026-08-28
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;
@@ -19,11 +19,11 @@
 # Per-million-token triples: (input, cached_input, output)
 #
 # Classes with a `long_context` block have a second pricing tier: per docs.x.ai,
-# "Requests whose prompt reaches 200k tokens are billed at the higher rate for
-# all tokens in the request" — so once a request's PROMPT token count reaches
-# threshold_tokens, ALL of its tokens (input, cached input, and output) bill at
-# the long_context rates, not just the overflow. Classes without the block bill
-# flat at any prompt size.
+# "Models with long context pricing bill the long context rates for all tokens
+# in a request once its prompt reaches the model's long context threshold" — so
+# once a request's PROMPT token count reaches threshold_tokens, ALL of its tokens
+# (input, cached input, and output) bill at the long_context rates, not just the
+# overflow. Classes without the block bill flat at any prompt size.
 pricing_classes:
   flagship:
     input_per_million: 1.25
