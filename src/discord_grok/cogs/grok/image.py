@@ -11,6 +11,18 @@ from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import calculate_image_cost, format_xai_error, truncate_text
 
+QUALITY_SUPPORTED_IMAGE_MODELS = frozenset({"grok-imagine-image-2.0"})
+
+
+def _validate_image_quality(model: str, quality: str | None) -> str | None:
+    """Reject quality controls that the API accepts but ignores for fixed-tier models."""
+    if not quality or model in QUALITY_SUPPORTED_IMAGE_MODELS:
+        return None
+    return (
+        f"Image quality `{quality}` is not supported by `{model}`. "
+        "Leave quality unset for this model or choose `grok-imagine-image-2.0`."
+    )
+
 
 async def run_image_command(
     cog,
@@ -39,6 +51,15 @@ async def run_image_command(
                     description=("Multi-image generation is not supported in Image Editing mode."),
                     color=Colour.red(),
                 ),
+                logger=cog.logger,
+            )
+            return
+
+        quality_error = _validate_image_quality(model, quality)
+        if quality_error:
+            await send_embed_batches(
+                ctx.send_followup,
+                embed=Embed(title="Error", description=quality_error, color=Colour.red()),
                 logger=cog.logger,
             )
             return
@@ -133,4 +154,4 @@ async def run_image_command(
         )
 
 
-__all__ = ["run_image_command"]
+__all__ = ["QUALITY_SUPPORTED_IMAGE_MODELS", "_validate_image_quality", "run_image_command"]

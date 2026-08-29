@@ -558,6 +558,41 @@ class TestImageBatchGeneration:
         cog.client.image.sample.assert_not_awaited()
         cog.client.image.sample_batch.assert_not_awaited()
 
+    async def test_image_rejects_quality_for_fixed_tier_models(self, cog, mock_discord_context):
+        """Legacy models accept but ignore quality, so fail before a billable request."""
+        await cog.image.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="A cat",
+            model="grok-imagine-image",
+            quality="low",
+            count=1,
+        )
+
+        call_kwargs = mock_discord_context.send_followup.call_args[1]
+        assert "quality `low` is not supported" in call_kwargs["embed"].description
+        assert "`grok-imagine-image-2.0`" in call_kwargs["embed"].description
+        cog.client.image.sample.assert_not_awaited()
+        cog.client.image.sample_batch.assert_not_awaited()
+
+    async def test_image_forwards_quality_for_image_2(self, cog, mock_discord_context):
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A cat",
+                model="grok-imagine-image-2.0",
+                quality="low",
+                count=1,
+            )
+
+        assert cog.client.image.sample.await_args.kwargs["quality"] == "low"
+
 
 class TestVideoCommand:
     """Integration tests for the /grok-media video command."""
