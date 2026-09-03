@@ -66,10 +66,10 @@ Start a stateful, multi-turn conversation with Grok.
 * **MCP Integration:** Use `mcp` with comma-separated preset names defined in `XAI_MCP_PRESETS_JSON` or `XAI_MCP_PRESETS_PATH`.
 
 ### `/grok-media image`
-Generate images from text prompts, or edit/remix an existing image via attachment.
+Generate images from text prompts, or edit/remix an existing image via attachment. Edits add xAI's flat per-input-image fee ($0.01 on Image 2.0 / Quality, $0.002 on Imagine Image) to the cost embed.
 
 ### `/grok-media video`
-Generate videos from text prompts or transform an image into a video.
+Generate videos from text prompts or transform an image into a video (the reference image adds xAI's per-input-image fee: $0.01 on Video 1.5, $0.002 on Imagine Video).
 
 ### `/grok-tools tts`
 Convert text to speech audio (Maximum 15,000 characters per request).

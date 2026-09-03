@@ -481,6 +481,25 @@ class TestPricing:
         """A resolution the catalog does not price falls back rather than free-riding."""
         assert calculate_image_cost("grok-imagine-image", "4k") == 0.07
 
+    def test_calculate_image_cost_adds_input_image_surcharge_on_edits(self):
+        """An edit / remix bills the output price plus xAI's flat per-input-image fee.
+        Only the YAML fallback needs this — the SDK's cost_usd already includes it."""
+        assert calculate_image_cost(
+            "grok-imagine-image-quality", "1k", input_images=1
+        ) == pytest.approx(0.06)
+        assert calculate_image_cost(
+            "grok-imagine-image-2.0", "1k", "low", input_images=1
+        ) == pytest.approx(0.05)
+        assert calculate_image_cost("grok-imagine-image-2.0", "2k", input_images=1) == (
+            pytest.approx(0.09)
+        )
+        assert calculate_image_cost("grok-imagine-image", "2k", input_images=1) == (
+            pytest.approx(0.022)
+        )
+        assert calculate_image_cost("grok-imagine-image", "2k", input_images=0) == 0.02
+        # Unknown model: unknown output rate plus the unknown-model input-image rate.
+        assert calculate_image_cost("unknown", "1k", input_images=1) == pytest.approx(0.08)
+
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""
         # grok-4.20 (flagship): $1.25/M in, $0.20/M cached, $2.50/M out
@@ -650,6 +669,18 @@ class TestPricing:
 
     def test_calculate_video_cost_unknown_model_uses_fallback(self):
         assert calculate_video_cost(5, "unknown-video-model", "720p") == pytest.approx(5 * 0.25)
+
+    def test_calculate_video_cost_adds_input_image_surcharge_for_image_to_video(self):
+        """Image-to-video bills the per-second rate plus the flat reference-image fee."""
+        assert calculate_video_cost(
+            5, "grok-imagine-video-1.5-preview", "720p", input_images=1
+        ) == pytest.approx(0.71)
+        assert calculate_video_cost(1, "grok-imagine-video", "480p", input_images=1) == (
+            pytest.approx(0.052)
+        )
+        assert calculate_video_cost(5, "unknown-video-model", "720p", input_images=1) == (
+            pytest.approx(5 * 0.25 + 0.01)
+        )
 
 
 class TestConversation:

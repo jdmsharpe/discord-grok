@@ -100,6 +100,22 @@ VIDEO_PRICING: dict[str, dict[str, float]] = {
     if isinstance(cfg, dict)
 }
 
+
+def _input_image_rates(rows: dict[str, Any]) -> dict[str, float]:
+    """Normalize the per-input-image surcharge rows into a model -> rate map."""
+    return {
+        model_id: float(cfg["per_input_image"])
+        for model_id, cfg in rows.items()
+        if isinstance(cfg, dict) and cfg.get("per_input_image") is not None
+    }
+
+
+# Flat per-input-image surcharge for image edits / remixes and image-to-video
+# requests (docs.x.ai's `pricePerInputImage`). Only the YAML fallback bills it —
+# the SDK's server-reported `cost_usd` already includes it.
+IMAGE_INPUT_PRICING: dict[str, float] = _input_image_rates(_IMAGE)
+VIDEO_INPUT_IMAGE_PRICING: dict[str, float] = _input_image_rates(_VIDEO)
+
 _LEGACY_VIDEO_RATE = _VIDEO.get("per_second")
 UNKNOWN_VIDEO_MODEL_PRICING: float = float(
     (_FALLBACKS.get("unknown_video_model") or {}).get(
@@ -118,15 +134,28 @@ UNKNOWN_IMAGE_MODEL_PRICING: float = float(
     (_FALLBACKS.get("unknown_image_model") or {}).get("per_image", 0.07)
 )
 
+# Per-input-image rates for models without a declared surcharge: the highest
+# published rate, so an unknown model is not under-billed.
+UNKNOWN_IMAGE_INPUT_PRICING: float = float(
+    (_FALLBACKS.get("unknown_image_model") or {}).get("per_input_image", 0.01)
+)
+UNKNOWN_VIDEO_INPUT_IMAGE_PRICING: float = float(
+    (_FALLBACKS.get("unknown_video_model") or {}).get("per_input_image", 0.01)
+)
+
 
 __all__ = [
     "FLAT_RATE_RESOLUTION",
+    "IMAGE_INPUT_PRICING",
     "IMAGE_PRICING",
     "LONG_CONTEXT_PRICING_CLASSES",
     "MODEL_PRICING_CLASSES",
     "TOOL_INVOCATION_PRICING",
     "TTS_PRICING_PER_MILLION_CHARS",
+    "UNKNOWN_IMAGE_INPUT_PRICING",
     "UNKNOWN_IMAGE_MODEL_PRICING",
+    "UNKNOWN_VIDEO_INPUT_IMAGE_PRICING",
     "UNKNOWN_VIDEO_MODEL_PRICING",
+    "VIDEO_INPUT_IMAGE_PRICING",
     "VIDEO_PRICING",
 ]

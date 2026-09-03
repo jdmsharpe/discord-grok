@@ -85,12 +85,16 @@ async def run_image_command(
         else:
             results = await client.image.sample_batch(n=count, **sample_kwargs)
 
-        # Prefer SDK-reported cost (xai-sdk 1.12+) per result; fall back to YAML
-        # pricing per missing result so mixed Some/None batches still total sensibly.
+        # Prefer SDK-reported cost (xai-sdk 1.12+) per result — it is the full price
+        # xAI charged, input-image surcharge included; fall back to YAML pricing per
+        # missing result (plus the edit's input-image surcharge) so mixed Some/None
+        # batches still total sensibly.
         image_cost = sum(
             r.cost_usd
             if r.cost_usd is not None
-            else calculate_image_cost(model, resolution, quality)
+            else calculate_image_cost(
+                model, resolution, quality, input_images=1 if is_editing else 0
+            )
             for r in results
         )
         daily_cost = cog._track_daily_cost(ctx.author.id, image_cost)

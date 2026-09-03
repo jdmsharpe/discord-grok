@@ -74,12 +74,15 @@ async def run_video_command(
                 raise Exception(f"Failed to download video: HTTP {response.status}")
             video_bytes = await response.read()
 
-        # Prefer SDK-reported cost (xai-sdk 1.12+); fall back to YAML pricing
-        # when the API does not report cost on this response.
+        # Prefer SDK-reported cost (xai-sdk 1.12+) — the full price xAI charged,
+        # reference-image surcharge included; fall back to YAML pricing (plus that
+        # surcharge on image-to-video) when the API does not report cost.
         video_cost = (
             result.cost_usd
             if result.cost_usd is not None
-            else calculate_video_cost(duration, model, resolution)
+            else calculate_video_cost(
+                duration, model, resolution, input_images=1 if is_image_to_video else 0
+            )
         )
         daily_cost = cog._track_daily_cost(ctx.author.id, video_cost)
 

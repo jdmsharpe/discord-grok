@@ -6,11 +6,15 @@ from urllib.parse import urlparse
 from ...config.auth import XAI_COLLECTION_IDS
 from ...config.pricing import (
     FLAT_RATE_RESOLUTION,
+    IMAGE_INPUT_PRICING,
     IMAGE_PRICING,
     TOOL_INVOCATION_PRICING,
     TTS_PRICING_PER_MILLION_CHARS,
+    UNKNOWN_IMAGE_INPUT_PRICING,
     UNKNOWN_IMAGE_MODEL_PRICING,
+    UNKNOWN_VIDEO_INPUT_IMAGE_PRICING,
     UNKNOWN_VIDEO_MODEL_PRICING,
+    VIDEO_INPUT_IMAGE_PRICING,
     VIDEO_PRICING,
 )
 from .command_options import (
@@ -105,37 +109,63 @@ def _resolution_rate(rates: dict[str, float], resolution: str, fallback: float) 
     return fallback if rate is None else rate
 
 
+def _input_image_surcharge(
+    rates: dict[str, float], model: str, count: int, fallback: float
+) -> float:
+    """Flat per-input-image charge xAI adds to the output price."""
+    if count <= 0:
+        return 0.0
+    return count * rates.get(model, fallback)
+
+
 def calculate_image_cost(
-    model: str, resolution: str | None = None, quality: str | None = None
+    model: str,
+    resolution: str | None = None,
+    quality: str | None = None,
+    *,
+    input_images: int = 0,
 ) -> float:
     """Calculate the cost in dollars for an image generation.
 
     Models priced on both resolution and quality (grok-imagine-image-2.0) are keyed
     ``"<resolution>/<quality>"``; `_resolution_rate` falls back to the bare
-    resolution for every single-axis model.
+    resolution for every single-axis model. ``input_images`` is the number of
+    reference images on an edit / remix; each adds the model's flat
+    ``per_input_image`` surcharge (unknown models use the highest published rate).
     """
     rates = IMAGE_PRICING.get(model, {})
     resolution = (resolution or DEFAULT_IMAGE_RESOLUTION).lower()
+    surcharge = _input_image_surcharge(
+        IMAGE_INPUT_PRICING, model, input_images, UNKNOWN_IMAGE_INPUT_PRICING
+    )
     if quality is not None and (composite := f"{resolution}/{quality.lower()}") in rates:
-        return rates[composite]
+        return rates[composite] + surcharge
     tiers = [rate for key, rate in rates.items() if key.startswith(f"{resolution}/")]
     if tiers:
         # Two-axis model with no quality to key on — bill the dearest tier for this
         # resolution rather than under-reporting.
-        return max(tiers)
-    return _resolution_rate(rates, resolution, UNKNOWN_IMAGE_MODEL_PRICING)
+        return max(tiers) + surcharge
+    return _resolution_rate(rates, resolution, UNKNOWN_IMAGE_MODEL_PRICING) + surcharge
 
 
 def calculate_video_cost(
     duration: int,
     model: str = "grok-imagine-video-1.5-preview",
     resolution: str | None = None,
+    *,
+    input_images: int = 0,
 ) -> float:
-    """Calculate the cost in dollars for a video generation."""
+    """Calculate the cost in dollars for a video generation.
+
+    ``input_images`` is the number of reference images on an image-to-video request;
+    each adds the model's flat ``per_input_image`` surcharge.
+    """
     return duration * _resolution_rate(
         VIDEO_PRICING.get(model, {}),
         resolution or DEFAULT_VIDEO_RESOLUTION,
         UNKNOWN_VIDEO_MODEL_PRICING,
+    ) + _input_image_surcharge(
+        VIDEO_INPUT_IMAGE_PRICING, model, input_images, UNKNOWN_VIDEO_INPUT_IMAGE_PRICING
     )
 
 

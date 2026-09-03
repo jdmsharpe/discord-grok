@@ -540,6 +540,37 @@ class TestImageBatchGeneration:
 
             assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
 
+    async def test_image_edit_yaml_fallback_adds_input_image_surcharge(
+        self, cog, mock_discord_context, mock_attachment
+    ):
+        """With no SDK-reported cost, an edit bills the output rate plus the per-input-image fee."""
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+        from discord_grok.cogs.grok.tooling import calculate_image_cost
+
+        cog.client.image.sample.return_value.cost_usd = None
+
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.image.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="Edit this",
+                model="grok-imagine-image-quality",
+                count=1,
+                attachment=mock_attachment,
+            )
+
+        expected = calculate_image_cost("grok-imagine-image-quality", input_images=1)
+        assert expected == pytest.approx(0.06)
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
+
     async def test_image_batch_rejects_editing_mode(
         self, cog, mock_discord_context, mock_attachment
     ):
@@ -665,6 +696,38 @@ class TestVideoCommand:
 
         call_kwargs = mock_discord_context.send_followup.call_args[1]
         assert call_kwargs["embed"].title == "Error"
+
+    async def test_video_image_to_video_yaml_fallback_adds_input_image_surcharge(
+        self, cog, mock_discord_context, mock_attachment
+    ):
+        """With no SDK-reported cost, image-to-video bills per second plus the reference-image fee."""
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+        from discord_grok.cogs.grok.tooling import calculate_video_cost
+
+        cog.client.video.generate.return_value.cost_usd = None
+
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.video.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="Animate this",
+                attachment=mock_attachment,
+            )
+
+        duration = cog.client.video.generate.await_args.kwargs["duration"]
+        expected = calculate_video_cost(
+            duration, "grok-imagine-video-1.5-preview", "720p", input_images=1
+        )
+        assert expected == pytest.approx(duration * 0.14 + 0.01)
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
 
     async def test_video_cost_prefers_sdk_reported_cost_usd(self, cog, mock_discord_context):
         """When the SDK response carries cost_usd, that value should be used over YAML pricing."""

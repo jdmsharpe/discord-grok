@@ -42,6 +42,24 @@ class TestPricingLoader:
         # grok-imagine-image is flat across resolutions but keeps the same shape.
         assert pricing.IMAGE_PRICING["grok-imagine-image"] == {"1k": 0.02, "2k": 0.02}
 
+    def test_bundled_yaml_loads_input_image_surcharges(self):
+        """docs.x.ai's `pricePerInputImage` (model table, 1e-10 USD ticks): $0.01 on
+        Image 2.0 / Quality (and its Pro alias) and Video 1.5, $0.002 on the 1.0 ids."""
+        pricing = _reload_pricing()
+        assert pricing.IMAGE_INPUT_PRICING == {
+            "grok-imagine-image-2.0": 0.01,
+            "grok-imagine-image-quality": 0.01,
+            "grok-imagine-image-pro": 0.01,
+            "grok-imagine-image": 0.002,
+        }
+        assert pricing.VIDEO_INPUT_IMAGE_PRICING == {
+            "grok-imagine-video": 0.002,
+            "grok-imagine-video-1.5-preview": 0.01,
+        }
+        # Models without a declared surcharge use the highest published rate.
+        assert pricing.UNKNOWN_IMAGE_INPUT_PRICING == 0.01
+        assert pricing.UNKNOWN_VIDEO_INPUT_IMAGE_PRICING == 0.01
+
     def test_bundled_yaml_loads_video_pricing(self):
         """Imagine video output is priced per resolution, per second."""
         pricing = _reload_pricing()

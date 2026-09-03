@@ -61,6 +61,11 @@ pricing_classes:
 # A scalar (per_image: 0.05) is still accepted and bills flat at any resolution.
 # grok-imagine-image-pro is an alias of grok-imagine-image-quality (canonical);
 # the row is kept for cost continuity of past requests, at the corrected price.
+# `per_input_image` is the flat surcharge xAI adds for every input image on an
+# edit / remix (`pricePerInputImage` in the model table docs.x.ai embeds, in
+# 1e-10 USD ticks — 100000000 = $0.01). The SDK's `cost_usd` already includes
+# it (usage.proto: "Full price paid by the user for this request ... also used
+# for image gen, video gen"), so it only matters for the YAML fallback path.
 image_generation:
   # grok-imagine-image-2.0 prices on TWO axes — resolution and quality — unlike every
   # other Imagine row. The axes are folded into one "<resolution>/<quality>" key so the
@@ -68,17 +73,20 @@ image_generation:
   # resolution, then to the flat rate, so single-axis rows are unaffected.
   grok-imagine-image-2.0:
     per_image: { "1k/low": 0.04, "2k/low": 0.06, "1k/medium": 0.06, "2k/medium": 0.08 }
-  grok-imagine-image-quality: { per_image: { 1k: 0.05, 2k: 0.07 } }
-  grok-imagine-image-pro:     { per_image: { 1k: 0.05, 2k: 0.07 } }
-  grok-imagine-image:         { per_image: { 1k: 0.02, 2k: 0.02 } }
+    per_input_image: 0.01
+  grok-imagine-image-quality: { per_image: { 1k: 0.05, 2k: 0.07 }, per_input_image: 0.01 }
+  grok-imagine-image-pro:     { per_image: { 1k: 0.05, 2k: 0.07 }, per_input_image: 0.01 }
+  grok-imagine-image:         { per_image: { 1k: 0.02, 2k: 0.02 }, per_input_image: 0.002 }
 
 # Per-second pricing for Grok Imagine video models, keyed by resolution the same way.
 # 1080p is published by docs.x.ai for the 1.5 model only, and /grok-media video
 # offers it alongside 720p/480p; `_validate_video_resolution` rejects it on other
 # models. grok-imagine-video has no published 1080p rate.
+# `per_input_image` is the surcharge for the reference image on an image-to-video
+# request (same `pricePerInputImage` source as above); the SDK's `cost_usd` includes it.
 video_generation:
-  grok-imagine-video:             { per_second: { 480p: 0.05, 720p: 0.07 } }
-  grok-imagine-video-1.5-preview: { per_second: { 480p: 0.08, 720p: 0.14, 1080p: 0.25 } }
+  grok-imagine-video:             { per_second: { 480p: 0.05, 720p: 0.07 }, per_input_image: 0.002 }
+  grok-imagine-video-1.5-preview: { per_second: { 480p: 0.08, 720p: 0.14, 1080p: 0.25 }, per_input_image: 0.01 }
 
 # Text-to-speech is charged per million characters.
 text_to_speech:
@@ -99,5 +107,5 @@ fallbacks:
   # catalog does not price, so they carry the most expensive published tier
   # rather than the cheapest. Under-reporting a real charge is worse than
   # over-reporting an estimate the SDK's cost_usd normally supersedes.
-  unknown_image_model: { per_image: 0.07 }
-  unknown_video_model: { per_second: 0.25 }
+  unknown_image_model: { per_image: 0.07, per_input_image: 0.01 }
+  unknown_video_model: { per_second: 0.25, per_input_image: 0.01 }
