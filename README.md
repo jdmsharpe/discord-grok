@@ -26,7 +26,7 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 - **Resilient Error Handling:** Retries transient xAI HTTP failures, preserves async cancellation, and returns safer user-facing Discord error messages for handled chat and conversation-control failures.
 - **Citations & Cost Tracking:** Source citations shown in a dedicated "Sources" embed. Per-request cost and token usage tracking includes reasoning, cached token discounts, tool invocation costs, TTS character-based costs, and resolution-priced image/video generation.
 - **Media Generation:**
-  - **Images:** Generate or remix images using Grok Imagine Image 2.0 (default), Grok Imagine Image Quality (canonical id for the former Pro tier), or Grok Imagine Image. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions; Image 2.0 additionally prices by `quality` (Low/Medium).
+  - **Images:** Generate or remix images using Grok Imagine Image 2.0 (default), Grok Imagine Image Quality (canonical id for the former Pro tier; xAI retires the slug on 2026-11-02, after which it is served by Image 2.0 at `low` quality), or Grok Imagine Image. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions; Image 2.0 additionally prices by `quality` (Low/Medium).
   - **Video:** Generate videos from text or image-to-video using Grok Imagine Video 1.5 (Preview, default) or Grok Imagine Video, with adjustable duration (1–15s), aspect ratios, and resolution (1080p/720p/480p — 1080p on Video 1.5 only).
   - **Text-to-Speech:** 5 expressive voices, 20+ languages (with auto-detection), multiple output codecs (MP3, WAV, PCM, etc.), configurable sample/bit rates, and support for xAI speech tags.
 
