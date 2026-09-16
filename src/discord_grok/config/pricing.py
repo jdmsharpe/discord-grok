@@ -131,7 +131,7 @@ TOOL_INVOCATION_PRICING: dict[str, float] = {
 }
 
 UNKNOWN_IMAGE_MODEL_PRICING: float = float(
-    (_FALLBACKS.get("unknown_image_model") or {}).get("per_image", 0.07)
+    (_FALLBACKS.get("unknown_image_model") or {}).get("per_image", 0.08)
 )
 
 # Per-input-image rates for models without a declared surcharge: the highest

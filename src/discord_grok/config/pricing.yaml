@@ -6,7 +6,7 @@
 #   https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
 #   It still carried grok-4.5's retired $0.50/M cached rate on 2026-07-24 and would
 #   have masked that drift, so verify against docs.x.ai first and treat it as a hint.
-# Last-verified: 2026-08-28
+# Last-verified: 2026-09-15
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;
@@ -95,6 +95,9 @@ text_to_speech:
 # Server-side tool invocation pricing (dollars per 1,000 invocations).
 tools:
   SERVER_SIDE_TOOL_WEB_SEARCH:         { per_1k_invocations: 5.00 }
+  # From 2026-09-21 12:00 PT X Search bills $5 per 1k posts and $10 per 1k user
+  # profiles fetched instead of per call, so this row becomes an estimate; the
+  # chat path prefers the cost xAI reports in usage.cost_in_usd_ticks.
   SERVER_SIDE_TOOL_X_SEARCH:           { per_1k_invocations: 5.00 }
   SERVER_SIDE_TOOL_CODE_EXECUTION:     { per_1k_invocations: 5.00 }
   SERVER_SIDE_TOOL_CODE_INTERPRETER:   { per_1k_invocations: 5.00 }
@@ -107,5 +110,5 @@ fallbacks:
   # catalog does not price, so they carry the most expensive published tier
   # rather than the cheapest. Under-reporting a real charge is worse than
   # over-reporting an estimate the SDK's cost_usd normally supersedes.
-  unknown_image_model: { per_image: 0.07, per_input_image: 0.01 }
+  unknown_image_model: { per_image: 0.08, per_input_image: 0.01 }  # Image 2.0 at 2k/medium
   unknown_video_model: { per_second: 0.25, per_input_image: 0.01 }

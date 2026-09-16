@@ -63,7 +63,12 @@ from .embeds import (
 )
 from .image import run_image_command
 from .models import ChatCompletionParameters, CitationInfo, Conversation, ToolInfo
-from .responses import extract_response_text, extract_tool_info, extract_usage
+from .responses import (
+    extract_response_text,
+    extract_tool_info,
+    extract_tool_usage,
+    extract_usage,
+)
 from .speech import run_tts_command
 from .state import (
     end_conversation as end_conversation_state,
@@ -100,6 +105,7 @@ __all__ = [
     "append_sources_embed",
     "extract_response_text",
     "extract_tool_info",
+    "extract_tool_usage",
     "extract_usage",
 ]
 
@@ -277,8 +283,12 @@ class GrokCog(commands.Cog):
         return extract_tool_info(response_json)
 
     @staticmethod
-    def _extract_usage(response_json: dict[str, Any]) -> dict[str, int]:
+    def _extract_usage(response_json: dict[str, Any]) -> dict[str, Any]:
         return extract_usage(response_json)
+
+    @staticmethod
+    def _extract_tool_usage(response_json: dict[str, Any]) -> dict[str, int]:
+        return extract_tool_usage(response_json)
 
     async def _fetch_attachment_bytes(self, attachment: Attachment) -> bytes | None:
         return await fetch_attachment_bytes(self, attachment)

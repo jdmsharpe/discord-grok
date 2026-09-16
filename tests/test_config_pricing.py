@@ -109,7 +109,7 @@ class TestPricingLoader:
 
     def test_unknown_image_fallback(self):
         pricing = _reload_pricing()
-        assert pricing.UNKNOWN_IMAGE_MODEL_PRICING == 0.07
+        assert pricing.UNKNOWN_IMAGE_MODEL_PRICING == 0.08
 
     def test_build_model_pricing_map_still_works(self):
         """End-to-end: command_options builds per-model pricing from catalog + classes."""

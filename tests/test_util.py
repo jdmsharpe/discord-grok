@@ -473,13 +473,13 @@ class TestPricing:
         assert calculate_image_cost("grok-imagine-image", "1k", "low") == 0.02
 
     def test_calculate_image_cost_unknown_model(self):
-        assert calculate_image_cost("unknown") == 0.07
-        assert calculate_image_cost("unknown", "2k") == 0.07
-        assert calculate_image_cost("unknown", "2k", "medium") == 0.07
+        assert calculate_image_cost("unknown") == 0.08
+        assert calculate_image_cost("unknown", "2k") == 0.08
+        assert calculate_image_cost("unknown", "2k", "medium") == 0.08
 
     def test_calculate_image_cost_unpriced_resolution_uses_fallback(self):
         """A resolution the catalog does not price falls back rather than free-riding."""
-        assert calculate_image_cost("grok-imagine-image", "4k") == 0.07
+        assert calculate_image_cost("grok-imagine-image", "4k") == 0.08
 
     def test_calculate_image_cost_adds_input_image_surcharge_on_edits(self):
         """An edit / remix bills the output price plus xAI's flat per-input-image fee.
@@ -498,7 +498,7 @@ class TestPricing:
         )
         assert calculate_image_cost("grok-imagine-image", "2k", input_images=0) == 0.02
         # Unknown model: unknown output rate plus the unknown-model input-image rate.
-        assert calculate_image_cost("unknown", "1k", input_images=1) == pytest.approx(0.08)
+        assert calculate_image_cost("unknown", "1k", input_images=1) == pytest.approx(0.09)
 
     def test_calculate_cost_with_cached_tokens(self):
         """Cached tokens should be billed at the discounted rate."""
