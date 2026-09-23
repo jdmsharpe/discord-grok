@@ -12,48 +12,56 @@ class TestAppendPricingEmbed:
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50)
         assert len(embeds) == 1
-        desc = embeds[0].description
-        assert "1,000 tokens in" in desc
-        assert "500 tokens out" in desc
-        assert "daily $1.50" in desc
+        assert embeds[0].description == "$0.0500 · 1k in / 500 out · $1.50 today"
         assert embeds[0].colour == Colour(0)
 
-    def test_append_pricing_embed_with_reasoning_tokens(self):
+    def test_append_pricing_embed_shows_reasoning_as_part_of_output(self):
+        """xAI's output_tokens includes reasoning_tokens; the line shows it unchanged."""
         from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=200)
+        append_pricing_embed(embeds, 0.05, 1000, 700, 1.50, reasoning_tokens=200)
         assert len(embeds) == 1
-        assert "200 reasoning" in embeds[0].description
+        assert embeds[0].description == "$0.0500 · 1k in / 700 out (200 thinking) · $1.50 today"
 
     def test_append_pricing_embed_hides_zero_reasoning_tokens(self):
         from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, reasoning_tokens=0)
-        assert "reasoning" not in embeds[0].description
+        assert embeds[0].description == "$0.0500 · 1k in / 500 out · $1.50 today"
 
     def test_append_pricing_embed_with_cached_tokens(self):
         from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=300)
-        assert "300 cached" in embeds[0].description
+        assert embeds[0].description == "$0.0500 · 1k in (300 cached) / 500 out · $1.50 today"
 
-    def test_append_pricing_embed_with_image_tokens(self):
+    def test_append_pricing_embed_hides_zero_cached_tokens(self):
         from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, image_tokens=200)
-        assert "200 image" in embeds[0].description
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=0)
+        assert embeds[0].description == "$0.0500 · 1k in / 500 out · $1.50 today"
 
-    def test_append_pricing_embed_hides_zero_cached_and_image_tokens(self):
+    def test_append_pricing_embed_full_line(self):
         from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
-        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, cached_tokens=0, image_tokens=0)
-        assert "cached" not in embeds[0].description
-        assert "image" not in embeds[0].description
+        append_pricing_embed(
+            embeds,
+            0.0014,
+            1252,
+            107,
+            0.004,
+            reasoning_tokens=102,
+            cached_tokens=1152,
+            tool_usage={"SERVER_SIDE_TOOL_WEB_SEARCH": 1},
+        )
+        assert embeds[0].description == (
+            "$0.0014 · 1.3k in (1.2k cached) / 107 out (102 thinking) · 1 search · <$0.01 today"
+        )
 
     def test_append_pricing_embed_with_tool_usage(self):
         from discord_grok.cogs.grok.embeds import append_pricing_embed
@@ -61,28 +69,48 @@ class TestAppendPricingEmbed:
         embeds: list[Embed] = []
         tool_usage = {"SERVER_SIDE_TOOL_WEB_SEARCH": 3, "SERVER_SIDE_TOOL_X_SEARCH": 2}
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage=tool_usage)
-        desc = embeds[0].description
-        assert desc is not None
-        assert "Web Search ×3" in desc
-        assert "X Search ×2" in desc
-        assert "\n" in desc
-        assert "tool cost" in desc
+        assert embeds[0].description == (
+            "$0.0500 · 1k in / 500 out · 3 searches · 2 X searches · $1.50 today"
+        )
 
-    def test_append_pricing_embed_no_tool_usage_line(self):
+    def test_append_pricing_embed_orders_and_merges_tool_counts(self):
+        """Tools appear in the fleet order, keys that share a label are summed, and an
+        unlisted key is shown as "<name> call"."""
+        from discord_grok.cogs.grok.embeds import append_pricing_embed
+
+        embeds: list[Embed] = []
+        tool_usage = {
+            "SERVER_SIDE_TOOL_NEW_TOOL": 2,
+            "SERVER_SIDE_TOOL_VIEW_X_VIDEO": 1,
+            "SERVER_SIDE_TOOL_MCP": 1,
+            "SERVER_SIDE_TOOL_FILE_SEARCH": 2,
+            "SERVER_SIDE_TOOL_CODE_INTERPRETER": 1,
+            "SERVER_SIDE_TOOL_CODE_EXECUTION": 1,
+            "SERVER_SIDE_TOOL_X_SEARCH": 1,
+            "SERVER_SIDE_TOOL_WEB_SEARCH": 1,
+            "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH": 0,
+        }
+        append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage=tool_usage)
+        assert embeds[0].description == (
+            "$0.0500 · 1k in / 500 out · 1 search · 1 X search · 2 code runs"
+            " · 2 file searches · 1 MCP call · 1 X video call · 2 new tool calls · $1.50 today"
+        )
+
+    def test_append_pricing_embed_no_tool_usage(self):
         from discord_grok.cogs.grok.embeds import append_pricing_embed
 
         embeds: list[Embed] = []
         append_pricing_embed(embeds, 0.05, 1000, 500, 1.50, tool_usage={})
-        assert "\n" not in embeds[0].description
+        assert embeds[0].description == "$0.0500 · 1k in / 500 out · $1.50 today"
 
     def test_append_generation_pricing_embed(self):
         from discord_grok.cogs.grok.embeds import append_generation_pricing_embed
 
         embeds: list[Embed] = []
-        append_generation_pricing_embed(embeds, 0.07, 2.50)
+        append_generation_pricing_embed(embeds, 0.07, 2.50, details=["1 image"])
         assert len(embeds) == 1
-        assert "$0.0700" in embeds[0].description
-        assert "daily $2.50" in embeds[0].description
+        assert embeds[0].description == "$0.0700 · 1 image · $2.50 today"
+        assert embeds[0].colour == Colour(0)
 
 
 class TestAppendReasoningEmbeds:

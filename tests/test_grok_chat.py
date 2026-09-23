@@ -1,10 +1,13 @@
 import asyncio
+import copy
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import aiohttp
 import pytest
 
+from tests.fixtures import MOCK_RESPONSES_API_RESPONSE
 from tests.support import make_cog
 
 
@@ -112,6 +115,68 @@ class TestGrokChat:
             for call in mock_discord_context.send_followup.await_args_list
         )
         assert mock_discord_context.send_followup.await_args_list[-1].kwargs["view"] is not None
+
+    @staticmethod
+    def _usage_response(**usage_extra):
+        response = copy.deepcopy(MOCK_RESPONSES_API_RESPONSE)
+        response["usage"] = {
+            "input_tokens": 1252,
+            "output_tokens": 107,
+            "input_tokens_details": {"cached_tokens": 1152},
+            "output_tokens_details": {"reasoning_tokens": 102},
+            "server_side_tool_usage_details": {"web_search_calls": 1},
+            **usage_extra,
+        }
+        response.pop("server_side_tool_usage")
+        return response
+
+    async def _run_chat_with_cost_line(self, cog, ctx):
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        cog.show_cost_embeds = True
+        ctx.channel.typing = MagicMock()
+        ctx.channel.typing.return_value.__aenter__ = AsyncMock()
+        ctx.channel.typing.return_value.__aexit__ = AsyncMock()
+        await cog.chat.callback(cog, ctx=ctx, prompt="Hi", model="grok-4.3")
+        daily_total = _extract_daily_total(
+            cog.daily_costs[(ctx.author.id, date.today().isoformat())]
+        )
+        return ctx.send_followup.await_args.kwargs["embeds"][-1].description, daily_total
+
+    async def test_chat_cost_line_shows_the_reported_cost_added_to_the_daily_total(
+        self, mock_bot, mock_discord_context
+    ):
+        """The line shows xAI's reported cost (tool charges included), the same amount
+        the daily total adds."""
+        cog = make_cog(mock_bot, self._usage_response(cost_in_usd_ticks=14_000_000))
+
+        line, daily_total = await self._run_chat_with_cost_line(cog, mock_discord_context)
+
+        assert line == (
+            "$0.0014 · 1.3k in (1.2k cached) / 107 out (102 thinking) · 1 search · <$0.01 today"
+        )
+        assert daily_total == pytest.approx(0.0014)
+
+    async def test_chat_cost_line_catalog_cost_includes_tool_cost(
+        self, mock_bot, mock_discord_context
+    ):
+        """Without a reported cost, the line and the daily total both use the catalog
+        token cost plus the tool cost."""
+        from discord_grok.cogs.grok.tooling import calculate_cost, calculate_tool_cost
+        from discord_grok.cost_line import format_daily_total, format_request_cost
+
+        cog = make_cog(mock_bot, self._usage_response())
+
+        line, daily_total = await self._run_chat_with_cost_line(cog, mock_discord_context)
+
+        tool_cost = calculate_tool_cost({"SERVER_SIDE_TOOL_WEB_SEARCH": 1})
+        expected = calculate_cost("grok-4.3", 1252, 107, 1152) + tool_cost
+        assert tool_cost > 0
+        assert line == (
+            f"{format_request_cost(expected)} · 1.3k in (1.2k cached) / 107 out (102 thinking)"
+            f" · 1 search · {format_daily_total(expected)} today"
+        )
+        assert daily_total == pytest.approx(expected)
 
     async def test_chat_with_four_tools(self, cog, mock_discord_context):
         """Chat should pass the selected four tools in the payload."""

@@ -217,7 +217,6 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
             params.model,
             input_tokens,
             output_tokens,
-            reasoning_tokens,
             cached_tokens,
         ) + calculate_tool_cost(tool_usage or {})
         # Prefer the price xAI reports for the request (usage.cost_in_usd_ticks,
@@ -233,10 +232,9 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
                 input_tokens,
                 output_tokens,
                 daily_cost,
-                reasoning_tokens,
-                cached_tokens,
-                image_tokens,
-                tool_usage,
+                reasoning_tokens=reasoning_tokens,
+                cached_tokens=cached_tokens,
+                tool_usage=tool_usage,
             )
 
         cog._log_chat_cost(
@@ -656,7 +654,6 @@ async def run_chat_command(
             model,
             input_tokens,
             output_tokens,
-            reasoning_tokens,
             cached_tokens,
         ) + calculate_tool_cost(tool_usage or {})
         # Prefer the price xAI reports for the request (usage.cost_in_usd_ticks,
@@ -672,10 +669,9 @@ async def run_chat_command(
                 input_tokens,
                 output_tokens,
                 daily_cost,
-                reasoning_tokens,
-                cached_tokens,
-                image_tokens,
-                tool_usage,
+                reasoning_tokens=reasoning_tokens,
+                cached_tokens=cached_tokens,
+                tool_usage=tool_usage,
             )
 
         cog._log_chat_cost(

@@ -7,6 +7,7 @@ from discord import ApplicationContext, Attachment, Colour, Embed, File
 from xai_sdk.video import VideoAspectRatio, VideoResolution
 
 from ...config.pricing import VIDEO_PRICING
+from ...cost_line import count_label
 from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import GROK_VIDEO_MODELS, calculate_video_cost, format_xai_error, truncate_text
@@ -110,7 +111,12 @@ async def run_video_command(
             )
         ]
         if cog.show_cost_embeds:
-            append_generation_pricing_embed(embeds, video_cost, daily_cost)
+            append_generation_pricing_embed(
+                embeds,
+                video_cost,
+                daily_cost,
+                details=[count_label(1, "video"), f"{duration}s", resolution],
+            )
         await send_embed_batches(
             ctx.send_followup,
             embeds=embeds,

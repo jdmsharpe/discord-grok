@@ -7,6 +7,7 @@ from typing import Any, cast
 from discord import ApplicationContext, Attachment, Colour, Embed, File
 from xai_sdk.image import ImageAspectRatio, ImageQuality, ImageResolution
 
+from ...cost_line import count_label
 from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
 from .tooling import calculate_image_cost, format_xai_error, truncate_text
@@ -144,7 +145,9 @@ async def run_image_command(
         embed.set_image(url=f"attachment://{files[0].filename}")
         embeds = [embed]
         if cog.show_cost_embeds:
-            append_generation_pricing_embed(embeds, image_cost, daily_cost)
+            append_generation_pricing_embed(
+                embeds, image_cost, daily_cost, details=[count_label(len(results), "image")]
+            )
         await send_embed_batches(ctx.send_followup, embeds=embeds, files=files, logger=cog.logger)
         cog.logger.info("Successfully generated and sent %d image(s)", len(results))
 

@@ -431,11 +431,12 @@ class TestPricing:
         cost = calculate_cost("unknown-model", 1_000_000, 1_000_000)
         assert cost == 2.00 + 6.00
 
-    def test_calculate_cost_with_reasoning_tokens(self):
-        """Reasoning tokens should be billed at the output rate."""
+    def test_calculate_cost_bills_output_once_including_reasoning(self):
+        """xAI's output_tokens includes reasoning tokens, so it is billed once at the
+        output rate with no separate reasoning term."""
         # grok-4.20 (flagship): $1.25/M in, $2.50/M out
-        cost = calculate_cost("grok-4.20", 100_000, 500_000, reasoning_tokens=500_000)
-        # 100k in * $1.25/M + (500k out + 500k reasoning) * $2.50/M
+        cost = calculate_cost("grok-4.20", 100_000, 1_000_000)
+        # 100k in * $1.25/M + 1M out (reasoning included) * $2.50/M
         assert cost == pytest.approx(0.125 + 2.50)
 
     def test_calculate_cost_zero_tokens(self):
@@ -549,10 +550,10 @@ class TestPricing:
         assert cost == pytest.approx((200_000 / 1_000_000) * 2.50 + 5.00)
 
     def test_calculate_cost_above_long_context_threshold(self):
-        """Above the threshold every flagship rate doubles, and reasoning tokens
-        bill at the long-tier output rate."""
-        # 1M in * $2.50/M + (500k out + 500k reasoning) * $5.00/M
-        cost = calculate_cost("grok-4.20", 1_000_000, 500_000, reasoning_tokens=500_000)
+        """Above the threshold every flagship rate doubles, output (reasoning
+        included) bills at the long-tier output rate."""
+        # 1M in * $2.50/M + 1M out * $5.00/M
+        cost = calculate_cost("grok-4.20", 1_000_000, 1_000_000)
         assert cost == pytest.approx(2.50 + 5.00)
 
     def test_calculate_cost_cached_tokens_long_tier(self):

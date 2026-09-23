@@ -1,12 +1,13 @@
+from collections.abc import Iterable
 from urllib.parse import urlparse
 
 from discord import Colour, Embed
 
+from ...cost_line import count_label, format_cost_line
 from .models import CitationInfo
 from .tooling import (
     CHUNK_TEXT_SIZE,
-    TOOL_USAGE_DISPLAY_NAMES,
-    calculate_tool_cost,
+    TOOL_USAGE_DETAIL_LABELS,
     chunk_text,
     truncate_text,
 )
@@ -115,6 +116,20 @@ def append_sources_embed(embeds: list[Embed], citations: list[CitationInfo]) -> 
     embeds.append(Embed(title="Sources", description=description, color=GROK_BLACK))
 
 
+def _tool_details(tool_usage: dict[str, int]) -> list[str]:
+    """Return the cost-line tool counts, such as ``["2 searches", "1 code run"]``."""
+    counts: dict[tuple[str, str | None], int] = {}
+    for key, labels in TOOL_USAGE_DETAIL_LABELS.items():
+        if tool_usage.get(key, 0) > 0:
+            counts[labels] = counts.get(labels, 0) + tool_usage[key]
+    for key, count in tool_usage.items():
+        if key not in TOOL_USAGE_DETAIL_LABELS and count > 0:
+            name = key.removeprefix("SERVER_SIDE_TOOL_").replace("_", " ").lower()
+            labels = (f"{name} call", None)
+            counts[labels] = counts.get(labels, 0) + count
+    return [count_label(count, singular, plural) for (singular, plural), count in counts.items()]
+
+
 def append_pricing_embed(
     embeds: list[Embed],
     cost: float,
@@ -123,44 +138,36 @@ def append_pricing_embed(
     daily_cost: float,
     reasoning_tokens: int = 0,
     cached_tokens: int = 0,
-    image_tokens: int = 0,
     tool_usage: dict[str, int] | None = None,
 ) -> None:
-    """Append a compact pricing embed showing cost and token usage."""
-    tool_cost = calculate_tool_cost(tool_usage) if tool_usage else 0.0
-    in_qualifiers = []
-    if cached_tokens > 0:
-        in_qualifiers.append(f"{cached_tokens:,} cached")
-    if image_tokens > 0:
-        in_qualifiers.append(f"{image_tokens:,} image")
-    token_info = f"{input_tokens:,} tokens in"
-    if in_qualifiers:
-        token_info += f" ({', '.join(in_qualifiers)})"
-    token_info += f" / {output_tokens:,} tokens out"
-    if reasoning_tokens > 0:
-        token_info += f" ({reasoning_tokens:,} reasoning)"
-    description = f"${cost:.4f} · {token_info} · daily ${daily_cost:.2f}"
-    if tool_usage:
-        tool_parts = []
-        for key, count in tool_usage.items():
-            name = TOOL_USAGE_DISPLAY_NAMES.get(
-                key,
-                key.replace("SERVER_SIDE_TOOL_", "").replace("_", " ").title(),
-            )
-            tool_parts.append(f"{name} ×{count}")
-        if tool_cost > 0:
-            tool_parts.append(f"tool cost ${tool_cost:.4f}")
-        description += "\n" + " · ".join(tool_parts)
-    embeds.append(Embed(description=description, color=GROK_BLACK))
+    """Append the one-line cost embed for a chat response.
+
+    ``cost`` is the whole request cost, tool charges included. The token counts are
+    xAI's usage fields: ``input_tokens`` includes ``cached_tokens`` and
+    ``output_tokens`` includes ``reasoning_tokens``.
+    """
+    line = format_cost_line(
+        cost,
+        daily_cost,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_tokens=cached_tokens,
+        thinking_tokens=reasoning_tokens,
+        details=_tool_details(tool_usage or {}),
+    )
+    embeds.append(Embed(description=line, color=GROK_BLACK))
 
 
 def append_generation_pricing_embed(
     embeds: list[Embed],
     cost: float,
     daily_cost: float,
+    *,
+    details: Iterable[str],
 ) -> None:
-    """Append a compact pricing embed for image/video generation."""
-    embeds.append(Embed(description=f"${cost:.4f} · daily ${daily_cost:.2f}", color=GROK_BLACK))
+    """Append the one-line cost embed for an image, video, or speech command."""
+    line = format_cost_line(cost, daily_cost, details=details)
+    embeds.append(Embed(description=line, color=GROK_BLACK))
 
 
 __all__ = [

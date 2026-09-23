@@ -45,17 +45,17 @@ def calculate_cost(
     model: str,
     input_tokens: int,
     output_tokens: int,
-    reasoning_tokens: int = 0,
     cached_tokens: int = 0,
 ) -> float:
     """Calculate the cost in dollars for a given model and token usage.
 
-    Cached tokens are a subset of input_tokens billed at a discounted rate.
+    Cached tokens are a subset of input_tokens billed at a discounted rate, and
+    reasoning tokens are a subset of output_tokens billed at the output rate.
     ``input_tokens`` is the request's prompt token count: per docs.x.ai,
     "Models with long context pricing bill the long context rates for all
     tokens in a request once its prompt reaches the model's long context
     threshold", so once it reaches a tiered model's threshold, ALL tokens —
-    input, cached, output, and reasoning — bill at the long-context rates,
+    input, cached and output — bill at the long-context rates,
     not just the overflow.
     """
     input_price, cached_price, output_price = MODEL_PRICING.get(model, DEFAULT_MODEL_PRICING)
@@ -70,7 +70,7 @@ def calculate_cost(
     return (
         (non_cached / 1_000_000) * input_price
         + (cached_tokens / 1_000_000) * cached_price
-        + ((output_tokens + reasoning_tokens) / 1_000_000) * output_price
+        + (output_tokens / 1_000_000) * output_price
     )
 
 
@@ -313,18 +313,23 @@ TOOL_BUILDERS: dict[str, Callable[..., dict[str, Any]]] = {
 }
 
 
-# Display names for server_side_tool_usage keys.
-TOOL_USAGE_DISPLAY_NAMES: dict[str, str] = {
-    "SERVER_SIDE_TOOL_WEB_SEARCH": "Web Search",
-    "SERVER_SIDE_TOOL_X_SEARCH": "X Search",
-    "SERVER_SIDE_TOOL_CODE_EXECUTION": "Code Execution",
-    "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": "Collections Search",
-    "SERVER_SIDE_TOOL_CODE_INTERPRETER": "Code Execution",
-    "SERVER_SIDE_TOOL_FILE_SEARCH": "Collections Search",
-    "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH": "Attachment Search",
-    "SERVER_SIDE_TOOL_VIEW_X_VIDEO": "X Video",
-    "SERVER_SIDE_TOOL_VIEW_IMAGE": "Image View",
-    "SERVER_SIDE_TOOL_MCP": "MCP",
+# Cost-line labels (singular, plural) for server_side_tool_usage keys, in the order
+# the counts appear on the line. Keys that share a label are counted together; a key
+# missing here is shown as "<tool name> call".
+TOOL_USAGE_DETAIL_LABELS: dict[str, tuple[str, str | None]] = {
+    "SERVER_SIDE_TOOL_WEB_SEARCH": ("search", "searches"),
+    "SERVER_SIDE_TOOL_X_SEARCH": ("X search", "X searches"),
+    "SERVER_SIDE_TOOL_CODE_EXECUTION": ("code run", None),
+    "SERVER_SIDE_TOOL_CODE_INTERPRETER": ("code run", None),
+    "SERVER_SIDE_TOOL_COLLECTIONS_SEARCH": ("file search", "file searches"),
+    "SERVER_SIDE_TOOL_FILE_SEARCH": ("file search", "file searches"),
+    "SERVER_SIDE_TOOL_MCP": ("MCP call", None),
+    "SERVER_SIDE_TOOL_ATTACHMENT_SEARCH": ("attachment search call", None),
+    "SERVER_SIDE_TOOL_DOCUMENT_SEARCH": ("document search call", None),
+    "SERVER_SIDE_TOOL_VIEW_X_VIDEO": ("X video call", None),
+    "SERVER_SIDE_TOOL_VIEW_IMAGE": ("image view call", None),
+    "SERVER_SIDE_TOOL_IMAGE_SEARCH": ("image search call", None),
+    "SERVER_SIDE_TOOL_IMAGE_GENERATION": ("image generation call", None),
 }
 
 
@@ -581,7 +586,7 @@ __all__ = [
     "TOOL_COLLECTIONS_SEARCH",
     "TOOL_REGISTRY",
     "TOOL_REMOTE_MCP",
-    "TOOL_USAGE_DISPLAY_NAMES",
+    "TOOL_USAGE_DETAIL_LABELS",
     "TOOL_WEB_SEARCH",
     "TOOL_X_SEARCH",
     "TTS_VOICES",

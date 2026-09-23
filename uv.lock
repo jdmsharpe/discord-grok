@@ -446,7 +446,7 @@ toml = [
 
 [[package]]
 name = "discord-grok"
-version = "1.11.0"
+version = "1.11.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

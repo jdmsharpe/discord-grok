@@ -276,7 +276,8 @@ class TestTTSCommand:
         assert "15,000" in call_kwargs["embed"].description
 
     async def test_tts_success(self, cog, mock_discord_context):
-        """Successful TTS should send an audio file with metadata embed."""
+        """Successful TTS should send an audio file with metadata and cost embeds."""
+        cog.show_cost_embeds = True
         with patch.object(cog, "_generate_tts", new_callable=AsyncMock) as mock_gen:
             mock_gen.return_value = b"fake audio bytes"
 
@@ -293,6 +294,7 @@ class TestTTSCommand:
         mock_discord_context.send_followup.assert_called_once()
         call_kwargs = mock_discord_context.send_followup.call_args[1]
         assert call_kwargs["embeds"][0].title == "Text-to-Speech Generation"
+        assert call_kwargs["embeds"][-1].description == "$0.0002 · 11 chars · <$0.01 today"
         assert call_kwargs["file"] is not None
 
     async def test_tts_with_sample_rate_and_bit_rate(self, cog, mock_discord_context):
@@ -446,6 +448,7 @@ class TestImageBatchGeneration:
         """Batch generation cost should be per-image cost × count."""
         from discord_grok.cogs.grok.tooling import calculate_image_cost
 
+        cog.show_cost_embeds = True
         with patch.object(
             cog,
             "_get_http_session",
@@ -467,10 +470,13 @@ class TestImageBatchGeneration:
 
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - expected_cost) < 1e-9
+        embeds = mock_discord_context.send_followup.call_args.kwargs["embeds"]
+        assert embeds[-1].description == "$0.0400 · 2 images · $0.04 today"
 
     async def test_image_cost_prefers_sdk_reported_cost_usd(self, cog, mock_discord_context):
         """When the SDK response carries cost_usd, that value should be used over YAML pricing."""
         cog.client.image.sample.return_value.cost_usd = 0.123
+        cog.show_cost_embeds = True
 
         with patch.object(
             cog,
@@ -492,6 +498,8 @@ class TestImageBatchGeneration:
 
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - 0.123) < 1e-9
+        embeds = mock_discord_context.send_followup.call_args.kwargs["embeds"]
+        assert embeds[-1].description == "$0.1230 · 1 image · $0.12 today"
 
     async def test_image_batch_cost_mixes_sdk_and_yaml_per_result(self, cog, mock_discord_context):
         """Mixed Some/None cost_usd across batch should sum SDK values + YAML fallback per missing."""
@@ -752,6 +760,7 @@ class TestVideoCommand:
     async def test_video_cost_prefers_sdk_reported_cost_usd(self, cog, mock_discord_context):
         """When the SDK response carries cost_usd, that value should be used over YAML pricing."""
         cog.client.video.generate.return_value.cost_usd = 0.42
+        cog.show_cost_embeds = True
 
         with patch.object(
             cog,
@@ -771,6 +780,8 @@ class TestVideoCommand:
 
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - 0.42) < 1e-9
+        embeds = mock_discord_context.send_followup.call_args.kwargs["embeds"]
+        assert embeds[-1].description == "$0.4200 · 1 video · 5s · 720p · $0.42 today"
 
     async def test_video_yaml_fallback_cost_uses_requested_resolution(
         self, cog, mock_discord_context

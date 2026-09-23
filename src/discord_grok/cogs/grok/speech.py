@@ -4,6 +4,7 @@ import io
 
 from discord import ApplicationContext, Colour, Embed, File
 
+from ...cost_line import count_label
 from .client import TTS_MAX_CHARS
 from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
@@ -85,7 +86,9 @@ async def run_tts_command(
             )
         ]
         if cog.show_cost_embeds:
-            append_generation_pricing_embed(embeds, tts_cost, daily_cost)
+            append_generation_pricing_embed(
+                embeds, tts_cost, daily_cost, details=[count_label(len(text), "char")]
+            )
         extension = "ulaw" if output_format == "mulaw" else output_format
         await send_embed_batches(
             ctx.send_followup,
