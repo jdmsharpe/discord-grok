@@ -286,11 +286,13 @@ class TestReasoningConstants:
         assert "grok-4.3" not in PENALTY_SUPPORTED_MODELS
         assert "grok-4.20" not in PENALTY_SUPPORTED_MODELS
         assert "grok-4.5" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-4.6" not in PENALTY_SUPPORTED_MODELS
+        assert "grok-4.7" not in PENALTY_SUPPORTED_MODELS
 
     def test_reasoning_effort_models(self):
         from discord_grok.cogs.grok.tooling import REASONING_EFFORT_MODELS
 
-        assert {"grok-4.3", "grok-4.5", "grok-4.6"} == REASONING_EFFORT_MODELS
+        assert {"grok-4.3", "grok-4.5", "grok-4.6", "grok-4.7"} == REASONING_EFFORT_MODELS
 
     def test_model_reasoning_efforts_per_model(self):
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
@@ -298,15 +300,17 @@ class TestReasoningConstants:
         assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset({"none", "low", "medium", "high"})
         assert "grok-4.20" not in MODEL_REASONING_EFFORTS
 
-    def test_xhigh_is_confined_to_grok_4_6(self):
+    def test_xhigh_is_confined_to_grok_4_6_and_grok_4_7(self):
         """xAI silently treats `xhigh` as `high` on models that lack it, rather than
         erroring — so this per-model set is the only thing that tells a user their
         chosen effort was not honored."""
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
-        assert "xhigh" in MODEL_REASONING_EFFORTS["grok-4.6"]
+        xhigh_models = {"grok-4.6", "grok-4.7"}
+        for model in xhigh_models:
+            assert "xhigh" in MODEL_REASONING_EFFORTS[model]
         for model, efforts in MODEL_REASONING_EFFORTS.items():
-            if model != "grok-4.6":
+            if model not in xhigh_models:
                 assert "xhigh" not in efforts, f"{model} must not advertise xhigh"
 
     def test_grok_4_6_is_reasoning_only(self):

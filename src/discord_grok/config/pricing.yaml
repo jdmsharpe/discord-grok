@@ -6,7 +6,7 @@
 #   https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
 #   It still carried grok-4.5's retired $0.50/M cached rate on 2026-07-24 and would
 #   have masked that drift, so verify against docs.x.ai first and treat it as a hint.
-# Last-verified: 2026-09-15
+# Last-verified: 2026-09-22
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;
@@ -32,6 +32,7 @@ pricing_classes:
     long_context: { threshold_tokens: 200000, input_per_million: 2.50, cached_input_per_million: 0.40, output_per_million: 5.00 }
   # grok-4.6 matches grok-4.5's $2.00/$6.00 input/output but cannot share its class:
   # it caches at $0.50/M, not $0.30/M (and $1.00 vs $0.60 long-context).
+  # grok-4.7 has the same published rates as grok-4.6 and uses this class too.
   grok_4_6:
     input_per_million: 2.00
     cached_input_per_million: 0.50
@@ -95,9 +96,9 @@ text_to_speech:
 # Server-side tool invocation pricing (dollars per 1,000 invocations).
 tools:
   SERVER_SIDE_TOOL_WEB_SEARCH:         { per_1k_invocations: 5.00 }
-  # From 2026-09-21 12:00 PT X Search bills $5 per 1k posts and $10 per 1k user
-  # profiles fetched instead of per call, so this row becomes an estimate; the
-  # chat path prefers the cost xAI reports in usage.cost_in_usd_ticks.
+  # X Search bills $5 per 1,000 posts and $10 per 1,000 user profiles fetched,
+  # not per call, so this per-call row is only a fallback estimate. The chat
+  # path bills the cost xAI reports in usage.cost_in_usd_ticks when present.
   SERVER_SIDE_TOOL_X_SEARCH:           { per_1k_invocations: 5.00 }
   SERVER_SIDE_TOOL_CODE_EXECUTION:     { per_1k_invocations: 5.00 }
   SERVER_SIDE_TOOL_CODE_INTERPRETER:   { per_1k_invocations: 5.00 }

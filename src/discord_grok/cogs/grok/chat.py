@@ -222,8 +222,8 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
         ) + calculate_tool_cost(tool_usage or {})
         # Prefer the price xAI reports for the request (usage.cost_in_usd_ticks,
         # token and tool charges included); the catalog estimate covers responses
-        # without it. From 2026-09-21 X Search bills per post and profile fetched,
-        # which only the reported figure reflects.
+        # without it. X Search bills per post and user profile fetched, which only
+        # the reported figure reflects.
         request_cost = usage["cost_usd"] if usage.get("cost_usd") is not None else catalog_cost
         daily_cost = cog._track_daily_cost(message.author.id, request_cost)
         if cog.show_cost_embeds:
@@ -661,8 +661,8 @@ async def run_chat_command(
         ) + calculate_tool_cost(tool_usage or {})
         # Prefer the price xAI reports for the request (usage.cost_in_usd_ticks,
         # token and tool charges included); the catalog estimate covers responses
-        # without it. From 2026-09-21 X Search bills per post and profile fetched,
-        # which only the reported figure reflects.
+        # without it. X Search bills per post and user profile fetched, which only
+        # the reported figure reflects.
         request_cost = usage["cost_usd"] if usage.get("cost_usd") is not None else catalog_cost
         daily_cost = cog._track_daily_cost(ctx.author.id, request_cost)
         if cog.show_cost_embeds:

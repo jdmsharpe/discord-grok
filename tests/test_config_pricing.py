@@ -128,6 +128,8 @@ class TestPricingLoader:
         assert pricing_map["grok-4.20-multi-agent"] == (1.25, 0.20, 2.50)
         # grok-4.6 and grok-4.5 share $2.00/$6.00 but differ on cached reads, so
         # neither may collapse into the other or into `premium` ($0.20 cached).
+        # grok-4.7 bills at grok-4.6's rates through the same class.
+        assert pricing_map["grok-4.7"] == (2.00, 0.50, 6.00)
         assert pricing_map["grok-4.6"] == (2.00, 0.50, 6.00)
         assert pricing_map["grok-4.5"] == (2.00, 0.30, 6.00)
         assert pricing_map["grok-4.6"] != pricing_map["grok-4.5"]
@@ -147,6 +149,8 @@ class TestPricingLoader:
         assert tier_map["grok-4.20"] == (200_000, 2.50, 0.40, 5.00)
         assert tier_map["grok-4.20-non-reasoning"] == (200_000, 2.50, 0.40, 5.00)
         assert tier_map["grok-4.20-multi-agent"] == (200_000, 2.50, 0.40, 5.00)
+        assert tier_map["grok-4.7"] == (200_000, 4.00, 1.00, 12.00)
+        assert tier_map["grok-4.6"] == (200_000, 4.00, 1.00, 12.00)
         assert tier_map["grok-4.5"] == (200_000, 4.00, 0.60, 12.00)
         assert tier_map["grok-build-0.1"] == (200_000, 2.00, 0.40, 4.00)
 
