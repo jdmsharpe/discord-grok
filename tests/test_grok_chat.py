@@ -412,6 +412,24 @@ class TestGrokChat:
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["reasoning_effort"] == "none"
 
+    @pytest.mark.parametrize("model", ["grok-4.5", "grok-4.3"])
+    async def test_chat_passes_xhigh_effort(self, cog, mock_discord_context, model):
+        """grok-4.5 and grok-4.3 accept `xhigh`; it must reach the payload unchanged."""
+        mock_discord_context.channel.typing = MagicMock()
+        mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
+        mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
+
+        await cog.chat.callback(
+            cog,
+            ctx=mock_discord_context,
+            prompt="Hello",
+            model=model,
+            reasoning_effort="xhigh",
+        )
+
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["reasoning_effort"] == "xhigh"
+
     async def test_chat_rejects_none_effort_on_default_model(self, cog, mock_discord_context):
         """`none` is a selectable menu choice but the default model (grok-4.7) cannot
         disable reasoning — the per-model effort check must reject it BEFORE the API

@@ -28,6 +28,7 @@ from .embeds import (
     append_sources_embed,
 )
 from .models import ChatCompletionParameters, Conversation
+from .safety import build_safety_identifier
 from .state import create_button_view
 from .tooling import (
     MODEL_REASONING_EFFORTS,
@@ -183,6 +184,7 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
             reasoning_effort=params.reasoning_effort,
             agent_count=params.agent_count,
             include_encrypted_reasoning=bool(params.tools) or params.model in MULTI_AGENT_MODELS,
+            safety_identifier=build_safety_identifier(message.author.id),
         )
         response_json = await cog._call_responses_api(
             payload,
@@ -593,6 +595,7 @@ async def run_chat_command(
             reasoning_effort=reasoning_effort,
             agent_count=agent_count if is_multi_agent else None,
             include_encrypted_reasoning=bool(tools) or is_multi_agent,
+            safety_identifier=build_safety_identifier(ctx.author.id),
         )
         response_json = await cog._call_responses_api(payload, grok_conv_id=grok_conv_id)
         response_text, reasoning_text = cog._extract_response_text(response_json)

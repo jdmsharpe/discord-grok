@@ -10,6 +10,7 @@ from xai_sdk.image import ImageAspectRatio, ImageQuality, ImageResolution
 from ...cost_line import count_label
 from .embed_delivery import send_embed_batches
 from .embeds import GROK_BLACK, append_generation_pricing_embed
+from .safety import build_safety_identifier
 from .tooling import calculate_image_cost, format_xai_error, truncate_text
 
 QUALITY_SUPPORTED_IMAGE_MODELS = frozenset({"grok-imagine-image-2.0"})
@@ -78,6 +79,11 @@ async def run_image_command(
             sample_kwargs["quality"] = cast(ImageQuality, quality)
         if is_editing:
             sample_kwargs["image_url"] = str(attachment.url)
+        # The Images API has no `safety_identifier`; its legacy `user` field takes
+        # the same keyed identifier.
+        user_identifier = build_safety_identifier(ctx.author.id)
+        if user_identifier is not None:
+            sample_kwargs["user"] = user_identifier
 
         client = cog._get_client()
         if count == 1:

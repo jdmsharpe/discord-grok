@@ -253,6 +253,7 @@ class GrokCog(commands.Cog):
         reasoning_effort: str | None = None,
         agent_count: int | None = None,
         include_encrypted_reasoning: bool = False,
+        safety_identifier: str | None = None,
     ) -> dict[str, Any]:
         return build_responses_payload(
             model,
@@ -268,6 +269,7 @@ class GrokCog(commands.Cog):
             reasoning_effort=reasoning_effort,
             agent_count=agent_count,
             include_encrypted_reasoning=include_encrypted_reasoning,
+            safety_identifier=safety_identifier,
         )
 
     @staticmethod
@@ -690,6 +692,7 @@ class GrokCog(commands.Cog):
             OptionChoice(
                 name="Grok Imagine Video 1.5 (Preview)", value="grok-imagine-video-1.5-preview"
             ),
+            OptionChoice(name="Grok Imagine Video 1.5 Lite", value="grok-imagine-video-1.5-lite"),
             OptionChoice(name="Grok Imagine Video", value="grok-imagine-video"),
         ],
     )
@@ -716,7 +719,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "resolution",
-        description="Resolution of the video. 1080p is Video 1.5 only. (default: 720p)",
+        description="Resolution of the video. 1080p is Video 1.5 and 1.5 Lite only. (default: 720p)",
         required=False,
         type=str,
         choices=[

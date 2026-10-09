@@ -55,6 +55,7 @@ class TestPricingLoader:
         assert pricing.VIDEO_INPUT_IMAGE_PRICING == {
             "grok-imagine-video": 0.002,
             "grok-imagine-video-1.5-preview": 0.01,
+            "grok-imagine-video-1.5-lite": 0.01,
         }
         # Models without a declared surcharge use the highest published rate.
         assert pricing.UNKNOWN_IMAGE_INPUT_PRICING == 0.01
@@ -68,6 +69,11 @@ class TestPricingLoader:
             "480p": 0.08,
             "720p": 0.14,
             "1080p": 0.25,
+        }
+        assert pricing.VIDEO_PRICING["grok-imagine-video-1.5-lite"] == {
+            "480p": 0.02,
+            "720p": 0.03,
+            "1080p": 0.14,
         }
         assert pricing.UNKNOWN_VIDEO_MODEL_PRICING == 0.25
 
@@ -105,7 +111,7 @@ class TestPricingLoader:
     def test_tool_invocation_pricing(self):
         pricing = _reload_pricing()
         assert pricing.TOOL_INVOCATION_PRICING["SERVER_SIDE_TOOL_WEB_SEARCH"] == 5.00
-        assert pricing.TOOL_INVOCATION_PRICING["SERVER_SIDE_TOOL_ATTACHMENT_SEARCH"] == 10.00
+        assert pricing.TOOL_INVOCATION_PRICING["SERVER_SIDE_TOOL_ATTACHMENT_SEARCH"] == 5.00
 
     def test_unknown_image_fallback(self):
         pricing = _reload_pricing()

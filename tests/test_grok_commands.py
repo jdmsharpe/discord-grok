@@ -192,7 +192,7 @@ class TestGrokCommandSchema:
                 assert f"{res}/{quality}" in rates, f"unpriced tier {res}/{quality}"
 
     def test_video_resolution_choices_are_priced_or_rejected(self, cog):
-        """1080p exists only on Video 1.5. Every offered (model, resolution) pair must
+        """1080p exists only on Video 1.5 and 1.5 Lite. Every offered (model, resolution) pair must
         therefore be either priced or refused before the request, never billed at the
         unknown-model fallback."""
         from discord_grok.cogs.grok.tooling import GROK_VIDEO_MODELS, VIDEO_PRICING
@@ -218,6 +218,19 @@ class TestGrokCommandSchema:
         res_option = next(opt for opt in cmd.options if opt.name == "resolution")
         assert any(choice.value == "1080p" for choice in res_option.choices)
         assert VIDEO_PRICING["grok-imagine-video-1.5-preview"]["1080p"] == 0.25
+
+    def test_video_1_5_lite_is_offered_and_not_the_default(self, cog):
+        """grok-imagine-video-1.5-lite is an extra, cheaper choice; Video 1.5 is still
+        the default, and Lite accepts the priced 1080p tier."""
+        from discord_grok.cogs.grok.tooling import GROK_VIDEO_MODELS
+        from discord_grok.cogs.grok.video import _validate_video_resolution
+
+        cmd = next(c for c in cog.grok_media.walk_commands() if c.name == "video")
+        model_option = next(opt for opt in cmd.options if opt.name == "model")
+        assert "grok-imagine-video-1.5-lite" in [c.value for c in model_option.choices]
+        assert "grok-imagine-video-1.5-lite" in GROK_VIDEO_MODELS
+        assert GROK_VIDEO_MODELS[0] == "grok-imagine-video-1.5-preview"
+        assert _validate_video_resolution("grok-imagine-video-1.5-lite", "1080p") is None
 
     def test_media_resolution_defaults_match_the_assumed_pricing_tier(self, cog):
         """``calculate_image_cost``/``calculate_video_cost`` assume these resolutions
@@ -810,6 +823,37 @@ class TestVideoCommand:
                 )
 
             assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
+
+    async def test_video_1_5_lite_sends_its_id_and_bills_its_own_rate(
+        self, cog, mock_discord_context
+    ):
+        """Video 1.5 Lite reaches the SDK under its own id, 1080p included, and the
+        YAML fallback bills Lite's rate rather than Video 1.5's."""
+        from datetime import date
+
+        from discord_grok.cogs.grok.state import _extract_daily_total
+
+        cog.client.video.generate.return_value.cost_usd = None
+        with patch.object(
+            cog,
+            "_get_http_session",
+            new_callable=AsyncMock,
+            return_value=self._mock_http_session(),
+        ):
+            await cog.video.callback(
+                cog,
+                ctx=mock_discord_context,
+                prompt="A sunset",
+                model="grok-imagine-video-1.5-lite",
+                duration=5,
+                resolution="1080p",
+            )
+
+        kwargs = cog.client.video.generate.await_args.kwargs
+        assert kwargs["model"] == "grok-imagine-video-1.5-lite"
+        assert kwargs["resolution"] == "1080p"
+        key = (mock_discord_context.author.id, date.today().isoformat())
+        assert abs(_extract_daily_total(cog.daily_costs[key]) - 5 * 0.14) < 1e-9
 
     async def test_video_no_url_returns_error(self, cog, mock_discord_context):
         """No video URL from API should display an error."""

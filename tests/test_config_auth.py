@@ -73,3 +73,37 @@ def test_show_cost_embeds_uses_standard_boolean_parser(monkeypatch, raw_value, e
     auth_config = _load_auth_with_env(monkeypatch, guild_ids="", collection_ids="")
 
     assert auth_config.SHOW_COST_EMBEDS is expected
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        ("  my-secret  ", "my-secret"),
+        ("   ", None),
+        ("", None),
+    ],
+)
+def test_safety_identifier_secret_is_optional_and_stripped(monkeypatch, raw_value, expected):
+    monkeypatch.setenv("SAFETY_IDENTIFIER_SECRET", raw_value)
+
+    auth_config = _load_auth_with_env(monkeypatch, guild_ids="", collection_ids="")
+
+    secret = auth_config.SAFETY_IDENTIFIER_SECRET
+    assert secret == expected
+    assert "SAFETY_IDENTIFIER_SECRET" not in auth_config.REQUIRED_ENV_VARS
+
+
+def test_validate_required_config_rejects_the_api_key_as_safety_secret(monkeypatch):
+    auth_config = _load_auth_with_env(monkeypatch, guild_ids="", collection_ids="")
+    monkeypatch.setenv("SAFETY_IDENTIFIER_SECRET", " dummy-key ")
+
+    with pytest.raises(RuntimeError, match="must not equal XAI_API_KEY") as exc_info:
+        auth_config.validate_required_config()
+    assert "dummy-key" not in str(exc_info.value)
+
+
+def test_validate_required_config_accepts_a_separate_safety_secret(monkeypatch):
+    auth_config = _load_auth_with_env(monkeypatch, guild_ids="", collection_ids="")
+    monkeypatch.setenv("SAFETY_IDENTIFIER_SECRET", "separate-secret")
+
+    auth_config.validate_required_config()

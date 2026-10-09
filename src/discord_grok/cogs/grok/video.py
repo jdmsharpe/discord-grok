@@ -16,8 +16,9 @@ from .tooling import GROK_VIDEO_MODELS, calculate_video_cost, format_xai_error, 
 def _validate_video_resolution(model: str, resolution: str) -> str | None:
     """Reject resolutions a model has no published rate for.
 
-    The resolution menu is shared across models but 1080p exists only on Video 1.5;
-    an unpriced tier would otherwise bill at the unknown-model fallback.
+    The resolution menu is shared across models but 1080p exists only on Video 1.5
+    and Video 1.5 Lite; an unpriced tier would otherwise bill at the unknown-model
+    fallback.
     """
 
     supported = VIDEO_PRICING.get(model, {})

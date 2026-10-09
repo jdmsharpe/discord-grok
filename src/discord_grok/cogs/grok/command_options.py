@@ -41,9 +41,7 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
         model_id="grok-4.6",
         display_name="Grok 4.6",
         pricing_class="grok_4_6",
-        # Reasoning-only like grok-4.5, so no "none". `xhigh` is supported here and
-        # on grok-4.7 only — models without it silently treat it as "high" rather
-        # than erroring, so the per-model set is the only real gate.
+        # Reasoning-only like grok-4.5, so no "none".
         capabilities=frozenset(),
         reasoning_efforts=frozenset({"low", "medium", "high", "xhigh"}),
     ),
@@ -54,14 +52,14 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
         # Reasoning models reject presence/frequency penalties and `stop`, and grok-4.5's
         # reasoning cannot be disabled — omitting "none" here is deliberate, not an oversight.
         capabilities=frozenset(),
-        reasoning_efforts=frozenset({"low", "medium", "high"}),
+        reasoning_efforts=frozenset({"low", "medium", "high", "xhigh"}),
     ),
     ChatModelCatalogEntry(
         model_id="grok-4.3",
         display_name="Grok 4.3",
         pricing_class="flagship",
         capabilities=frozenset(),
-        reasoning_efforts=frozenset({"none", "low", "medium", "high"}),
+        reasoning_efforts=frozenset({"none", "low", "medium", "high", "xhigh"}),
     ),
     ChatModelCatalogEntry(
         model_id="grok-4.20-multi-agent",

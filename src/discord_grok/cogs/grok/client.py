@@ -198,6 +198,7 @@ def build_responses_payload(
     reasoning_effort: str | None = None,
     agent_count: int | None = None,
     include_encrypted_reasoning: bool = False,
+    safety_identifier: str | None = None,
 ) -> dict[str, Any]:
     """Build a JSON payload for the xAI Responses API."""
     payload: dict[str, Any] = {
@@ -227,6 +228,8 @@ def build_responses_payload(
         payload["reasoning_effort"] = reasoning_effort
     if agent_count is not None:
         payload["agent_count"] = agent_count
+    if safety_identifier:
+        payload["safety_identifier"] = safety_identifier
     return payload
 
 

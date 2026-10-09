@@ -297,21 +297,21 @@ class TestReasoningConstants:
     def test_model_reasoning_efforts_per_model(self):
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
-        assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset({"none", "low", "medium", "high"})
+        assert MODEL_REASONING_EFFORTS["grok-4.3"] == frozenset(
+            {"none", "low", "medium", "high", "xhigh"}
+        )
         assert "grok-4.20" not in MODEL_REASONING_EFFORTS
 
-    def test_xhigh_is_confined_to_grok_4_6_and_grok_4_7(self):
-        """xAI silently treats `xhigh` as `high` on models that lack it, rather than
-        erroring — so this per-model set is the only thing that tells a user their
-        chosen effort was not honored."""
+    def test_xhigh_is_offered_on_every_effort_model(self):
+        """docs.x.ai lists `xhigh` for grok-4.3, grok-4.5, grok-4.6 and grok-4.7, and
+        xAI returns 400 for an effort a model does not accept, so the per-model sets
+        must carry it on all four."""
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
-        xhigh_models = {"grok-4.6", "grok-4.7"}
-        for model in xhigh_models:
-            assert "xhigh" in MODEL_REASONING_EFFORTS[model]
-        for model, efforts in MODEL_REASONING_EFFORTS.items():
-            if model not in xhigh_models:
-                assert "xhigh" not in efforts, f"{model} must not advertise xhigh"
+        xhigh_models = {"grok-4.3", "grok-4.5", "grok-4.6", "grok-4.7"}
+        assert {
+            model for model, efforts in MODEL_REASONING_EFFORTS.items() if "xhigh" in efforts
+        } == xhigh_models
 
     def test_grok_4_6_is_reasoning_only(self):
         """Reasoning cannot be disabled on grok-4.6, so `none` must stay out."""
@@ -323,7 +323,7 @@ class TestReasoningConstants:
         """xAI rejects reasoning_effort="none" on grok-4.5; exposing it would 400 live."""
         from discord_grok.cogs.grok.tooling import MODEL_REASONING_EFFORTS
 
-        assert MODEL_REASONING_EFFORTS["grok-4.5"] == frozenset({"low", "medium", "high"})
+        assert MODEL_REASONING_EFFORTS["grok-4.5"] == frozenset({"low", "medium", "high", "xhigh"})
         assert "none" not in MODEL_REASONING_EFFORTS["grok-4.5"]
 
     def test_multi_agent_models(self):
@@ -661,6 +661,9 @@ class TestPricing:
         assert calculate_video_cost(1, "grok-imagine-video-1.5-preview", "480p") == 0.08
         assert calculate_video_cost(1, "grok-imagine-video-1.5-preview", "720p") == 0.14
         assert calculate_video_cost(1, "grok-imagine-video-1.5-preview", "1080p") == 0.25
+        assert calculate_video_cost(1, "grok-imagine-video-1.5-lite", "480p") == 0.02
+        assert calculate_video_cost(1, "grok-imagine-video-1.5-lite", "720p") == 0.03
+        assert calculate_video_cost(1, "grok-imagine-video-1.5-lite", "1080p") == 0.14
         assert calculate_video_cost(1, "grok-imagine-video", "480p") == 0.05
         assert calculate_video_cost(1, "grok-imagine-video", "720p") == 0.07
 

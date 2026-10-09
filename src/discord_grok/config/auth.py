@@ -50,10 +50,18 @@ def validate_required_config() -> None:
             "Missing required environment configuration: "
             f"{missing_list}. Please set these variables before starting the bot."
         )
+    # xAI holds XAI_API_KEY, so a safety_identifier keyed with it could be
+    # reversed by hashing known Discord user IDs.
+    if _get_env_or_none("SAFETY_IDENTIFIER_SECRET") == _get_env_or_none("XAI_API_KEY"):
+        raise RuntimeError(
+            "SAFETY_IDENTIFIER_SECRET must not equal XAI_API_KEY. "
+            "Set it to a separate random string or leave it unset."
+        )
 
 
 BOT_TOKEN = _get_env_or_none("BOT_TOKEN")
 GUILD_IDS = _parse_guild_ids(os.getenv("GUILD_IDS", ""))
 XAI_API_KEY = _get_env_or_none("XAI_API_KEY")
 XAI_COLLECTION_IDS = _parse_csv_values(os.getenv("XAI_COLLECTION_IDS", ""))
+SAFETY_IDENTIFIER_SECRET = _get_env_or_none("SAFETY_IDENTIFIER_SECRET")
 SHOW_COST_EMBEDS = _parse_bool_env("SHOW_COST_EMBEDS")
