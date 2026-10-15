@@ -490,8 +490,12 @@ class TestGrokChat:
         assert "agent_count" in call_kwargs["embed"].description
         assert "multi-agent" in call_kwargs["embed"].description
 
-    async def test_chat_passes_agent_count_for_multi_agent(self, cog, mock_discord_context):
-        """agent_count should be passed to the API for multi-agent models."""
+    @pytest.mark.parametrize(("agent_count", "effort"), [(4, "medium"), (16, "high")])
+    async def test_chat_sends_agent_count_as_reasoning_effort_for_multi_agent(
+        self, cog, mock_discord_context, agent_count, effort
+    ):
+        """The Responses API ignores a top-level agent_count; the multi-agent model
+        runs 4 agents at low or medium effort and 16 at high or xhigh."""
         mock_discord_context.channel.typing = MagicMock()
         mock_discord_context.channel.typing.return_value.__aenter__ = AsyncMock()
         mock_discord_context.channel.typing.return_value.__aexit__ = AsyncMock()
@@ -501,11 +505,13 @@ class TestGrokChat:
             ctx=mock_discord_context,
             prompt="Research quantum computing",
             model="grok-4.20-multi-agent",
-            agent_count=16,
+            agent_count=agent_count,
         )
 
         payload = cog._call_responses_api.call_args[0][0]
-        assert payload["agent_count"] == 16
+        assert payload["reasoning"] == {"effort": effort}
+        assert "agent_count" not in payload
+        assert "reasoning_effort" not in payload
         assert "reasoning.encrypted_content" in payload["include"]
 
     async def test_chat_multi_agent_sets_encrypted_content(self, cog, mock_discord_context):
@@ -524,6 +530,7 @@ class TestGrokChat:
         payload = cog._call_responses_api.call_args[0][0]
         assert "reasoning.encrypted_content" in payload["include"]
         assert "agent_count" not in payload
+        assert "reasoning" not in payload
 
     async def test_chat_tools_set_encrypted_content(self, cog, mock_discord_context):
         """Tool-using conversations should include encrypted content."""
@@ -597,6 +604,21 @@ class TestHandleNewMessageInConversation:
         message.reply.assert_called()
         assert conversation.previous_response_id == "resp_01XFDUDYJgAACzvnptvVoYEL"
         assert "resp_01XFDUDYJgAACzvnptvVoYEL" in conversation.response_id_history
+
+    async def test_follow_up_sends_agent_count_as_reasoning_effort(
+        self, cog, message, conversation
+    ):
+        """A multi-agent conversation's follow-ups keep the agent count it started with."""
+        conversation.params.model = "grok-4.20-multi-agent"
+        conversation.params.agent_count = 16
+        cog.conversations[777888999] = conversation
+        cog.views[message.author] = MagicMock()
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["reasoning"] == {"effort": "high"}
+        assert "agent_count" not in payload
 
     async def test_paused_conversation_ignored(self, cog, message, conversation):
         """Messages in a paused conversation should be silently ignored."""

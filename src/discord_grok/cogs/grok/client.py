@@ -16,6 +16,10 @@ from .attachments import MAX_FILE_SIZE
 TTS_API_URL = "https://api.x.ai/v1/tts"
 TTS_MAX_CHARS = 15_000
 RESPONSES_API_URL = "https://api.x.ai/v1/responses"
+# The Responses API has no agent_count field (only the gRPC SDK does). The multi-agent
+# model takes its agent count from reasoning.effort: low or medium runs 4 agents, high
+# or xhigh runs 16 (https://docs.x.ai/developers/model-capabilities/text/multi-agent).
+MULTI_AGENT_EFFORT_BY_AGENT_COUNT: dict[int, str] = {4: "medium", 16: "high"}
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 MAX_API_ATTEMPTS = 5
 INITIAL_RETRY_DELAY_SECONDS = 0.5
@@ -227,7 +231,7 @@ def build_responses_payload(
     if reasoning_effort is not None:
         payload["reasoning_effort"] = reasoning_effort
     if agent_count is not None:
-        payload["agent_count"] = agent_count
+        payload["reasoning"] = {"effort": MULTI_AGENT_EFFORT_BY_AGENT_COUNT[agent_count]}
     if safety_identifier:
         payload["safety_identifier"] = safety_identifier
     return payload
