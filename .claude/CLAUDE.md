@@ -1,5 +1,12 @@
 # Discord Grok Bot - Developer Reference
 
+## SDK sweep — 2026-10-28
+
+- `xai-sdk~=1.21`; `/grok chat service_tier:priority` persists across follow-ups and requests priority scheduling. xAI's returned `service_tier` controls the 2x token/cache estimate; default or unreported tiers keep normal rates and tool fees are not multiplied. Reported `usage.cost_in_usd_ticks` remains authoritative when available; https://docs.x.ai/developers/advanced-api-usage/priority-processing and https://docs.x.ai/developers/pricing.
+- Removed Image Quality and its former Pro alias from selectable image models before their November 2 retirement; historical pricing rows remain. Image 2.0 stays the default. The temperature option now advertises and enforces xAI's 0–1 sampling range.
+- Shared embed fallback uploads preserve attachment bytes after a failed send.
+
+
 ## Quick Start
 
 ```bash
@@ -173,7 +180,7 @@ pytest -q
   - Pinned by `tests/test_grok_safety.py` (determinism, per-user and per-secret difference, the shared `b"safety-identifier-v1"` label, two literal 64-hex vectors that discord-claude, discord-openai and discord-openrouter must also produce (`BOT_TOKEN=tok` with no secret, and secret `shared-secret`, both for user 111222333; `test_fixed_vectors_shared_with_sibling_bots`), not the raw or unkeyed-hashed ID, present on `/grok chat` and follow-up payloads and as `user` on image generate (`sample` and `sample_batch`) and edit kwargs, every image kwarg the bot sends being a parameter of the installed `xai_sdk.aio.image.Client` method (the fixture's image client is an unspecced mock), the raw ID in none of them, `user` omitted without a key, absent from video SDK kwargs and the TTS payload, absent from logs; `test_module_key_is_read_from_the_environment` runs fresh copies of `auth.py` and `safety.py` with the secret set, with only `BOT_TOKEN`, and with neither) and `test_safety_identifier_secret_is_optional_and_stripped` / `test_validate_required_config_rejects_the_api_key_as_safety_secret` (`tests/test_config_auth.py`).
 - `fallbacks.unknown_image_model.per_image` is $0.08 (Image 2.0 at 2k/medium, the dearest published tier, 2026-09-15); it was $0.07 before v1.10.0.
 - Grok Imagine bills per **output resolution**, so `image_generation` / `video_generation` rows in `pricing.yaml` map resolution → rate and `calculate_image_cost` / `calculate_video_cost` take the requested resolution. `grok-imagine-image-2.0` bills on resolution AND quality; its rows are keyed `"<resolution>/<quality>"` so the normalized map stays flat, and `calculate_image_cost` bills the dearest tier for a resolution when no quality is supplied. 1080p is priced only for `grok-imagine-video-1.5-preview` and `grok-imagine-video-1.5-lite`, so `_validate_video_resolution` (`video.py`) rejects it on other models rather than letting it reach the unknown-model fallback. A scalar rate is still accepted and bills flat. When a caller passes no resolution, the tier assumed is `DEFAULT_IMAGE_RESOLUTION` / `DEFAULT_VIDEO_RESOLUTION` in `tooling.py`, which must track the `/grok-media` option defaults.
-- **`grok-imagine-image-quality` retires 2026-11-02** (60-day notice began 2026-09-02; docs.x.ai migration guide, found 2026-09-03). Afterwards the slug keeps resolving but is SERVED BY `grok-imagine-image-2.0` with `quality=low` at Image 2.0's rate — $0.01/image cheaper at every resolution — so the `image_generation` row ($0.05 1k / $0.07 2k) would over-report by $0.01 from that date. Deferred at the 2026-09-03 sweep (60 days out) and again at the 2026-10-08 sweep (migration guide re-read, date unchanged): before 2026-11-02 drop the `Grok Imagine Image Quality` menu choice (or remap it to Image 2.0 `low`) and re-point its pricing; `grok-imagine-image-pro` is an alias of the same slug and goes with it. Per-resolution/quality rates for every Imagine row were re-verified 2026-09-03 against the model table docs.x.ai embeds (the per-model pages show only the base rate).
+- **Image Quality retirement:** the Quality and former Pro IDs were removed from menu/allowlist on 2026-10-28 ahead of the November 2 retirement; retain their historical pricing rows. Image 2.0 remains the default.
 
 ## Runtime Conventions (Cross-Project)
 

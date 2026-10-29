@@ -28,6 +28,7 @@ class ChatCompletionParameters:
     """A dataclass to store the parameters for a chat completion."""
 
     model: str
+    service_tier: str = "default"
     temperature: float | None = None
     top_p: float | None = None
     max_tokens: int | None = None

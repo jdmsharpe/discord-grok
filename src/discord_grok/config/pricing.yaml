@@ -6,7 +6,7 @@
 #   https://github.com/pydantic/genai-prices/blob/main/prices/providers/x_ai.yml
 #   It still carried grok-4.5's retired $0.50/M cached rate on 2026-07-24 and would
 #   have masked that drift, so verify against docs.x.ai first and treat it as a hint.
-# Last-verified: 2026-09-22
+# Last-verified: 2026-10-28
 #
 # Chat pricing is organized by pricing class (premium / fast / mini / etc.).
 # The model → class mapping lives in command_options.py alongside the catalog;

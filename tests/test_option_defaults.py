@@ -72,7 +72,7 @@ DEFAULT_CLAUSE_RE = re.compile(r"\(default:\s*([^)]+)\)", re.I)
 # a choice-backed option that states a default. A mismatch means either a real
 # change to the option surface or a discovery regression -- both deserve a human
 # look, so do not "fix" a failure here by loosening the assertion.
-EXPECTED_ASSERTABLE_OPTIONS = 8
+EXPECTED_ASSERTABLE_OPTIONS = 9
 EXPECTED_UNASSERTABLE_OPTIONS = 0
 
 # Options whose stated default resolves to none of their own choices. Nothing

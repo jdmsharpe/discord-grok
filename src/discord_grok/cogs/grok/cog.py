@@ -254,6 +254,7 @@ class GrokCog(commands.Cog):
         agent_count: int | None = None,
         include_encrypted_reasoning: bool = False,
         safety_identifier: str | None = None,
+        service_tier: str = "default",
     ) -> dict[str, Any]:
         return build_responses_payload(
             model,
@@ -270,6 +271,7 @@ class GrokCog(commands.Cog):
             agent_count=agent_count,
             include_encrypted_reasoning=include_encrypted_reasoning,
             safety_identifier=safety_identifier,
+            service_tier=service_tier,
         )
 
     @staticmethod
@@ -445,9 +447,21 @@ class GrokCog(commands.Cog):
     )
     @option(
         "temperature",
-        description="(Advanced) Controls the randomness of the model. 0.0 to 2.0. (default: not set)",
+        description="(Advanced) Controls randomness. Sampling is capped at 1.0. (default: not set)",
         required=False,
         type=float,
+        min_value=0.0,
+        max_value=1.0,
+    )
+    @option(
+        "service_tier",
+        description="Priority requests faster scheduling at 2x token prices when granted. (default: standard)",
+        required=False,
+        type=str,
+        choices=[
+            OptionChoice(name="Standard", value="default"),
+            OptionChoice(name="Priority (2x)", value="priority"),
+        ],
     )
     @option(
         "top_p",
@@ -544,6 +558,7 @@ class GrokCog(commands.Cog):
         attachment: Attachment | None = None,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        service_tier: str = "default",
         top_p: float | None = None,
         frequency_penalty: float | None = None,
         presence_penalty: float | None = None,
@@ -568,6 +583,7 @@ class GrokCog(commands.Cog):
             attachment=attachment,
             max_tokens=max_tokens,
             temperature=temperature,
+            service_tier=service_tier,
             top_p=top_p,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
@@ -596,7 +612,6 @@ class GrokCog(commands.Cog):
         type=str,
         choices=[
             OptionChoice(name="Grok Imagine Image 2.0", value="grok-imagine-image-2.0"),
-            OptionChoice(name="Grok Imagine Image Quality", value="grok-imagine-image-quality"),
             OptionChoice(name="Grok Imagine Image", value="grok-imagine-image"),
         ],
     )

@@ -89,6 +89,7 @@ class TestGrokCommandSchema:
             "attachment",
             "max_tokens",
             "temperature",
+            "service_tier",
             "top_p",
             "frequency_penalty",
             "presence_penalty",
@@ -407,7 +408,7 @@ class TestImageBatchGeneration:
                 cog,
                 ctx=mock_discord_context,
                 prompt="A cat",
-                model="grok-imagine-image-pro",
+                model="grok-imagine-image",
                 count=1,
             )
 
@@ -426,7 +427,7 @@ class TestImageBatchGeneration:
                 cog,
                 ctx=mock_discord_context,
                 prompt="A cat",
-                model="grok-imagine-image-pro",
+                model="grok-imagine-image",
                 count=3,
             )
 
@@ -501,7 +502,7 @@ class TestImageBatchGeneration:
                 cog,
                 ctx=mock_discord_context,
                 prompt="A cat",
-                model="grok-imagine-image-pro",
+                model="grok-imagine-image",
                 count=1,
             )
 
@@ -555,14 +556,14 @@ class TestImageBatchGeneration:
     async def test_image_yaml_fallback_cost_uses_requested_resolution(
         self, cog, mock_discord_context
     ):
-        """2k output costs more than 1k on the quality tier, and an unset resolution
+        """2k output costs more than 1k on the Image 2.0 default medium quality, and an unset resolution
         bills at the 1k rate the command documents as the default."""
         from datetime import date
 
         from discord_grok.cogs.grok.state import _extract_daily_total
 
         key = (mock_discord_context.author.id, date.today().isoformat())
-        for resolution, expected in ((None, 0.05), ("1k", 0.05), ("2k", 0.07)):
+        for resolution, expected in ((None, 0.06), ("1k", 0.06), ("2k", 0.08)):
             cog.daily_costs.clear()
             with patch.object(
                 cog,
@@ -574,7 +575,7 @@ class TestImageBatchGeneration:
                     cog,
                     ctx=mock_discord_context,
                     prompt="A cat",
-                    model="grok-imagine-image-quality",
+                    model="grok-imagine-image-2.0",
                     resolution=resolution,
                     count=1,
                 )
@@ -602,13 +603,13 @@ class TestImageBatchGeneration:
                 cog,
                 ctx=mock_discord_context,
                 prompt="Edit this",
-                model="grok-imagine-image-quality",
+                model="grok-imagine-image-2.0",
                 count=1,
                 attachment=mock_attachment,
             )
 
-        expected = calculate_image_cost("grok-imagine-image-quality", input_images=1)
-        assert expected == pytest.approx(0.06)
+        expected = calculate_image_cost("grok-imagine-image-2.0", input_images=1)
+        assert expected == pytest.approx(0.07)
         key = (mock_discord_context.author.id, date.today().isoformat())
         assert abs(_extract_daily_total(cog.daily_costs[key]) - expected) < 1e-9
 
@@ -620,7 +621,7 @@ class TestImageBatchGeneration:
             cog,
             ctx=mock_discord_context,
             prompt="Edit this",
-            model="grok-imagine-image-pro",
+            model="grok-imagine-image",
             count=3,
             attachment=mock_attachment,
         )

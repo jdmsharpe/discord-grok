@@ -46,6 +46,8 @@ def calculate_cost(
     input_tokens: int,
     output_tokens: int,
     cached_tokens: int = 0,
+    *,
+    service_tier: str | None = None,
 ) -> float:
     """Calculate the cost in dollars for a given model and token usage.
 
@@ -67,7 +69,7 @@ def calculate_cost(
         if input_tokens >= threshold_tokens:
             input_price, cached_price, output_price = long_input, long_cached, long_output
     non_cached = input_tokens - cached_tokens
-    return (
+    return (2 if service_tier == "priority" else 1) * (
         (non_cached / 1_000_000) * input_price
         + (cached_tokens / 1_000_000) * cached_price
         + (output_tokens / 1_000_000) * output_price
@@ -173,11 +175,8 @@ def calculate_video_cost(
 GROK_MODELS = [entry.model_id for entry in iter_slash_command_models()]
 
 # Image generation models (index 0 is the default).
-# grok-imagine-image-pro is now an alias of grok-imagine-image-quality
-# (the canonical id), so only the canonical id is exposed in the menu.
 GROK_IMAGE_MODELS = [
     "grok-imagine-image-2.0",
-    "grok-imagine-image-quality",
     "grok-imagine-image",
 ]
 

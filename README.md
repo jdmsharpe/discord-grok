@@ -26,7 +26,7 @@ A Discord bot built on Pycord 2.0 that integrates xAI's Grok APIs. It provides s
 - **Resilient Error Handling:** Retries transient xAI HTTP failures, preserves async cancellation, and returns safer user-facing Discord error messages for handled chat and conversation-control failures.
 - **Citations & Cost Tracking:** Source citations shown in a dedicated "Sources" embed. Per-request cost and token usage tracking uses the price xAI reports for each chat request (token and tool charges included) and covers reasoning, cached token discounts, tool invocation counts, TTS character-based costs, and resolution-priced image/video generation. Each response ends with one cost line, such as `$0.0014 · 1.3k in (1.2k cached) / 107 out (102 thinking) · 1 search · <$0.01 today`: `in` counts every input token including cached ones, `out` counts every billed output token including thinking, tools appear as call counts (their charges are in the request cost), and the last figure is your total for the day.
 - **Media Generation:**
-  - **Images:** Generate or remix images using Grok Imagine Image 2.0 (default), Grok Imagine Image Quality (canonical id for the former Pro tier), or Grok Imagine Image. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions; Image 2.0 additionally prices by `quality` (Low/Medium).
+  - **Images:** Generate or remix images using Grok Imagine Image 2.0 (default) or Grok Imagine Image. Supports batch generation (up to 10 images) and 13 aspect ratios at 1k or 2k resolutions; Image 2.0 additionally prices by `quality` (Low/Medium).
   - **Video:** Generate videos from text or image-to-video using Grok Imagine Video 1.5 (Preview, default), Grok Imagine Video 1.5 Lite (the lowest per-second price), or Grok Imagine Video, with adjustable duration (1–15s), aspect ratios, and resolution (1080p/720p/480p — 1080p on Video 1.5 and 1.5 Lite only; Lite's 1080p is upscaled from 720p).
   - **Text-to-Speech:** 5 expressive voices, 20+ languages (with auto-detection), multiple output codecs (MP3, WAV, PCM, etc.), configurable sample/bit rates, and support for xAI speech tags.
 
@@ -62,7 +62,8 @@ PY
 ### `/grok chat`
 Start a stateful, multi-turn conversation with Grok.
 * **Core Inputs:** `prompt`, `system_prompt`, `model`, `attachment`, tool toggles, and optional MCP preset names.
-* **Model Tuning:** Adjust `max_tokens`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `reasoning_effort`, and `agent_count`. `reasoning_effort` accepts `low`, `medium`, `high`, and `xhigh` on Grok 4.7, 4.6, 4.5, and 4.3, and also `none` on Grok 4.3.
+* **Priority Processing:** set `service_tier=priority` on `/grok chat` to request faster scheduling for the conversation; token and cache prices double only when xAI confirms the priority tier, while tool fees stay unchanged.
+* **Model Tuning:** Adjust `max_tokens`, `temperature` (0–1), `top_p`, `frequency_penalty`, `presence_penalty`, `reasoning_effort`, and `agent_count`. `reasoning_effort` accepts `low`, `medium`, `high`, and `xhigh` on Grok 4.7, 4.6, 4.5, and 4.3, and also `none` on Grok 4.3.
 * **Tool Refinements:** Configure `x_search_images`, `x_search_videos`, `x_search_date_range`, and `web_search_images`.
 * **MCP Integration:** Use `mcp` with comma-separated preset names defined in `XAI_MCP_PRESETS_JSON` or `XAI_MCP_PRESETS_PATH`.
 

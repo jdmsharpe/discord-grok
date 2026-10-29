@@ -178,6 +178,7 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
             tools=params.tools or None,
             max_output_tokens=params.max_tokens,
             temperature=params.temperature,
+            service_tier=params.service_tier,
             top_p=params.top_p,
             frequency_penalty=params.frequency_penalty,
             presence_penalty=params.presence_penalty,
@@ -220,6 +221,7 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
             input_tokens,
             output_tokens,
             cached_tokens,
+            service_tier=response_json.get("service_tier"),
         ) + calculate_tool_cost(tool_usage or {})
         # Prefer the price xAI reports for the request (usage.cost_in_usd_ticks,
         # token and tool charges included); the catalog estimate covers responses
@@ -310,6 +312,7 @@ async def run_chat_command(
     attachment: Attachment | None = None,
     max_tokens: int | None = None,
     temperature: float | None = None,
+    service_tier: str = "default",
     top_p: float | None = None,
     frequency_penalty: float | None = None,
     presence_penalty: float | None = None,
@@ -589,6 +592,7 @@ async def run_chat_command(
             tools=tools or None,
             max_output_tokens=max_tokens,
             temperature=temperature,
+            service_tier=service_tier,
             top_p=top_p,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
@@ -612,6 +616,11 @@ async def run_chat_command(
         truncated_prompt = truncate_text(prompt, 2000)
         description = f"**Prompt:** {truncated_prompt}\n"
         description += f"**Model:** {model}\n"
+        if service_tier == "priority":
+            actual_tier = response_json.get("service_tier", "unreported")
+            description += (
+                f"**Priority requested:** served tier `{actual_tier}` (priority tokens cost 2x)\n"
+            )
         if system_prompt:
             description += f"**System:** {truncate_text(system_prompt, 500)}\n"
         if max_tokens is not None:
@@ -658,6 +667,7 @@ async def run_chat_command(
             input_tokens,
             output_tokens,
             cached_tokens,
+            service_tier=response_json.get("service_tier"),
         ) + calculate_tool_cost(tool_usage or {})
         # Prefer the price xAI reports for the request (usage.cost_in_usd_ticks,
         # token and tool charges included); the catalog estimate covers responses
@@ -716,6 +726,7 @@ async def run_chat_command(
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
+            service_tier=service_tier,
             top_p=top_p,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,

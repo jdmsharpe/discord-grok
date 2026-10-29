@@ -203,6 +203,7 @@ def build_responses_payload(
     agent_count: int | None = None,
     include_encrypted_reasoning: bool = False,
     safety_identifier: str | None = None,
+    service_tier: str = "default",
 ) -> dict[str, Any]:
     """Build a JSON payload for the xAI Responses API."""
     payload: dict[str, Any] = {
@@ -210,6 +211,10 @@ def build_responses_payload(
         "input": input_messages,
         "store": True,
     }
+    if service_tier not in {"default", "priority"}:
+        raise ValueError("service_tier must be default or priority")
+    if service_tier == "priority":
+        payload["service_tier"] = service_tier
     if prompt_cache_key:
         payload["prompt_cache_key"] = prompt_cache_key
     if previous_response_id:
