@@ -91,6 +91,7 @@ src/
     ├── bot.py
     ├── cost_line.py                 # One-line cost formatter, byte-identical across the discord-* bots (change all five together)
     ├── logging_setup.py             # Structured logging + request-id ContextVar
+    ├── stickers.py                  # Sticker-to-text labels for follow-ups, byte-identical across the discord-* bots (change all five together)
     ├── config/
     │   ├── __init__.py
     │   ├── auth.py
@@ -181,6 +182,7 @@ pytest -q
 - `fallbacks.unknown_image_model.per_image` is $0.08 (Image 2.0 at 2k/medium, the dearest published tier, 2026-09-15); it was $0.07 before v1.10.0.
 - Grok Imagine bills per **output resolution**, so `image_generation` / `video_generation` rows in `pricing.yaml` map resolution → rate and `calculate_image_cost` / `calculate_video_cost` take the requested resolution. `grok-imagine-image-2.0` bills on resolution AND quality; its rows are keyed `"<resolution>/<quality>"` so the normalized map stays flat, and `calculate_image_cost` bills the dearest tier for a resolution when no quality is supplied. 1080p is priced only for `grok-imagine-video-1.5-preview` and `grok-imagine-video-1.5-lite`, so `_validate_video_resolution` (`video.py`) rejects it on other models rather than letting it reach the unknown-model fallback. A scalar rate is still accepted and bills flat. When a caller passes no resolution, the tier assumed is `DEFAULT_IMAGE_RESOLUTION` / `DEFAULT_VIDEO_RESOLUTION` in `tooling.py`, which must track the `/grok-media` option defaults.
 - **Image Quality retirement:** the Quality and former Pro IDs were removed from menu/allowlist on 2026-10-28 ahead of the November 2 retirement; retain their historical pricing rows. Image 2.0 remains the default.
+- **Stickers are sent as text (v1.13.1).** A Discord sticker arrives with empty `content` and no `attachments`; `handle_new_message_in_conversation` (`chat.py`) sends each sticker in `message.stickers` as a `[Sticker: <name>]` line after the message text, built by `text_with_stickers` in `stickers.py`, which is byte-identical in the five AI bots (change all five together). The sticker image is not sent. A follow-up with nothing to send (no text, no sticker, no attachment that yields content) is ignored and the conversation stays open. Before, discord-openai, discord-gemini and discord-claude sent an empty turn, got a 400, and the error path removed the conversation; discord-grok and discord-openrouter dropped a sticker-only message without a reply. Pinned by `tests/test_stickers.py` and the sticker follow-up tests in `tests/test_grok_chat.py`.
 
 ## Runtime Conventions (Cross-Project)
 

@@ -1,6 +1,7 @@
 import asyncio
 import copy
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -619,6 +620,30 @@ class TestHandleNewMessageInConversation:
         payload = cog._call_responses_api.call_args[0][0]
         assert payload["reasoning"] == {"effort": "high"}
         assert "agent_count" not in payload
+
+    async def test_sticker_only_follow_up_sends_the_sticker_name(self, cog, message, conversation):
+        """A sticker-only message has no text and no attachments; it used to be dropped
+        without a reply, and the sticker's name is now the follow-up's text."""
+        message.content = ""
+        message.stickers = [SimpleNamespace(name="EEYUP")]
+        cog.conversations[777888999] = conversation
+        cog.views[message.author] = MagicMock()
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        payload = cog._call_responses_api.call_args[0][0]
+        assert payload["input"] == [{"role": "user", "content": "[Sticker: EEYUP]"}]
+        message.reply.assert_called()
+
+    async def test_follow_up_with_nothing_to_send_is_ignored(self, cog, message, conversation):
+        """A message with no text, no sticker and no attachment sends no request."""
+        message.content = ""
+        message.stickers = []
+
+        await cog.handle_new_message_in_conversation(message, conversation)
+
+        cog._call_responses_api.assert_not_called()
+        message.reply.assert_not_called()
 
     async def test_paused_conversation_ignored(self, cog, message, conversation):
         """Messages in a paused conversation should be silently ignored."""

@@ -495,7 +495,7 @@ wheels = [
 
 [[package]]
 name = "discord-grok"
-version = "1.13.0"
+version = "1.13.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

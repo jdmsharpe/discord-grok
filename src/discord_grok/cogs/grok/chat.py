@@ -17,6 +17,7 @@ from discord import (
     TextChannel,
 )
 
+from ...stickers import text_with_stickers
 from .attachments import MAX_IMAGE_SIZE, SUPPORTED_IMAGE_TYPES
 from .client import XaiApiError
 from .command_options import DEFAULT_CHAT_MODEL_ID
@@ -121,8 +122,9 @@ async def handle_new_message_in_conversation(cog, message: Message, conversation
         typing_task = asyncio.create_task(keep_typing(cog, message.channel))
 
         content_parts: list[Any] = []
-        if message.content:
-            content_parts.append(message.content)
+        text = text_with_stickers(message.content, message.stickers)
+        if text:
+            content_parts.append(text)
         if message.attachments:
             unsupported_image_error = next(
                 (
