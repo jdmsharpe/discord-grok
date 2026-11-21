@@ -79,12 +79,6 @@ CHAT_MODEL_CATALOG: tuple[ChatModelCatalogEntry, ...] = (
         pricing_class="flagship",
         capabilities=frozenset({"supports_penalties"}),
     ),
-    ChatModelCatalogEntry(
-        model_id="grok-build-0.1",
-        display_name="Grok Build 0.1",
-        pricing_class="build",
-        capabilities=frozenset(),
-    ),
 )
 
 CHAT_MODEL_INDEX: dict[str, ChatModelCatalogEntry] = {

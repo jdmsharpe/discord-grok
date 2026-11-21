@@ -19,6 +19,7 @@ class TestPricingLoader:
         assert pricing.MODEL_PRICING_CLASSES["grok_4_6"] == (2.00, 0.50, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["grok_4_5"] == (2.00, 0.30, 6.00)
         assert pricing.MODEL_PRICING_CLASSES["premium"] == (2.00, 0.20, 6.00)
+        # `build` belongs to the retired grok-build-0.1; the class is kept for its history.
         assert pricing.MODEL_PRICING_CLASSES["build"] == (1.00, 0.20, 2.00)
         assert pricing.MODEL_PRICING_CLASSES["fast"] == (0.20, 0.05, 0.50)
         assert pricing.MODEL_PRICING_CLASSES["mini"] == (0.30, 0.075, 0.50)
@@ -139,8 +140,8 @@ class TestPricingLoader:
         assert pricing_map["grok-4.6"] == (2.00, 0.50, 6.00)
         assert pricing_map["grok-4.5"] == (2.00, 0.30, 6.00)
         assert pricing_map["grok-4.6"] != pricing_map["grok-4.5"]
-        # grok-build-0.1 is in the 'build' class.
-        assert pricing_map["grok-build-0.1"] == (1.00, 0.20, 2.00)
+        # grok-build-0.1 is retired and no longer in the menu; only its YAML class remains.
+        assert "grok-build-0.1" not in pricing_map
 
     def test_build_model_long_context_map_joins_catalog(self):
         """End-to-end: every catalog chat model picks up its class's long tier."""
@@ -158,7 +159,7 @@ class TestPricingLoader:
         assert tier_map["grok-4.7"] == (200_000, 4.00, 1.00, 12.00)
         assert tier_map["grok-4.6"] == (200_000, 4.00, 1.00, 12.00)
         assert tier_map["grok-4.5"] == (200_000, 4.00, 0.60, 12.00)
-        assert tier_map["grok-build-0.1"] == (200_000, 2.00, 0.40, 4.00)
+        assert "grok-build-0.1" not in tier_map
 
     def test_env_var_override_path(self, monkeypatch, tmp_path: Path):
         custom_yaml = tmp_path / "custom-pricing.yaml"

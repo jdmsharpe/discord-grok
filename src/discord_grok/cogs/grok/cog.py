@@ -465,7 +465,7 @@ class GrokCog(commands.Cog):
     )
     @option(
         "top_p",
-        description="(Advanced) Nucleus sampling. 0.0 to 1.0. (default: not set)",
+        description="(Advanced) Nucleus sampling. Values above 0.95 are capped by the API. (default: not set)",
         required=False,
         type=float,
     )
