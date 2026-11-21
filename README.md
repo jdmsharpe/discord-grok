@@ -18,7 +18,7 @@ A Discord bot for xAI's Grok API, built on Pycord 2.0. It provides chat, image a
 
 ## Features
 
-- **Chat:** Multi-turn conversations with Grok 4.7 (default), 4.6, 4.5, 4.3, 4.20 (Multi-Agent, Reasoning, Non-Reasoning) and Grok Build 0.1. Messages you send in the channel continue the conversation.
+- **Chat:** Multi-turn conversations with Grok 4.7 (default), 4.6, 4.5, 4.3 and 4.20 (Multi-Agent, Reasoning, Non-Reasoning). Messages you send in the channel continue the conversation.
 - **Attachments:** Images (JPEG, PNG) and files through the xAI Files API (PDF, TXT, CSV, code files, up to 48 MB).
 - **Reasoning:** Reasoning content appears in a spoiler. Grok 4.20 Multi-Agent runs 4 agents (quick) or 16 (deep research).
 - **Built-in tools:** `web_search`, `x_search`, `code_execution` and `collections_search`.
